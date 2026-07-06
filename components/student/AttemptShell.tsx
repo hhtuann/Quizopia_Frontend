@@ -51,10 +51,16 @@ export function AttemptShell({
   detail,
   autosaveStatus,
   submitSlot,
+  liveServerTime,
+  wsStatus,
 }: {
   detail: AttemptDetailResponse;
   autosaveStatus?: AutosaveStatus;
   submitSlot?: ReactNode;
+  /** Latest server time from SERVER_TIME_SYNC (WS). Null when WS not connected. */
+  liveServerTime?: string | null;
+  /** WS connection status for the indicator. */
+  wsStatus?: "connecting" | "connected" | "disconnected";
 }) {
   // Hydrate the answer store from the server detail on load.
   const hydrate = useAnswerStore((s) => s.hydrate);
@@ -62,20 +68,28 @@ export function AttemptShell({
     hydrate(detail.questions);
   }, [detail, hydrate]);
 
-  // Timer: snapshot from deadlineAt - serverTime; tick via setInterval (client-only).
-  const [remainingMs, setRemainingMs] = useState(() => {
-    const deadline = new Date(detail.deadlineAt).getTime();
-    const server = new Date(detail.serverTime).getTime();
-    return Math.max(0, deadline - server);
-  });
+  // Timer: track the "server now" in epoch ms. When WS connected, liveServerTime
+  // keeps it accurate; when disconnected, local tick provides smooth fallback.
+  const deadlineMs = new Date(detail.deadlineAt).getTime();
+  const [nowMs, setNowMs] = useState(() =>
+    new Date(liveServerTime ?? detail.serverTime).getTime()
+  );
+
+  // Adjust state when liveServerTime changes (WS sync) — "adjust on prop change" pattern.
+  const [prevLive, setPrevLive] = useState(liveServerTime);
+  if (liveServerTime !== prevLive) {
+    setPrevLive(liveServerTime);
+    if (liveServerTime) setNowMs(new Date(liveServerTime).getTime());
+  }
 
   useEffect(() => {
     const id = setInterval(() => {
-      setRemainingMs((prev) => Math.max(0, prev - 1000));
+      setNowMs((prev) => prev + 1000);
     }, 1000);
     return () => clearInterval(id);
   }, []);
 
+  const remainingMs = Math.max(0, deadlineMs - nowMs);
   const sorted = [...detail.questions].sort(
     (a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)
   );
@@ -98,6 +112,7 @@ export function AttemptShell({
           {detail.answeredCount} / {detail.totalQuestions} answered
         </div>
         {autosaveStatus && <AutosaveIndicator status={autosaveStatus} />}
+        {wsStatus && <WsIndicator status={wsStatus} />}
         <div className="ml-auto text-xs font-medium text-[#6B7280]">
           Attempt #{detail.attemptNumber ?? "—"} · {detail.status.replace("_", " ")}
         </div>
@@ -133,6 +148,24 @@ export function AttemptShell({
         Answers are saved automatically.
       </p>
     </div>
+  );
+}
+
+function WsIndicator({ status }: { status: "connecting" | "connected" | "disconnected" }) {
+  const config = {
+    connected: { label: "Live", tone: "text-[#38B2AC]" },
+    connecting: { label: "Connecting…", tone: "text-[#6C63FF]" },
+    disconnected: { label: "Offline", tone: "text-[#A0AEC0]" },
+  } as const;
+  const { label, tone } = config[status];
+  return (
+    <span
+      role="status"
+      aria-live="polite"
+      className={`text-xs font-semibold ${tone}${status === "connecting" ? " animate-pulse" : ""}`}
+    >
+      ● {label}
+    </span>
   );
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -11,6 +12,8 @@ import { AttemptShell } from "@/components/student/AttemptShell";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
 import { useAutosaveAnswers } from "@/lib/attempt/use-autosave";
 import { useAnswerStore } from "@/lib/attempt/answer-store";
+import { useStompConnection } from "@/lib/realtime/use-stomp-connection";
+import { useServerTimeSync } from "@/lib/realtime/use-server-time-sync";
 import type {
   AttemptDetailResponse,
   SubmitResponse,
@@ -62,6 +65,22 @@ function InProgressShell({
   const autosaveStatus = useAutosaveAnswers(attemptId);
   const submitMut = useSubmitAttemptMutation(attemptId);
   const router = useRouter();
+  const queryClient = useQueryClient();
+
+  // WebSocket: mount only for IN_PROGRESS attempts (InProgressShell is only
+  // rendered for IN_PROGRESS — see AttemptPage :45). Connects, subscribes to
+  // /user/queue/attempt, and receives SERVER_TIME_SYNC for live timer sync.
+  const { status: wsStatus, client: wsClient } = useStompConnection(true);
+  const { serverTime: liveServerTime } = useServerTimeSync(
+    wsClient,
+    wsStatus,
+    () => {
+      // On reconnect: refetch REST detail (authoritative source of truth).
+      void queryClient.invalidateQueries({
+        queryKey: ["student", "attempts", attemptId],
+      });
+    }
+  );
 
   // Subscribe to any-dirty state (re-renders when dirty flags change).
   const anyDirty = useAnswerStore((s) =>
@@ -182,6 +201,8 @@ function InProgressShell({
         detail={detail}
         autosaveStatus={autosaveStatus}
         submitSlot={submitSlot}
+        liveServerTime={liveServerTime}
+        wsStatus={wsStatus}
       />
       <ConfirmDialog
         open={confirmOpen}

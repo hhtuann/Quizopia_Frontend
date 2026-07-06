@@ -20,6 +20,7 @@ import type {
 import { updateSessionSchema, type UpdateSessionValues } from "@/lib/validation/exam-session-schemas";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
 import { ParticipantsManager } from "@/components/teacher/session-participants/ParticipantsManager";
+import { LiveMonitor } from "@/components/teacher/LiveMonitor";
 import type { NormalizedApiError } from "@/lib/api";
 
 const EDITABLE_STATES: ExamSessionStatus[] = ["DRAFT", "SCHEDULED"];
@@ -248,6 +249,19 @@ function DetailView({ data }: { data: ExamSessionDetailResponse }) {
       </div>
 
       {/* Participants (FE8c). */}
+      {/* Live monitoring (FE14) — WS real-time; only shown when monitoring is
+          meaningful (OPEN or recently active). Uses participantCount as the
+          baseline for metrics; WS events update from there. */}
+      <LiveMonitor
+        sessionId={data.id}
+        initial={{
+          activeCount: 0,
+          startedCount: 0,
+          submittedCount: 0,
+          sessionStatus: data.status,
+        }}
+      />
+
       <ParticipantsManager sessionId={data.id} sessionStatus={data.status} />
 
       {/* Confirm for close/cancel (irreversible-ish actions). */}
