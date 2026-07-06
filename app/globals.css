@@ -1,26 +1,69 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  /* Colors */
+  --color-background: #E0E5EC;
+  --color-foreground: #3D4852;
+  --color-muted: #6B7280;
+  --color-accent: #6C63FF;
+  --color-accent-light: #8B84FF;
+  --color-accent-secondary: #38B2AC;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  /* Typography */
+  --font-display: var(--font-plus-jakarta), sans-serif;
+  --font-sans: var(--font-dm-sans), sans-serif;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  /* Radius System */
+  --radius-container: 32px;
+  --radius-button: 16px;
+  --radius-inner: 12px;
+
+  /* Shadows (Soft UI Physics) */
+  --shadow-extruded: 9px 9px 16px rgba(163, 177, 198, 0.6), -9px -9px 16px rgba(255, 255, 255, 0.5);
+  --shadow-extruded-hover: 12px 12px 20px rgba(163, 177, 198, 0.7), -12px -12px 20px rgba(255, 255, 255, 0.6);
+  --shadow-extruded-small: 5px 5px 10px rgba(163, 177, 198, 0.6), -5px -5px 10px rgba(255, 255, 255, 0.5);
+  --shadow-inset-pressed: inset 6px 6px 10px rgba(163, 177, 198, 0.6), inset -6px -6px 10px rgba(255, 255, 255, 0.5);
+  --shadow-inset-deep: inset 10px 10px 20px rgba(163, 177, 198, 0.7), inset -10px -10px 20px rgba(255, 255, 255, 0.6);
+  --shadow-inset-small: inset 3px 3px 6px rgba(163, 177, 198, 0.6), inset -3px -3px 6px rgba(255, 255, 255, 0.5);
+
+  /* Animation & Keyframes */
+  --animate-float: float 3s ease-in-out infinite;
+  --animate-fadeIn: fadeIn 0.3s ease-out;
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }
 
+/* Custom Base Styles */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
 }
+
+/* Custom Utilities for smooth Neumorphic interactions */
+.neumorphic-active-press {
+  transition: all 0.3s ease-out;
+}
+.neumorphic-active-press:active {
+  transform: translateY(1px);
+}
+
