@@ -247,8 +247,14 @@ function SubmitResultCard({ result }: { result: SubmitResponse }) {
         <p className="mt-1 text-sm font-medium text-[#6C63FF]">{result.percentage}%</p>
       )}
       <p className="mt-4 text-xs text-[#6B7280]">
-        Attempt #{result.attemptNumber ?? "—"} · Redirecting to history…
+        Attempt #{result.attemptNumber ?? "—"}
       </p>
+      <Link
+        href={`/attempts/${result.attemptId}/result`}
+        className="mt-4 inline-flex h-11 items-center justify-center rounded-2xl bg-[#E0E5EC] px-5 text-sm font-semibold text-[#6C63FF] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
+      >
+        View detailed result →
+      </Link>
     </div>
   );
 }

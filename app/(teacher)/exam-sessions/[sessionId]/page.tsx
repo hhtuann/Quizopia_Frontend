@@ -21,6 +21,7 @@ import { updateSessionSchema, type UpdateSessionValues } from "@/lib/validation/
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
 import { ParticipantsManager } from "@/components/teacher/session-participants/ParticipantsManager";
 import { LiveMonitor } from "@/components/teacher/LiveMonitor";
+import { ReportingSection } from "@/components/teacher/reporting/ReportingSection";
 import type { NormalizedApiError } from "@/lib/api";
 
 const EDITABLE_STATES: ExamSessionStatus[] = ["DRAFT", "SCHEDULED"];
@@ -261,6 +262,9 @@ function DetailView({ data }: { data: ExamSessionDetailResponse }) {
           sessionStatus: data.status,
         }}
       />
+
+      {/* Results & statistics (FE15b) */}
+      <ReportingSection sessionId={data.id} />
 
       <ParticipantsManager sessionId={data.id} sessionStatus={data.status} />
 

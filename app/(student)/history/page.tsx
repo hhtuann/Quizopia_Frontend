@@ -76,6 +76,7 @@ export default function StudentHistoryPage() {
                   <th scope="col" className="px-3 pb-3 font-semibold">Submitted</th>
                   <th scope="col" className="px-3 pb-3 font-semibold">Deadline</th>
                   <th scope="col" className="px-3 pb-3 font-semibold">Created</th>
+                  <th scope="col" className="px-3 pb-3 font-semibold"></th>
                 </tr>
               </thead>
               <tbody>
@@ -99,6 +100,16 @@ export default function StudentHistoryPage() {
                     <td className="px-3 py-3 text-[#6B7280]">{formatDateTime(a.submittedAt)}</td>
                     <td className="px-3 py-3 text-[#6B7280]">{formatDateTime(a.deadlineAt)}</td>
                     <td className="px-3 py-3 text-[#6B7280]">{formatDateTime(a.createdAt)}</td>
+                    <td className="px-3 py-3">
+                      {(a.status === "SUBMITTED" || a.status === "GRADED") && (
+                        <Link
+                          href={`/attempts/${a.attemptId}/result`}
+                          className="inline-flex items-center gap-1 rounded-inner text-xs font-semibold text-[#6C63FF] outline-none transition-all duration-300 hover:text-[#8B84FF] focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
+                        >
+                          View result →
+                        </Link>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
