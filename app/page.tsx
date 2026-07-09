@@ -1,135 +1,120 @@
-import React from "react";
+"use client";
+
+import { useMemo } from "react";
+import Link from "next/link";
 import AppShell from "@/components/layout/AppShell";
 import { RequireAuth } from "@/components/auth/RequireAuth";
+import { useAuth } from "@/hooks/useAuth";
+import { navItemsForRoles } from "@/lib/navigation";
+
+/** Friendly labels for the role codes returned by `GET /api/auth/me`. */
+const ROLE_LABELS: Record<string, string> = {
+  STUDENT: "Student",
+  TEACHER: "Teacher",
+  ACADEMIC_ADMIN: "Academic Admin",
+  SYSTEM_ADMIN: "System Admin",
+};
 
 export default function Home() {
+  const { user } = useAuth();
+
+  // Prefer the registered display name, fall back to the username, then a neutral greeting.
+  const displayName = user?.displayName?.trim() || user?.username || "there";
+
+  const roleLabel = useMemo(() => {
+    const known = user?.roles?.find((r) => ROLE_LABELS[r]);
+    if (known) return ROLE_LABELS[known];
+    const fallback = user?.roles?.[0];
+    return fallback ? (ROLE_LABELS[fallback] ?? fallback) : null;
+  }, [user]);
+
+  // Functional cards = the same role-filtered nav the sidebar uses, minus the Dashboard itself.
+  const cards = useMemo(
+    () => navItemsForRoles(user?.roles).filter((item) => item.href !== "/"),
+    [user]
+  );
+
+  const subtitle =
+    user?.roles?.includes("TEACHER")
+      ? "Manage your question banks, build exams, and run live sessions."
+      : user?.roles?.includes("STUDENT")
+        ? "Jump into an available session or review your past attempts."
+        : "Choose an area below to get started.";
+
   return (
     <RequireAuth>
       <AppShell>
-      {/* Welcome Section */}
-      <div className="mb-10 select-none">
-        <h1 className="font-display font-extrabold text-3xl sm:text-4xl tracking-tight text-[#3D4852]">
-          Dashboard Overview
-        </h1>
-        <p className="text-sm sm:text-base text-[#6B7280] mt-2 font-medium">
-          Welcome back, <span className="font-semibold text-[#6C63FF]">John Doe</span>! Let&apos;s explore your quiz progress and design system components.
-        </p>
-      </div>
-
-      {/* Main Grid Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Card 1: Performance Statistics */}
-        <div className="rounded-container bg-[#E0E5EC] p-8 shadow-extruded flex flex-col justify-between min-h-[300px] transition-all duration-300 hover:-translate-y-1 hover:shadow-extruded-hover">
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <span className="text-xs font-bold text-[#6B7280] uppercase tracking-wider">Your Progress</span>
-              <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#38B2AC] animate-ping" />
-            </div>
-            
-            <h2 className="font-display font-bold text-xl text-[#3D4852] mb-6">Performance stats</h2>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 rounded-xl bg-[#E0E5EC] shadow-inset-pressed">
-                <span className="block text-xs font-semibold text-[#6B7280]">Total Quizzes</span>
-                <span className="block text-2xl font-extrabold text-[#3D4852] mt-1">42</span>
-              </div>
-              <div className="p-4 rounded-xl bg-[#E0E5EC] shadow-inset-pressed">
-                <span className="block text-xs font-semibold text-[#6B7280]">Accuracy Rate</span>
-                <span className="block text-2xl font-extrabold text-[#38B2AC] mt-1">87.5%</span>
-              </div>
-            </div>
+        {/* Welcome header */}
+        <header className="mb-10 select-none">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="font-display font-extrabold text-3xl tracking-tight text-[#3D4852] sm:text-4xl">
+              Dashboard
+            </h1>
+            {roleLabel && (
+              <span className="inline-flex items-center rounded-full bg-[#E0E5EC] px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-[#6C63FF] shadow-inset-small">
+                {roleLabel}
+              </span>
+            )}
           </div>
-
-          <div className="mt-8 flex items-center justify-between text-xs font-semibold text-[#6B7280]">
-            <span>Next milestone: 50 Quizzes</span>
-            <span className="text-[#6C63FF]">84% complete</span>
-          </div>
-        </div>
-
-        {/* Card 2: Interactive Element Showcase */}
-        <div className="rounded-container bg-[#E0E5EC] p-8 shadow-extruded flex flex-col justify-between min-h-[300px] transition-all duration-300 hover:-translate-y-1 hover:shadow-extruded-hover">
-          <div>
-            <span className="text-xs font-bold text-[#6B7280] uppercase tracking-wider block mb-6">Design Tokens</span>
-            <h2 className="font-display font-bold text-xl text-[#3D4852] mb-6">Interactive States</h2>
-            
-            <div className="flex flex-col gap-4">
-              {/* Secondary resting button */}
-              <button className="w-full h-12 rounded-button bg-[#E0E5EC] shadow-extruded text-sm font-semibold text-[#3D4852] hover:-translate-y-0.5 hover:shadow-extruded-hover active:translate-y-[0.5px] active:shadow-inset-small focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] outline-none transition-all duration-300 neumorphic-active-press">
-                Secondary Raised Button
-              </button>
-
-              {/* Primary active/accent button */}
-              <button className="w-full h-12 rounded-button bg-[#6C63FF] text-white text-sm font-semibold hover:bg-[#8B84FF] transition-all duration-300 shadow-extruded-small active:translate-y-[0.5px] focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] outline-none">
-                Primary Accent Button
-              </button>
-
-              {/* Inset pressed mock button */}
-              <div className="w-full h-12 flex items-center justify-center rounded-button bg-[#E0E5EC] shadow-inset-pressed text-sm font-semibold text-[#6B7280]">
-                Pressed / Inset State
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Forms & Input Elements */}
-        <div className="rounded-container bg-[#E0E5EC] p-8 shadow-extruded flex flex-col justify-between min-h-[300px] transition-all duration-300 hover:-translate-y-1 hover:shadow-extruded-hover">
-          <div>
-            <span className="text-xs font-bold text-[#6B7280] uppercase tracking-wider block mb-6">Forms</span>
-            <h2 className="font-display font-bold text-xl text-[#3D4852] mb-6">Input Elements</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-[#6B7280] mb-2 pl-1">USERNAME</label>
-                <input
-                  type="text"
-                  defaultValue="johndoe_quiz"
-                  className="w-full h-12 rounded-button bg-[#E0E5EC] px-4 text-sm text-[#3D4852] outline-none shadow-inset-pressed focus:shadow-inset-deep focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] transition-all duration-300"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[#6B7280] mb-2 pl-1">PASSPHRASE</label>
-                <input
-                  type="password"
-                  placeholder="••••••••••••"
-                  className="w-full h-12 rounded-button bg-[#E0E5EC] px-4 text-sm text-[#3D4852] placeholder-[#A0AEC0] outline-none shadow-inset-pressed focus:shadow-inset-deep focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] transition-all duration-300"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Decorative / Concentric Circles Section */}
-      <div className="mt-12 p-8 rounded-container bg-[#E0E5EC] shadow-extruded flex flex-col md:flex-row items-center gap-8 justify-between">
-        <div className="max-w-md select-none text-center md:text-left">
-          <span className="text-xs font-bold text-[#38B2AC] uppercase tracking-wider">Tactile Depth System</span>
-          <h2 className="font-display font-extrabold text-2xl text-[#3D4852] mt-2">Soft UI Layer Physics</h2>
-          <p className="text-sm text-[#6B7280] mt-3 leading-relaxed">
-            By layering extruded and inset shadows on monochromatic base surfaces, we create physical depth and realism without color clutter.
+          <p className="mt-2 text-sm font-medium text-[#6B7280] sm:text-base">
+            Welcome back, <span className="font-semibold text-[#6C63FF]">{displayName}</span>. {subtitle}
           </p>
-        </div>
+        </header>
 
-        {/* Complex nested depth layout */}
-        <div className="flex items-center justify-center">
-          <div className="relative w-48 h-48 rounded-container bg-[#E0E5EC] shadow-extruded flex items-center justify-center">
-            {/* Mid circle (inset) */}
-            <div className="w-36 h-36 rounded-full bg-[#E0E5EC] shadow-inset-deep flex items-center justify-center">
-              {/* Inner raised circle */}
-              <div className="w-24 h-24 rounded-full bg-[#E0E5EC] shadow-extruded flex items-center justify-center">
-                {/* Center inset button */}
-                <div className="w-12 h-12 rounded-full bg-[#E0E5EC] shadow-inset-small text-[#6C63FF] flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 animate-pulse">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
-                  </svg>
+        {/* Functional action cards */}
+        {cards.length > 0 ? (
+          <section
+            aria-label="Quick actions"
+            className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            {cards.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="group flex min-h-[220px] flex-col rounded-container bg-[#E0E5EC] p-8 shadow-extruded outline-none transition-all duration-300 hover:-translate-y-1 hover:shadow-extruded-hover focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
+              >
+                {/* Icon well — inset deep, "drilled" into the card */}
+                <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-inner bg-[#E0E5EC] text-[#6C63FF] shadow-inset-deep transition-transform duration-300 group-hover:scale-105">
+                  {item.icon}
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+
+                <h2 className="font-display text-lg font-bold tracking-tight text-[#3D4852]">
+                  {item.label}
+                </h2>
+                {item.description && (
+                  <p className="mt-2 text-sm font-medium leading-relaxed text-[#6B7280]">
+                    {item.description}
+                  </p>
+                )}
+
+                {/* Open affordance */}
+                <span className="mt-auto flex items-center gap-2 pt-6 text-sm font-semibold text-[#6C63FF]">
+                  Open
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2.5}
+                    stroke="currentColor"
+                    className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1"
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                  </svg>
+                </span>
+              </Link>
+            ))}
+          </section>
+        ) : (
+          <section
+            aria-label="Quick actions"
+            className="flex min-h-[220px] items-center justify-center rounded-container bg-[#E0E5EC] p-8 shadow-inset-pressed"
+          >
+            <p className="max-w-sm text-center text-sm font-medium text-[#6B7280]">
+              Welcome, {displayName}. Your tools will appear here once your account is assigned a role.
+            </p>
+          </section>
+        )}
       </AppShell>
     </RequireAuth>
   );

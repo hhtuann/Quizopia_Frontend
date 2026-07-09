@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* Colors */
+  /* ===== Neumorphic tokens (OLD — kept for FE1–FE15b; removed in FE-R5) ===== */
   --color-background: #E0E5EC;
   --color-foreground: #3D4852;
   --color-muted: #6B7280;
@@ -9,9 +9,10 @@
   --color-accent-light: #8B84FF;
   --color-accent-secondary: #38B2AC;
 
-  /* Typography */
-  --font-display: var(--font-plus-jakarta), sans-serif;
-  --font-sans: var(--font-dm-sans), sans-serif;
+  /* Typography — updated to DESIGN_NEXT fonts (old fonts no longer loaded) */
+  --font-display: var(--font-calistoga), serif;
+  --font-sans: var(--font-inter), sans-serif;
+  --font-mono: var(--font-jetbrains-mono), monospace;
 
   /* Radius System */
   --radius-container: 32px;
@@ -31,27 +32,38 @@
   --animate-fadeIn: fadeIn 0.3s ease-out;
 
   @keyframes float {
-    0%, 100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-8px);
-    }
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
   }
 
   @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(-8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
   }
+
+  /* ===== DESIGN_NEXT tokens (Minimalist Modern — additive, FE-R1) ===== */
+  /* Colors (prefixed --color-next-* to avoid conflicts with neumorphic) */
+  --color-next-background: #FAFAFA;
+  --color-next-foreground: #0F172A;
+  --color-next-muted: #F1F5F9;
+  --color-next-muted-foreground: #64748B;
+  --color-next-accent: #0052FF;
+  --color-next-accent-secondary: #4D7CFF;
+  --color-next-accent-foreground: #FFFFFF;
+  --color-next-border: #E2E8F0;
+  --color-next-card: #FFFFFF;
+  --color-next-ring: #0052FF;
+  /* Functional */
+  --color-next-success: #10B981;
+  --color-next-warn: #F59E0B;
+  --color-next-destructive: #EF4444;
+
+  /* DESIGN_NEXT Shadows */
+  --shadow-accent: 0 4px 14px rgba(0, 82, 255, 0.25);
+  --shadow-accent-lg: 0 8px 24px rgba(0, 82, 255, 0.35);
 }
 
-/* Custom Base Styles */
+/* ===== Custom Base Styles ===== */
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);
@@ -59,11 +71,26 @@ body {
   overflow-x: hidden;
 }
 
-/* Custom Utilities for smooth Neumorphic interactions */
+/* ===== Neumorphic Utilities (OLD — kept for FE1–FE15b) ===== */
 .neumorphic-active-press {
   transition: all 0.3s ease-out;
 }
 .neumorphic-active-press:active {
   transform: translateY(1px);
 }
+
+/* ===== DESIGN_NEXT Utilities (FE-R1) ===== */
+.gradient-text {
+  background: linear-gradient(to right, #0052FF, #4D7CFF);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.dot-pattern {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 1) 1px, transparent 1px);
+  background-size: 32px 32px;
+  opacity: 0.03;
+}
+
 

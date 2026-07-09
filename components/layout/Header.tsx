@@ -1,20 +1,68 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 
 interface HeaderProps {
   isMobileMenuOpen: boolean;
   setIsMobileMenuOpen: (open: boolean) => void;
 }
 
+/** Up to two uppercase initials from a display name (first + last word). */
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: HeaderProps) {
+  const router = useRouter();
+  const { user, logout } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close the profile menu on outside-click or Escape.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
+
+  const handleLogout = async () => {
+    setBusy(true);
+    try {
+      await logout();
+    } finally {
+      router.replace("/login");
+    }
+  };
+
+  const displayName = user?.displayName || user?.username || "Account";
+  const initials = initialsOf(displayName);
+
   return (
     <header className="sticky top-0 z-40 w-full bg-[#E0E5EC]/85 backdrop-blur-md transition-all duration-300">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-20 items-center justify-between gap-4">
           
-          {/* Logo Brand Area */}
-          <div className="flex items-center gap-3">
+          {/* Logo brand — click returns to the Dashboard */}
+          <Link href="/" aria-label="Go to dashboard" className="flex items-center gap-3 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#E0E5EC] shadow-extruded text-[#6C63FF] animate-float">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -34,7 +82,7 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
             <span className="font-display font-extrabold text-2xl tracking-tight text-[#3D4852]">
               Quiz<span className="text-[#6C63FF]">opia</span>
             </span>
-          </div>
+          </Link>
 
           {/* Search bar - Desktop */}
           <div className="hidden md:flex flex-1 max-w-md mx-8">
@@ -85,13 +133,47 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
               </svg>
             </button>
 
-            {/* Profile Avatar Button */}
-            <button className="flex h-11 items-center gap-2 rounded-2xl bg-[#E0E5EC] px-4 shadow-extruded text-sm font-medium text-[#3D4852] hover:-translate-y-0.5 hover:shadow-extruded-hover active:translate-y-0.5 active:shadow-inset-small focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] outline-none transition-all duration-300 neumorphic-active-press">
-              <div className="h-6 w-6 rounded-full bg-gradient-to-br from-[#6C63FF] to-[#38B2AC] flex items-center justify-center text-white font-bold text-xs">
-                JD
-              </div>
-              <span className="hidden sm:inline">John Doe</span>
-            </button>
+            {/* Profile menu — real user + sign out */}
+            <div className="relative" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                className="flex h-11 items-center gap-2 rounded-2xl bg-[#E0E5EC] px-4 shadow-extruded text-sm font-medium text-[#3D4852] hover:-translate-y-0.5 hover:shadow-extruded-hover active:translate-y-0.5 active:shadow-inset-small focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] outline-none transition-all duration-300 neumorphic-active-press"
+              >
+                <div className="h-6 w-6 rounded-full bg-gradient-to-br from-[#6C63FF] to-[#38B2AC] flex items-center justify-center text-white font-bold text-xs">
+                  {initials}
+                </div>
+                <span className="hidden sm:inline">{displayName}</span>
+              </button>
+              {menuOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 z-50 mt-2 w-64 rounded-container bg-[#E0E5EC] p-3 shadow-extruded"
+                >
+                  <div className="px-3 py-2">
+                    <p className="truncate text-sm font-semibold text-[#3D4852]">{displayName}</p>
+                    <p className="truncate text-xs text-[#6B7280]">{user?.email}</p>
+                    {user?.roles && user.roles.length > 0 && (
+                      <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-[#6C63FF]">
+                        {user.roles.join(", ")}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={busy}
+                    onClick={handleLogout}
+                    aria-label="Sign out"
+                    className="mt-1 w-full rounded-button bg-[#E0E5EC] px-4 py-3 text-left text-sm font-semibold text-[#3D4852] shadow-inset-pressed transition-all duration-300 hover:shadow-inset-deep active:translate-y-[0.5px] focus-visible:ring-2 focus-visible:ring-[#6C63FF] outline-none disabled:opacity-60"
+                  >
+                    {busy ? "Signing out…" : "Sign out"}
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Mobile Hamburger menu toggle button */}
             <button
