@@ -1,51 +1,177 @@
 "use client";
 
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useSubjectsQuery } from "@/hooks/queries/use-subjects";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
 import { RequireAuth } from "@/components/auth/RequireAuth";
-import { SectionLabel, cardVariants } from "@/components/ui";
+import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
+import { Badge, Button, Input, SectionLabel, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
-import type { SubjectView } from "@/lib/api/subjects";
+import {
+  useCreateSubjectMutation,
+  useGradeLevelsQuery,
+  useSubjectsQuery,
+  useUpdateSubjectMutation,
+} from "@/hooks/queries/use-subjects";
+import {
+  updateSubjectStatus,
+  type AcademicStatus,
+  type GradeLevelView,
+  type SubjectView,
+} from "@/lib/api/subjects";
+import {
+  createSubjectSchema,
+  updateSubjectSchema,
+  type CreateSubjectValues,
+  type UpdateSubjectValues,
+} from "@/lib/validation/admin-schemas";
 import type { NormalizedApiError } from "@/lib/api";
 
 /**
- * Admin subject list. Page-level guard tightens to ACADEMIC_ADMIN (the
- * `/admin` layout admits both admin roles). Reuses the FE5 `useSubjectsQuery`
- * (GET /api/subjects — school-scoped, active only). The response is a flat
- * `items[]` with no pagination, so this is a single-page bordered table.
+ * MVP single-school demo. The list endpoint (`SubjectView`) carries no school
+ * or status, and there is no `GET /api/schools` yet, so the create form scopes
+ * to this fixed demo school. Tech debt: revisit once the schools list + a
+ * status-bearing subject list DTO exist.
  */
+const DEMO_SCHOOL_ID = 1;
+const STATUS_OPTIONS: AcademicStatus[] = ["ACTIVE", "INACTIVE", "ARCHIVED"];
+
+const labelClass = "mb-2 block pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]";
+const textareaClass =
+  "w-full min-h-[80px] rounded-lg border border-[#E2E8F0] bg-transparent px-4 py-3 text-sm text-[#0F172A] placeholder:text-[#64748B]/50 outline-none transition-all duration-200 resize-y focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
+const selectClass =
+  "h-12 w-full rounded-lg border border-[#E2E8F0] bg-transparent px-4 pr-9 text-sm text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
+const statusSelectClass =
+  "h-9 rounded-lg border border-[#E2E8F0] bg-transparent px-2 pr-7 text-xs text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
+
+/** Map a subject mutation error to a field or form-level message. */
+function describeSubjectError(err: unknown): { field?: "code" | "gradeLevelId"; message: string } {
+  const norm = err as NormalizedApiError | undefined;
+  if (norm?.kind === "api") {
+    switch (norm.code) {
+      case "ACADEMIC_SUBJECT_CODE_CONFLICT":
+        return { field: "code", message: "This code is already in use." };
+      case "ACADEMIC_GRADE_LEVEL_NOT_FOUND":
+        return { field: "gradeLevelId", message: "Grade level not found in this school." };
+      case "ACADEMIC_SCHOOL_NOT_FOUND":
+        return { message: "School not found." };
+      case "ACADEMIC_SUBJECT_NOT_FOUND":
+        return { message: "This subject could not be found." };
+      case "ACADEMIC_ACCESS_DENIED":
+        return { message: "You don't have permission to manage subjects." };
+      default:
+        return { message: norm.message || "Could not save the subject." };
+    }
+  }
+  if (norm?.kind === "network") {
+    return { message: "Network error — check your connection and try again." };
+  }
+  return { message: "Something went wrong. Please try again." };
+}
+
+function statusVariant(status: AcademicStatus): "success" | "warn" | "default" {
+  if (status === "ACTIVE") return "success";
+  if (status === "INACTIVE") return "warn";
+  return "default";
+}
+
 export default function AdminSubjectsPage() {
   return (
     <RequireAuth requireRole="ACADEMIC_ADMIN">
-      <SubjectList />
+      <SubjectAdmin />
     </RequireAuth>
   );
 }
 
-function SubjectList() {
+function SubjectAdmin() {
   const { data, isPending, isError, error } = useSubjectsQuery();
+  const { data: glData } = useGradeLevelsQuery(DEMO_SCHOOL_ID);
   const items = data?.items ?? [];
+  const gradeLevels = glData?.items ?? [];
+  const glMap = useMemo(
+    () => new Map((glData?.items ?? []).map((g) => [g.id, g] as const)),
+    [glData]
+  );
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<SubjectView | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<{ id: number; code: string } | null>(null);
+  // The list DTO carries no status; track the real status per row as mutations
+  // return SubjectResponse. Defaults to ACTIVE (the entity default).
+  const [statusMap, setStatusMap] = useState<Record<number, AcademicStatus>>({});
+  const [notice, setNotice] = useState<{ kind: "success" | "error"; message: string } | null>(null);
+
+  const statusMut = useMutation({
+    mutationFn: (v: { id: number; status: AcademicStatus }) => updateSubjectStatus(v.id, v.status),
+    onSuccess: (res) => {
+      setStatusMap((m) => ({ ...m, [res.id]: res.status }));
+      setNotice({ kind: "success", message: `Subject set to ${res.status.toLowerCase()}.` });
+    },
+    onError: (err) => setNotice({ kind: "error", message: describeSubjectError(err).message }),
+  });
+
+  const currentStatus = (id: number): AcademicStatus => statusMap[id] ?? "ACTIVE";
+
+  const onStatusSelectChange = (subject: SubjectView, next: AcademicStatus) => {
+    if (next === currentStatus(subject.id)) return;
+    if (next === "ARCHIVED") {
+      setArchiveTarget({ id: subject.id, code: subject.code });
+      return;
+    }
+    statusMut.mutate({ id: subject.id, status: next });
+  };
+
+  const onConfirmArchive = () => {
+    if (!archiveTarget) return;
+    const target = archiveTarget;
+    setArchiveTarget(null);
+    statusMut.mutate({ id: target.id, status: "ARCHIVED" });
+  };
 
   return (
     <div>
-      <header className="mb-6">
-        <Link
-          href="/admin"
-          className="inline-flex items-center gap-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-[#64748B] outline-none transition-colors hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-[#64748B] outline-none transition-colors hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+            </svg>
+            Admin dashboard
+          </Link>
+          <SectionLabel className="mb-3 mt-3">Subjects</SectionLabel>
+          <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
+            Subjects
+          </h1>
+          <p className="mt-2 text-sm font-medium text-[#64748B]">
+            Create, edit and manage subjects in your school.
+          </p>
+        </div>
+        <Button type="button" onClick={() => setCreateOpen(true)} className="gap-1.5">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
-          Admin dashboard
-        </Link>
-        <SectionLabel className="mb-3 mt-3">Subjects</SectionLabel>
-        <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
-          Subjects
-        </h1>
-        <p className="mt-2 text-sm font-medium text-[#64748B]">
-          Active subjects in your school.
-        </p>
+          Create subject
+        </Button>
       </header>
+
+      {notice && (
+        <div
+          role={notice.kind === "success" ? "status" : "alert"}
+          className={cn(
+            "mb-6 flex items-start gap-2 rounded-lg border p-4 text-sm font-medium",
+            notice.kind === "success"
+              ? "border-[#10B981]/30 bg-[#10B981]/5 text-[#10B981]"
+              : "border-[#EF4444]/30 bg-[#EF4444]/5 text-[#EF4444]"
+          )}
+        >
+          <span>{notice.message}</span>
+        </div>
+      )}
 
       <div className={cn(cardVariants(), "p-4 sm:p-6")}>
         {isPending ? (
@@ -55,14 +181,70 @@ function SubjectList() {
         ) : items.length === 0 ? (
           <EmptyState />
         ) : (
-          <SubjectsTable items={items} />
+          <SubjectsTable
+            items={items}
+            glMap={glMap}
+            currentStatus={currentStatus}
+            busy={statusMut.isPending}
+            onEdit={setEditTarget}
+            onStatusChange={onStatusSelectChange}
+          />
         )}
       </div>
+
+      {createOpen && (
+        <CreateSubjectModal
+          gradeLevels={gradeLevels}
+          onClose={() => setCreateOpen(false)}
+          onCreated={(msg) => {
+            setCreateOpen(false);
+            setNotice({ kind: "success", message: msg });
+          }}
+        />
+      )}
+
+      {editTarget && (
+        <EditSubjectModal
+          subject={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={(msg) => {
+            setEditTarget(null);
+            setNotice({ kind: "success", message: msg });
+          }}
+        />
+      )}
+
+      <ConfirmDialog
+        open={archiveTarget !== null}
+        titleId="archive-subject-title"
+        title={`Archive subject ${archiveTarget?.code ?? ""}?`}
+        description="Archived subjects are hidden from creation dropdowns. You can reactivate them later."
+        confirmLabel="Archive"
+        cancelLabel="Keep"
+        busyLabel="Archiving…"
+        busy={statusMut.isPending}
+        onConfirm={onConfirmArchive}
+        onCancel={() => setArchiveTarget(null)}
+      />
     </div>
   );
 }
 
-function SubjectsTable({ items }: { items: SubjectView[] }) {
+function SubjectsTable({
+  items,
+  glMap,
+  currentStatus,
+  busy,
+  onEdit,
+  onStatusChange,
+}: {
+  items: SubjectView[];
+  glMap: Map<number, GradeLevelView>;
+  currentStatus: (id: number) => AcademicStatus;
+  busy: boolean;
+  onEdit: (s: SubjectView) => void;
+  onStatusChange: (s: SubjectView, next: AcademicStatus) => void;
+}) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -71,23 +253,320 @@ function SubjectsTable({ items }: { items: SubjectView[] }) {
             <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Name</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Grade level</th>
+            <th scope="col" className="px-3 pb-3 font-semibold">Status</th>
+            <th scope="col" className="px-3 pb-3 text-right font-semibold">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {items.map((s) => (
-            <tr key={s.id} className="border-b border-[#E2E8F0] text-[#0F172A] transition-colors last:border-0 group hover:bg-[#F1F5F9]">
-              <td className="px-3 py-3 align-top">
-                <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B] whitespace-nowrap transition-colors group-hover:text-[#0052FF]">
-                  {s.code}
-                </span>
-              </td>
-              <td className="px-3 py-3 align-top font-medium">{s.name}</td>
-              <td className="px-3 py-3 align-top text-[#64748B] tabular-nums">{s.gradeLevelId}</td>
-            </tr>
-          ))}
+          {items.map((s) => {
+            const status = currentStatus(s.id);
+            return (
+              <tr key={s.id} className="border-b border-[#E2E8F0] text-[#0F172A] transition-colors last:border-0 group hover:bg-[#F1F5F9]">
+                <td className="px-3 py-3 align-top">
+                  <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B] whitespace-nowrap transition-colors group-hover:text-[#0052FF]">
+                    {s.code}
+                  </span>
+                </td>
+                <td className="px-3 py-3 align-top font-medium">{s.name}</td>
+                <td className="px-3 py-3 align-top text-[#64748B]">
+                  {glMap.get(s.gradeLevelId)?.name ?? `#${s.gradeLevelId}`}
+                </td>
+                <td className="px-3 py-3 align-top">
+                  <Badge variant={statusVariant(status)}>{status}</Badge>
+                </td>
+                <td className="px-3 py-3 align-top">
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onEdit(s)}
+                      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9")}
+                    >
+                      Edit
+                    </button>
+                    <label className="sr-only" htmlFor={`subject-status-${s.id}`}>
+                      Status for {s.code}
+                    </label>
+                    <select
+                      id={`subject-status-${s.id}`}
+                      value={status}
+                      disabled={busy}
+                      onChange={(e) => onStatusChange(s, e.target.value as AcademicStatus)}
+                      className={statusSelectClass}
+                    >
+                      {STATUS_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt.charAt(0) + opt.slice(1).toLowerCase()}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
+  );
+}
+
+// ============================================================
+// Modals
+// ============================================================
+
+function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
+      <div className="absolute inset-0 bg-[#0F172A]/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div className={cn(cardVariants({ variant: "elevated" }), "relative w-full max-w-lg p-6")}>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#64748B] outline-none transition-colors hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-5 w-5" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function CreateSubjectModal({
+  gradeLevels,
+  onClose,
+  onCreated,
+}: {
+  gradeLevels: GradeLevelView[];
+  onClose: () => void;
+  onCreated: (message: string) => void;
+}) {
+  const createMut = useCreateSubjectMutation();
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<CreateSubjectValues>({
+    resolver: zodResolver(createSubjectSchema),
+    defaultValues: { code: "", name: "", description: "", schoolId: DEMO_SCHOOL_ID, gradeLevelId: NaN },
+  });
+
+  const onSubmit = async (values: CreateSubjectValues) => {
+    setFormError(null);
+    try {
+      const res = await createMut.mutateAsync({
+        code: values.code.trim(),
+        name: values.name.trim(),
+        description: values.description?.trim() ? values.description.trim() : null,
+        schoolId: DEMO_SCHOOL_ID,
+        gradeLevelId: values.gradeLevelId,
+      });
+      onCreated(`Subject "${res.code}" created.`);
+    } catch (err) {
+      const mapped = describeSubjectError(err);
+      if (mapped.field === "code") setError("code", { message: mapped.message });
+      else if (mapped.field === "gradeLevelId") setError("gradeLevelId", { message: mapped.message });
+      else setFormError(mapped.message);
+    }
+  };
+
+  return (
+    <ModalShell title="Create subject" onClose={onClose}>
+      {formError && (
+        <div role="alert" className="mb-4 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-3 text-sm font-medium text-[#EF4444]">
+          {formError}
+        </div>
+      )}
+      <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div>
+          <label htmlFor="subject-code" className={labelClass}>Code</label>
+          <Input
+            id="subject-code"
+            type="text"
+            placeholder="e.g. GEN-MATH"
+            aria-invalid={!!errors.code}
+            aria-describedby={errors.code ? "subject-code-error" : undefined}
+            className={cn(errors.code && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")}
+            {...register("code")}
+          />
+          <FieldError id="subject-code-error" message={errors.code?.message} />
+        </div>
+        <div>
+          <label htmlFor="subject-name" className={labelClass}>Name</label>
+          <Input
+            id="subject-name"
+            type="text"
+            placeholder="Toán"
+            aria-invalid={!!errors.name}
+            aria-describedby={errors.name ? "subject-name-error" : undefined}
+            className={cn(errors.name && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")}
+            {...register("name")}
+          />
+          <FieldError id="subject-name-error" message={errors.name?.message} />
+        </div>
+        <div>
+          <label htmlFor="subject-description" className={labelClass}>
+            Description <span className="font-normal normal-case text-[#64748B]/60">(optional)</span>
+          </label>
+          <textarea
+            id="subject-description"
+            placeholder="What is this subject about?"
+            aria-invalid={!!errors.description}
+            aria-describedby={errors.description ? "subject-description-error" : undefined}
+            className={cn(textareaClass, errors.description && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")}
+            {...register("description")}
+          />
+          <FieldError id="subject-description-error" message={errors.description?.message} />
+        </div>
+        <div>
+          <label htmlFor="subject-grade-level" className={labelClass}>Grade level</label>
+          <select
+            id="subject-grade-level"
+            aria-invalid={!!errors.gradeLevelId}
+            aria-describedby={errors.gradeLevelId ? "subject-grade-level-error" : undefined}
+            className={cn(selectClass, errors.gradeLevelId && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")}
+            {...register("gradeLevelId", { valueAsNumber: true })}
+          >
+            <option value="">Select a grade level…</option>
+            {gradeLevels.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.code} — {g.name}
+              </option>
+            ))}
+          </select>
+          <FieldError id="subject-grade-level-error" message={errors.gradeLevelId?.message} />
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+          <button type="button" onClick={onClose} className={buttonVariants({ variant: "outline" })}>
+            Cancel
+          </button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Creating…" : "Create subject"}
+          </Button>
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
+function EditSubjectModal({
+  subject,
+  onClose,
+  onSaved,
+}: {
+  subject: SubjectView;
+  onClose: () => void;
+  onSaved: (message: string) => void;
+}) {
+  const updateMut = useUpdateSubjectMutation(subject.id);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<UpdateSubjectValues>({
+    resolver: zodResolver(updateSubjectSchema),
+    // The list DTO carries no description (tech debt); prefill name only.
+    defaultValues: { name: subject.name, description: "" },
+  });
+
+  const onSubmit = async (values: UpdateSubjectValues) => {
+    setFormError(null);
+    try {
+      await updateMut.mutateAsync({
+        name: values.name.trim(),
+        description: values.description?.trim() ? values.description.trim() : null,
+      });
+      onSaved("Subject updated.");
+    } catch (err) {
+      const mapped = describeSubjectError(err);
+      setFormError(mapped.message);
+    }
+  };
+
+  return (
+    <ModalShell title={`Edit ${subject.code}`} onClose={onClose}>
+      {formError && (
+        <div role="alert" className="mb-4 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-3 text-sm font-medium text-[#EF4444]">
+          {formError}
+        </div>
+      )}
+      <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div>
+          <label htmlFor="edit-subject-name" className={labelClass}>Name</label>
+          <Input
+            id="edit-subject-name"
+            type="text"
+            aria-invalid={!!errors.name}
+            aria-describedby={errors.name ? "edit-subject-name-error" : undefined}
+            className={cn(errors.name && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")}
+            {...register("name")}
+          />
+          <FieldError id="edit-subject-name-error" message={errors.name?.message} />
+        </div>
+        <div>
+          <label htmlFor="edit-subject-description" className={labelClass}>
+            Description <span className="font-normal normal-case text-[#64748B]/60">(optional)</span>
+          </label>
+          <textarea
+            id="edit-subject-description"
+            placeholder="What is this subject about?"
+            aria-invalid={!!errors.description}
+            aria-describedby={errors.description ? "edit-subject-description-error" : undefined}
+            className={cn(textareaClass, errors.description && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")}
+            {...register("description")}
+          />
+          <FieldError id="edit-subject-description-error" message={errors.description?.message} />
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+          <button type="button" onClick={onClose} className={buttonVariants({ variant: "outline" })}>
+            Cancel
+          </button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Saving…" : "Save changes"}
+          </Button>
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
+// ============================================================
+// States
+// ============================================================
+
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p id={id} role="alert" className="mt-1.5 flex items-center gap-1.5 pl-1 text-xs font-semibold text-[#EF4444]">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-3.5 w-3.5 shrink-0" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+      </svg>
+      {message}
+    </p>
   );
 }
 
@@ -130,7 +609,7 @@ function EmptyState() {
         </svg>
       </div>
       <p className="font-display text-lg font-bold text-[#0F172A]">No subjects yet</p>
-      <p className="mt-1 text-sm text-[#64748B]">Subjects will appear here once they are configured for your school.</p>
+      <p className="mt-1 text-sm text-[#64748B]">Create your first subject to get started.</p>
     </div>
   );
 }
