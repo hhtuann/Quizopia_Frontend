@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Input } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 
 interface HeaderProps {
@@ -57,13 +58,13 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
   const initials = initialsOf(displayName);
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-[#E0E5EC]/85 backdrop-blur-md transition-all duration-300">
+    <header className="sticky top-0 z-40 w-full border-b border-[#E2E8F0] bg-white/80 backdrop-blur-md transition-all duration-300">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-20 items-center justify-between gap-4">
-          
+
           {/* Logo brand — click returns to the Dashboard */}
-          <Link href="/" aria-label="Go to dashboard" className="flex items-center gap-3 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#E0E5EC] shadow-extruded text-[#6C63FF] animate-float">
+          <Link href="/" aria-label="Go to dashboard" className="flex items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFAFA]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] text-white shadow-[0_4px_14px_rgba(0,82,255,0.25)] animate-float">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
@@ -79,15 +80,15 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
                 />
               </svg>
             </div>
-            <span className="font-display font-extrabold text-2xl tracking-tight text-[#3D4852]">
-              Quiz<span className="text-[#6C63FF]">opia</span>
+            <span className="font-display text-2xl tracking-tight text-[#0F172A]">
+              Quiz<span className="gradient-text">opia</span>
             </span>
           </Link>
 
           {/* Search bar - Desktop */}
           <div className="hidden md:flex flex-1 max-w-md mx-8">
             <div className="relative w-full">
-              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#6B7280]">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#64748B]">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
@@ -103,11 +104,11 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
                   />
                 </svg>
               </div>
-              <input
+              <Input
                 type="text"
                 placeholder="Search quizzes, categories..."
                 aria-label="Search quizzes and categories"
-                className="w-full h-11 rounded-2xl bg-[#E0E5EC] pl-11 pr-4 text-sm text-[#3D4852] placeholder-[#A0AEC0] outline-none shadow-inset-pressed focus:shadow-inset-deep focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] transition-all duration-300"
+                className="h-11 pl-11"
               />
             </div>
           </div>
@@ -116,7 +117,7 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
           <div className="flex items-center gap-4">
             
             {/* Notification Button (Desktop) */}
-            <button className="hidden sm:flex h-11 w-11 items-center justify-center rounded-2xl bg-[#E0E5EC] shadow-extruded text-[#3D4852] hover:-translate-y-0.5 hover:shadow-extruded-hover active:translate-y-0.5 active:shadow-inset-small focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] outline-none transition-all duration-300 neumorphic-active-press" aria-label="Notifications">
+            <button className="hidden sm:flex h-11 w-11 items-center justify-center rounded-lg text-[#64748B] outline-none transition-all duration-200 hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFAFA]" aria-label="Notifications">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
@@ -140,9 +141,9 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
-                className="flex h-11 items-center gap-2 rounded-2xl bg-[#E0E5EC] px-4 shadow-extruded text-sm font-medium text-[#3D4852] hover:-translate-y-0.5 hover:shadow-extruded-hover active:translate-y-0.5 active:shadow-inset-small focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] outline-none transition-all duration-300 neumorphic-active-press"
+                className="flex h-11 items-center gap-2 rounded-lg border border-[#E2E8F0] bg-white px-3 text-sm font-medium text-[#0F172A] shadow-sm outline-none transition-all duration-200 hover:bg-[#F1F5F9] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFAFA]"
               >
-                <div className="h-6 w-6 rounded-full bg-gradient-to-br from-[#6C63FF] to-[#38B2AC] flex items-center justify-center text-white font-bold text-xs">
+                <div className="h-6 w-6 rounded-full bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] flex items-center justify-center text-white font-bold text-xs">
                   {initials}
                 </div>
                 <span className="hidden sm:inline">{displayName}</span>
@@ -150,13 +151,13 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
               {menuOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 z-50 mt-2 w-64 rounded-container bg-[#E0E5EC] p-3 shadow-extruded"
+                  className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-[#E2E8F0] bg-white p-3 shadow-lg"
                 >
                   <div className="px-3 py-2">
-                    <p className="truncate text-sm font-semibold text-[#3D4852]">{displayName}</p>
-                    <p className="truncate text-xs text-[#6B7280]">{user?.email}</p>
+                    <p className="truncate text-sm font-semibold text-[#0F172A]">{displayName}</p>
+                    <p className="truncate text-xs text-[#64748B]">{user?.email}</p>
                     {user?.roles && user.roles.length > 0 && (
-                      <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-[#6C63FF]">
+                      <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.15em] text-[#0052FF]">
                         {user.roles.join(", ")}
                       </p>
                     )}
@@ -167,7 +168,7 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
                     disabled={busy}
                     onClick={handleLogout}
                     aria-label="Sign out"
-                    className="mt-1 w-full rounded-button bg-[#E0E5EC] px-4 py-3 text-left text-sm font-semibold text-[#3D4852] shadow-inset-pressed transition-all duration-300 hover:shadow-inset-deep active:translate-y-[0.5px] focus-visible:ring-2 focus-visible:ring-[#6C63FF] outline-none disabled:opacity-60"
+                    className="mt-1 w-full rounded-lg px-4 py-3 text-left text-sm font-semibold text-[#EF4444] outline-none transition-all duration-200 hover:bg-[#EF4444]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] disabled:opacity-60"
                   >
                     {busy ? "Signing out…" : "Sign out"}
                   </button>
@@ -178,7 +179,7 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
             {/* Mobile Hamburger menu toggle button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="flex md:hidden h-11 w-11 items-center justify-center rounded-2xl bg-[#E0E5EC] shadow-extruded text-[#3D4852] hover:shadow-extruded-hover active:shadow-inset-small focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] outline-none transition-all duration-300"
+              className="flex md:hidden h-11 w-11 items-center justify-center rounded-lg text-[#64748B] outline-none transition-all duration-200 hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFAFA]"
               aria-label="Toggle navigation menu"
               aria-expanded={isMobileMenuOpen}
               aria-controls="mobile-navigation"
@@ -190,7 +191,7 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
                   viewBox="0 0 24 24"
                   strokeWidth={2.5}
                   stroke="currentColor"
-                  className="w-6 h-6 text-[#6C63FF]"
+                  className="w-6 h-6 text-[#0052FF]"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                 </svg>

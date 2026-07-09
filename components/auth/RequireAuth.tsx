@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { Card, SectionLabel } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 
 /**
@@ -10,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
  * docs/QUIZOPIA_PROJECT_HANDOFF.md §13); this guard only avoids flashing
  * protected UI to unauthenticated / under-privileged users.
  *
- * - `loading`         → neumorphic loader (same on SSR + first paint → no hydration mismatch).
+ * - `loading`         → DESIGN_NEXT loader (same on SSR + first paint → no hydration mismatch).
  * - `unauthenticated` → redirect to /login in an effect; render the loader meanwhile.
  * - `authenticated`   → render children, unless `requireRole` is set and the user
  *                       lacks every required role, in which case redirect to "/" (and
@@ -52,15 +53,18 @@ export function RequireAuth({
 
   if (forbidden) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#E0E5EC] px-4">
-        <div className="max-w-md rounded-container bg-[#E0E5EC] p-8 text-center shadow-extruded">
-          <h1 className="font-display text-2xl font-extrabold tracking-tight text-[#3D4852]">
+      <main className="flex min-h-screen items-center justify-center bg-[#FAFAFA] px-4">
+        <Card variant="elevated" className="max-w-md p-8 text-center">
+          <SectionLabel className="mb-4">
+            Restricted
+          </SectionLabel>
+          <h1 className="font-display text-2xl tracking-tight text-[#0F172A]">
             Access denied
           </h1>
-          <p className="mt-2 text-sm font-medium text-[#6B7280]">
+          <p className="mt-2 text-sm font-medium text-[#64748B]">
             You don&apos;t have permission to view this page.
           </p>
-        </div>
+        </Card>
       </main>
     );
   }
@@ -68,19 +72,17 @@ export function RequireAuth({
   return <>{children}</>;
 }
 
-/** Neumorphic loading indicator (shared with RedirectIfAuthenticated). */
+/** DESIGN_NEXT loading indicator — accent ring spinner (shared with RedirectIfAuthenticated). */
 export function AuthLoader() {
   return (
     <div
       role="status"
       aria-busy="true"
       aria-label="Loading…"
-      className="flex min-h-screen items-center justify-center bg-[#E0E5EC]"
+      className="flex min-h-screen items-center justify-center bg-[#FAFAFA]"
     >
-      {/* Inset well + orbiting accent dot = a neumorphic spinner. */}
-      <div className="relative h-10 w-10 animate-spin rounded-full bg-[#E0E5EC] shadow-inset-deep">
-        <span className="absolute left-1/2 top-1 h-2 w-2 -translate-x-1/2 rounded-full bg-[#6C63FF] shadow-extruded-small" />
-      </div>
+      {/* Spinning ring with an accent top arc — minimalist, no neumorphic insets. */}
+      <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#E2E8F0] border-t-[#0052FF]" />
       <span className="sr-only">Loading…</span>
     </div>
   );

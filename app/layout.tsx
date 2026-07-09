@@ -40,7 +40,16 @@ export default function RootLayout({
       lang="en"
       className={`${calistoga.variable} ${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#E0E5EC] text-[#3D4852] font-sans selection:bg-[#6C63FF]/20">
+      {/*
+        DESIGN_NEXT body bg (#FAFAFA) + foreground (#0F172A). globals.css ships an
+        UNLAYERED body rule that sets background-color to var(--color-background), which
+        is #E0E5EC (out of FE-R2 scope to edit). Unlayered CSS beats Tailwind utilities,
+        so the inline style is what actually flips the body. ClassNames mirror the values.
+      */}
+      <body
+        className="min-h-full flex flex-col bg-[#FAFAFA] text-[#0F172A] font-sans selection:bg-[#0052FF]/20"
+        style={{ backgroundColor: "#FAFAFA", color: "#0F172A" }}
+      >
         <QueryProvider>
           <AuthProvider>{children}</AuthProvider>
         </QueryProvider>

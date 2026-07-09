@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
 import Footer from "./Footer";
+import { cardVariants } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/hooks/useAuth";
 import { navItemsForRoles, isActive } from "@/lib/navigation";
 
@@ -26,7 +28,7 @@ export default function AppShell({ children }: AppShellProps) {
   const items = navItemsForRoles(user?.roles);
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#E0E5EC] text-[#3D4852]">
+    <div className="flex min-h-screen flex-col bg-[#FAFAFA] text-[#0F172A]">
       <Header isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
       {/* Main layout area */}
@@ -46,9 +48,9 @@ export default function AppShell({ children }: AppShellProps) {
             id="mobile-navigation"
             role="navigation"
             aria-label="Mobile navigation"
-            className="space-y-3 rounded-container bg-[#E0E5EC] p-6 shadow-extruded"
+            className={cn(cardVariants(), "space-y-2 p-5")}
           >
-            <p className="mb-2 pl-2 text-xs font-bold uppercase tracking-wider text-[#6B7280]">Navigation</p>
+            <p className="mb-2 pl-2 font-mono text-xs uppercase tracking-[0.15em] text-[#64748B]">Navigation</p>
             {items.map((item) => {
               const active = isActive(pathname, item);
               return (
@@ -57,13 +59,13 @@ export default function AppShell({ children }: AppShellProps) {
                   href={item.href}
                   onClick={() => setIsMobileMenuOpen(false)}
                   aria-current={active ? "page" : undefined}
-                  className={`flex w-full items-center gap-3 rounded-button px-5 py-4 text-sm font-semibold outline-none transition-all duration-300 ${
+                  className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-semibold outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFAFA] ${
                     active
-                      ? "translate-y-[0.5px] text-[#6C63FF] shadow-inset-pressed"
-                      : "text-[#6B7280] shadow-extruded-small hover:text-[#3D4852] active:shadow-inset-small"
+                      ? "bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white shadow-[0_4px_14px_rgba(0,82,255,0.25)]"
+                      : "text-[#64748B] hover:bg-[#F1F5F9] hover:text-[#0F172A]"
                   }`}
                 >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-inner text-[#6C63FF]">
+                  <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${active ? "text-white" : "text-[#0052FF]"}`}>
                     {item.icon}
                   </span>
                   <span>{item.label}</span>

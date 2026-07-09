@@ -2,27 +2,27 @@ import React from "react";
 
 export default function Footer() {
   return (
-    <footer className="w-full bg-[#E0E5EC] py-8 border-t-0 mt-auto select-none">
+    <footer className="mt-auto w-full select-none border-t border-[#E2E8F0] py-8">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-between gap-6 sm:flex-row">
-          
+
           {/* Logo / Brand Name */}
           <div className="text-center sm:text-left">
-            <p className="text-sm font-semibold text-[#3D4852]">
+            <p className="text-sm font-semibold text-[#0F172A]">
               © {new Date().getFullYear()} Quizopia. All rights reserved.
             </p>
-            <p className="text-xs text-[#6B7280] mt-1">
-              Crafted with Soft UI Neumorphic Design.
+            <p className="mt-1 text-xs text-[#64748B]">
+              Crafted with Minimalist Modern design.
             </p>
           </div>
 
-          {/* Quick Footer Links in Neumorphic small buttons/tracks */}
-          <div className="flex flex-wrap items-center justify-center gap-4">
+          {/* Quick Footer Links */}
+          <div className="flex flex-wrap items-center justify-center gap-2">
             {["Terms", "Privacy", "Help Center", "Contact"].map((item) => (
               <a
                 key={item}
                 href="#"
-                className="inline-flex items-center min-h-[44px] px-4 py-3 text-xs font-semibold text-[#6B7280] rounded-xl bg-[#E0E5EC] shadow-extruded-small hover:-translate-y-0.5 hover:shadow-extruded hover:text-[#3D4852] active:translate-y-[0.5px] active:shadow-inset-small focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] outline-none transition-all duration-300"
+                className="inline-flex min-h-[44px] items-center rounded-lg px-3 py-2 text-xs font-semibold text-[#64748B] outline-none transition-all duration-200 hover:bg-[#F1F5F9] hover:text-[#0052FF] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFAFA]"
               >
                 {item}
               </a>
