@@ -7,6 +7,8 @@ import {
   type WsStatus,
 } from "@/lib/realtime/use-session-events";
 import type { RealtimeEventEnvelope } from "@/lib/realtime/types";
+import { SectionLabel, cardVariants } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 
 const EVENT_LABEL: Record<string, string> = {
   SESSION_OPENED: "Session opened",
@@ -58,11 +60,14 @@ export function LiveMonitor({
   );
 
   return (
-    <div className="rounded-container bg-[#E0E5EC] p-6 shadow-extruded">
+    <div className={cn(cardVariants(), "mt-6 p-6")}>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-          Live monitoring
-        </h2>
+        <div>
+          <SectionLabel className="mb-2">Realtime</SectionLabel>
+          <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
+            Live monitoring
+          </h2>
+        </div>
         <ConnectionIndicator status={status} />
       </div>
 
@@ -75,10 +80,10 @@ export function LiveMonitor({
 
       {/* Event feed */}
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+        <p className="font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
           Recent events
         </p>
-        <span className="text-xs text-[#A0AEC0]">{metrics.sessionStatus}</span>
+        <span className="text-xs text-[#94A3B8]">{metrics.sessionStatus}</span>
       </div>
       <EventFeed events={recentEvents} />
     </div>
@@ -87,16 +92,16 @@ export function LiveMonitor({
 
 function ConnectionIndicator({ status }: { status: WsStatus }) {
   const config = {
-    connected: { label: "Live", tone: "text-[#38B2AC]" },
-    connecting: { label: "Connecting…", tone: "text-[#6C63FF]" },
-    disconnected: { label: "Offline", tone: "text-[#A0AEC0]" },
+    connected: { label: "Live", tone: "text-[#10B981]" },
+    connecting: { label: "Connecting…", tone: "text-[#0052FF]" },
+    disconnected: { label: "Offline", tone: "text-[#94A3B8]" },
   } as const;
   const { label, tone } = config[status];
   return (
     <span
       role="status"
       aria-live="polite"
-      className={`text-xs font-semibold ${tone}${status === "connecting" ? " animate-pulse" : ""}`}
+      className={cn("text-xs font-semibold", tone, status === "connecting" && "animate-pulse")}
     >
       ● {label}
     </span>
@@ -113,17 +118,18 @@ function MetricCard({
   tone?: "accent";
 }) {
   return (
-    <div className="rounded-2xl bg-[#E0E5EC] p-4 text-center shadow-inset-small">
+    <div className="rounded-lg border border-[#E2E8F0] bg-white p-4 text-center shadow-sm">
       <p
-        className={`text-2xl font-extrabold tabular-nums ${
-          tone === "accent" ? "text-[#6C63FF]" : "text-[#3D4852]"
-        }`}
+        className={cn(
+          "text-2xl font-extrabold tabular-nums",
+          tone === "accent" ? "text-[#0052FF]" : "text-[#0F172A]"
+        )}
         role="status"
         aria-live="polite"
       >
         {value}
       </p>
-      <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+      <p className="mt-1 font-mono text-xs uppercase tracking-wide text-[#64748B]">
         {label}
       </p>
     </div>
@@ -133,7 +139,7 @@ function MetricCard({
 function EventFeed({ events }: { events: RealtimeEventEnvelope[] }) {
   if (events.length === 0) {
     return (
-      <div className="rounded-2xl bg-[#E0E5EC] px-4 py-6 text-center text-xs text-[#6B7280] shadow-inset-small">
+      <div className="rounded-lg border border-dashed border-[#E2E8F0] bg-[#F1F5F9]/50 px-4 py-6 text-center text-xs text-[#64748B]">
         No events yet. Live events will appear here when students interact.
       </div>
     );
@@ -143,25 +149,26 @@ function EventFeed({ events }: { events: RealtimeEventEnvelope[] }) {
       {events.map((ev, i) => (
         <li
           key={`${ev.eventId}-${i}`}
-          className="flex items-center gap-2 rounded-2xl bg-[#E0E5EC] px-3 py-2 text-xs shadow-inset-small"
+          className="flex items-center gap-2 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-3 py-2 text-xs"
         >
           <span
-            className={`inline-block h-2 w-2 shrink-0 rounded-full ${
+            className={cn(
+              "inline-block h-2 w-2 shrink-0 rounded-full",
               ev.eventType === "ATTEMPT_SUBMITTED"
-                ? "bg-[#38B2AC]"
+                ? "bg-[#10B981]"
                 : ev.eventType === "ATTEMPT_STARTED"
-                ? "bg-[#6C63FF]"
-                : "bg-[#6B7280]"
-            }`}
+                ? "bg-[#0052FF]"
+                : "bg-[#64748B]"
+            )}
             aria-hidden="true"
           />
-          <span className="font-semibold text-[#3D4852]">
+          <span className="font-semibold text-[#0F172A]">
             {EVENT_LABEL[ev.eventType] ?? ev.eventType}
           </span>
           {ev.studentProfileId != null && (
-            <span className="text-[#6B7280]">· profile #{ev.studentProfileId}</span>
+            <span className="text-[#64748B]">· profile #{ev.studentProfileId}</span>
           )}
-          <span className="ml-auto tabular-nums text-[#A0AEC0]">
+          <span className="ml-auto tabular-nums text-[#94A3B8]">
             {formatTime(ev.occurredAt)}
           </span>
         </li>

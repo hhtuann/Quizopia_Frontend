@@ -3,19 +3,18 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useExamSessionsQuery } from "@/hooks/queries/use-exam-sessions";
+import { Badge, Input, SectionLabel, buttonVariants, cardVariants } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 import type { ExamSessionListItem, ExamSessionStatus } from "@/lib/api/exam-sessions";
 import type { NormalizedApiError } from "@/lib/api";
 
 const PAGE_SIZE = 10;
 
-const inputClass =
-  "w-full h-11 rounded-2xl bg-[#E0E5EC] px-4 text-sm text-[#3D4852] placeholder-[#A0AEC0] outline-none shadow-inset-pressed focus-visible:shadow-inset-deep focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] transition-all duration-300";
-
 const selectClass =
-  "h-11 w-full rounded-2xl bg-[#E0E5EC] px-4 pr-9 text-sm text-[#3D4852] outline-none shadow-inset-pressed focus-visible:shadow-inset-deep focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] transition-all duration-300";
+  "h-11 w-full rounded-lg border border-[#E2E8F0] bg-transparent px-4 pr-9 text-sm text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
 
 const pageBtnClass =
-  "inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#E0E5EC] shadow-extruded-small text-[#3D4852] outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover active:translate-y-[0.5px] active:shadow-inset-small focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-extruded-small";
+  "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#64748B] outline-none transition-all duration-200 hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
 const STATUS_OPTIONS: ExamSessionStatus[] = ["DRAFT", "SCHEDULED", "OPEN", "CLOSED", "CANCELLED"];
 
@@ -30,15 +29,16 @@ function formatDateTime(iso: string): string {
   });
 }
 
-function statusTone(status: ExamSessionStatus): string {
+function statusVariant(status: ExamSessionStatus): "success" | "accent" | "warn" | "default" {
   switch (status) {
     case "OPEN":
-      return "text-[#38B2AC]";
-    case "CANCELLED":
-    case "CLOSED":
-      return "text-[#A0AEC0]";
+      return "success";
+    case "SCHEDULED":
+      return "accent";
+    case "DRAFT":
+      return "warn";
     default:
-      return "text-[#6C63FF]";
+      return "default";
   }
 }
 
@@ -76,16 +76,17 @@ export default function ExamSessionsPage() {
     <div>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
         <div className="select-none">
-          <h1 className="font-display text-2xl font-extrabold tracking-tight text-[#3D4852] sm:text-3xl">
+          <SectionLabel className="mb-3">Delivery</SectionLabel>
+          <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
             Exam sessions
           </h1>
-          <p className="mt-2 text-sm font-medium text-[#6B7280]">
+          <p className="mt-2 text-sm font-medium text-[#64748B]">
             Schedule and run exam sessions from published versions.
           </p>
         </div>
         <Link
           href="/exam-sessions/new"
-          className="neumorphic-active-press inline-flex h-11 items-center justify-center gap-1.5 rounded-2xl bg-[#E0E5EC] px-5 text-sm font-semibold text-[#6C63FF] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover active:translate-y-[0.5px] active:shadow-inset-small focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
+          className={cn(buttonVariants({ variant: "primary" }), "gap-1.5")}
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-4 w-4" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -99,13 +100,13 @@ export default function ExamSessionsPage() {
           <label htmlFor="session-search" className="sr-only">
             Search sessions by title or code
           </label>
-          <input
+          <Input
             id="session-search"
             type="search"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search sessions…"
-            className={inputClass}
+            className="h-11"
           />
         </div>
         <div>
@@ -131,7 +132,7 @@ export default function ExamSessionsPage() {
         </div>
       </div>
 
-      <div className="rounded-container bg-[#E0E5EC] p-4 shadow-extruded sm:p-6">
+      <div className={cn(cardVariants(), "p-4 sm:p-6")}>
         {isPending ? (
           <ListSkeleton label="Loading exam sessions" />
         ) : isError ? (
@@ -154,14 +155,14 @@ function SessionsTable({ items, refreshing }: { items: ExamSessionListItem[]; re
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <caption className="mb-3 flex items-center gap-2 px-1 text-left text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+        <caption className="mb-3 flex items-center gap-2 px-1 text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
           <span>Your sessions ({items.length})</span>
           {refreshing && (
-            <span role="status" aria-label="Updating" className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#6C63FF]" />
+            <span role="status" aria-label="Updating" className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#0052FF]" />
           )}
         </caption>
         <thead>
-          <tr className="text-left text-xs uppercase tracking-wider text-[#6B7280]">
+          <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
             <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Title</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Exam</th>
@@ -173,31 +174,27 @@ function SessionsTable({ items, refreshing }: { items: ExamSessionListItem[]; re
         </thead>
         <tbody>
           {items.map((s) => (
-            <tr key={s.id} className="align-top text-[#3D4852]">
+            <tr key={s.id} className="border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 hover:bg-[#F1F5F9]">
               <td className="px-3 py-3">
                 <Link
                   href={`/exam-sessions/${s.id}`}
-                  className="rounded-inner font-semibold text-[#3D4852] outline-none transition-all duration-300 hover:text-[#6C63FF] focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
+                  className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B] outline-none transition-colors hover:text-[#0052FF] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
                 >
-                  <span className="rounded-inner bg-[#E0E5EC] px-2 py-1 font-mono text-xs shadow-inset-small">
-                    {s.code}
-                  </span>
+                  {s.code}
                 </Link>
               </td>
               <td className="px-3 py-3 font-semibold">{s.title}</td>
-              <td className="px-3 py-3 text-[#6B7280]">
+              <td className="px-3 py-3 text-[#64748B]">
                 exam #{s.examId} · v{s.examVersionNumber}
               </td>
               <td className="px-3 py-3">
-                <span className={`text-xs font-bold uppercase tracking-wide ${statusTone(s.status)}`}>
-                  {s.status}
-                </span>
+                <Badge variant={statusVariant(s.status)}>{s.status}</Badge>
               </td>
-              <td className="px-3 py-3 text-[#6B7280]">
+              <td className="px-3 py-3 text-[#64748B]">
                 {formatDateTime(s.startsAt)} → {formatDateTime(s.endsAt)}
               </td>
-              <td className="px-3 py-3 text-center tabular-nums text-[#6B7280]">{s.maxAttempts}</td>
-              <td className="px-3 py-3 text-center tabular-nums text-[#6B7280]">{s.participantCount}</td>
+              <td className="px-3 py-3 text-center tabular-nums text-[#64748B]">{s.maxAttempts}</td>
+              <td className="px-3 py-3 text-center tabular-nums text-[#64748B]">{s.participantCount}</td>
             </tr>
           ))}
         </tbody>
@@ -210,7 +207,7 @@ function ListSkeleton({ label }: { label: string }) {
   return (
     <div role="status" aria-busy="true" aria-label={label} className="space-y-3 py-2">
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="h-12 animate-pulse rounded-2xl bg-[#E0E5EC] shadow-inset-small" />
+        <div key={i} className="h-12 animate-pulse rounded-lg bg-[#F1F5F9]" />
       ))}
       <span className="sr-only">Loading…</span>
     </div>
@@ -237,7 +234,7 @@ function ErrorState({ error }: { error: NormalizedApiError | undefined }) {
     message = "Something went wrong. Please try again.";
   }
   return (
-    <div role="alert" className="flex items-start gap-3 rounded-2xl bg-[#E0E5EC] p-5 text-sm font-medium text-[#3D4852] shadow-inset-deep">
+    <div role="alert" className="flex items-start gap-3 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-5 text-sm font-medium text-[#EF4444]">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
       </svg>
@@ -249,13 +246,13 @@ function ErrorState({ error }: { error: NormalizedApiError | undefined }) {
 function EmptyState({ hasFilters }: { hasFilters: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#E0E5EC] text-[#6B7280] shadow-inset-deep">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#F1F5F9] text-[#64748B]">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="h-7 w-7" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0V18a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 18v.75m-18 0h18M12 9v3m1.5-1.5h-3" />
         </svg>
       </div>
-      <p className="font-display text-lg font-bold text-[#3D4852]">No exam sessions</p>
-      <p className="mt-1 text-sm text-[#6B7280]">
+      <p className="font-display text-lg font-bold text-[#0F172A]">No exam sessions</p>
+      <p className="mt-1 text-sm text-[#64748B]">
         {hasFilters ? "No sessions match your filters." : "Sessions you create will appear here."}
       </p>
     </div>
@@ -267,7 +264,7 @@ function Pagination({ page, totalPages, totalElements, onPage }: { page: number;
   const nextDisabled = page >= totalPages - 1;
   return (
     <div className="mt-4 flex items-center justify-between px-1 pt-4">
-      <p className="text-xs font-medium text-[#6B7280]" aria-live="polite">
+      <p className="text-xs font-medium text-[#64748B]" aria-live="polite">
         {totalElements} session{totalElements === 1 ? "" : "s"} · Page {page + 1} of {Math.max(totalPages, 1)}
       </p>
       <div className="flex gap-2">

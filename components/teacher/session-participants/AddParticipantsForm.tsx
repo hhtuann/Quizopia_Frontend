@@ -3,13 +3,13 @@
 import { useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAddParticipantsMutation } from "@/hooks/queries/use-exam-session-participants";
+import { Button, cardVariants } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 import type { AddParticipantsResponse } from "@/lib/api/exam-session-participants";
 import type { NormalizedApiError } from "@/lib/api";
 
 const textareaClass =
-  "w-full min-h-[88px] rounded-button bg-[#E0E5EC] px-4 py-3 text-sm text-[#3D4852] placeholder-[#A0AEC0] outline-none shadow-inset-pressed focus-visible:shadow-inset-deep focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] transition-all duration-300 resize-y";
-const primaryBtn =
-  "neumorphic-active-press inline-flex h-11 items-center justify-center rounded-button bg-[#6C63FF] px-5 text-sm font-semibold text-white shadow-extruded-small outline-none transition-all duration-300 hover:bg-[#8B84FF] active:translate-y-[0.5px] focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] disabled:cursor-not-allowed disabled:opacity-60";
+  "w-full min-h-[88px] rounded-lg border border-[#E2E8F0] bg-transparent px-4 py-3 text-sm text-[#0F172A] placeholder:text-[#64748B]/50 outline-none transition-all duration-200 resize-y focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
 
 /** Parse free-form ID text (comma/space/newline separated) → deduped positive integers. */
 function parseIds(text: string): number[] {
@@ -83,9 +83,9 @@ export function AddParticipantsForm({ sessionId }: { sessionId: number }) {
   };
 
   return (
-    <form noValidate onSubmit={onSubmit} className="rounded-container bg-[#E0E5EC] p-5 shadow-extruded">
-      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[#6B7280]">Add participants</h3>
-      <label htmlFor="add-ids" className="mb-2 block pl-1 text-xs font-semibold text-[#6B7280]">
+    <form noValidate onSubmit={onSubmit} className={cn(cardVariants(), "p-5")}>
+      <h3 className="mb-3 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">Add participants</h3>
+      <label htmlFor="add-ids" className="mb-2 block pl-1 text-xs font-semibold text-[#64748B]">
         Student profile IDs
       </label>
       <textarea
@@ -95,27 +95,27 @@ export function AddParticipantsForm({ sessionId }: { sessionId: number }) {
         placeholder={"201, 202, 203\n(one per line or comma/space separated)"}
         className={textareaClass}
       />
-      <p className="mt-1.5 pl-1 text-xs text-[#6B7280]">
+      <p className="mt-1.5 pl-1 text-xs text-[#64748B]">
         No student search yet — enter profile IDs. Invalid or cross-school IDs are reported, not added.
       </p>
-      <button type="submit" disabled={addMut.isPending} className={`mt-3 ${primaryBtn}`}>
+      <Button type="submit" disabled={addMut.isPending} className="mt-3">
         {addMut.isPending ? "Adding…" : "Add participants"}
-      </button>
+      </Button>
 
       {error && (
-        <p role="alert" className="mt-3 rounded-2xl bg-[#E0E5EC] p-3 text-xs font-medium text-[#3D4852] shadow-inset-deep">
+        <p role="alert" className="mt-3 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-3 text-xs font-medium text-[#EF4444]">
           {error}
         </p>
       )}
 
       {result && (
-        <div role="status" className="mt-3 space-y-1.5 rounded-2xl bg-[#E0E5EC] p-3 text-xs shadow-inset-small">
-          <p className="font-semibold text-[#38B2AC]">Added {result.added} participant{result.added === 1 ? "" : "s"}.</p>
+        <div role="status" className="mt-3 space-y-1.5 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] p-3 text-xs">
+          <p className="font-semibold text-[#10B981]">Added {result.added} participant{result.added === 1 ? "" : "s"}.</p>
           {result.duplicated.length > 0 && (
-            <p className="text-[#6B7280]">Already added: {result.duplicated.join(", ")}</p>
+            <p className="text-[#64748B]">Already added: {result.duplicated.join(", ")}</p>
           )}
           {result.invalid.length > 0 && (
-            <p className="text-[#6B7280]">Not found / not in your school: {result.invalid.join(", ")}</p>
+            <p className="text-[#64748B]">Not found / not in your school: {result.invalid.join(", ")}</p>
           )}
         </div>
       )}

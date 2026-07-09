@@ -2,17 +2,17 @@
 
 import { useMemo, useState } from "react";
 import { useSessionResultsQuery } from "@/hooks/queries/use-teacher-reporting";
+import { Input, buttonVariants, cardVariants } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 import type { ResultDirection, ResultSort, SessionResultItem } from "@/lib/api/teacher-reporting";
 import type { NormalizedApiError } from "@/lib/api";
 
 const pageBtnClass =
-  "inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#E0E5EC] shadow-extruded-small text-[#3D4852] outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover active:translate-y-[0.5px] active:shadow-inset-small focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#64748B] outline-none transition-all duration-200 hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 const selectClass =
-  "h-10 rounded-2xl bg-[#E0E5EC] px-3 pr-8 text-xs text-[#3D4852] outline-none shadow-inset-pressed focus-visible:shadow-inset-deep focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] transition-all duration-300";
-const numInputClass =
-  "h-10 w-20 rounded-2xl bg-[#E0E5EC] px-3 text-xs text-[#3D4852] outline-none shadow-inset-pressed focus-visible:shadow-inset-deep focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] transition-all duration-300";
+  "h-10 rounded-lg border border-[#E2E8F0] bg-transparent px-3 pr-8 text-xs text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
 const sortHeaderClass =
-  "px-3 pb-3 font-semibold cursor-pointer select-none transition-all duration-300 hover:text-[#6C63FF] focus-visible:text-[#6C63FF] outline-none";
+  "px-3 pb-3 font-semibold cursor-pointer select-none transition-colors hover:text-[#0052FF] focus-visible:text-[#0052FF] outline-none";
 
 const SORT_OPTIONS: { value: ResultSort; label: string }[] = [
   { value: "percentage", label: "Percentage" },
@@ -29,10 +29,10 @@ function fmtDate(iso: string | null): string {
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
 }
 function pctTone(p: number | null): string {
-  if (p == null) return "text-[#A0AEC0]";
-  if (p >= 80) return "text-[#38B2AC]";
-  if (p >= 50) return "text-[#6C63FF]";
-  return "text-[#6B7280]";
+  if (p == null) return "text-[#94A3B8]";
+  if (p >= 80) return "text-[#10B981]";
+  if (p >= 50) return "text-[#0052FF]";
+  return "text-[#64748B]";
 }
 
 export function ResultsTable({ sessionId }: { sessionId: number }) {
@@ -91,7 +91,7 @@ export function ResultsTable({ sessionId }: { sessionId: number }) {
   };
 
   return (
-    <div className="rounded-container bg-[#E0E5EC] p-4 shadow-extruded sm:p-6">
+    <div className={cn(cardVariants(), "p-4 sm:p-6")}>
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div>
           <label htmlFor="r-sort" className="sr-only">Sort by</label>
@@ -113,31 +113,31 @@ export function ResultsTable({ sessionId }: { sessionId: number }) {
           </select>
         </div>
         <div className="flex items-center gap-1.5">
-          <input id="r-min" type="number" min={0} max={100} placeholder="Min %" value={minPct} onChange={(e) => setMinPct(e.target.value)} className={numInputClass} aria-label="Minimum percentage" />
-          <span className="text-xs text-[#6B7280]">–</span>
-          <input id="r-max" type="number" min={0} max={100} placeholder="Max %" value={maxPct} onChange={(e) => setMaxPct(e.target.value)} className={numInputClass} aria-label="Maximum percentage" />
-          <button type="button" onClick={applyFilters} className="h-10 rounded-2xl bg-[#E0E5EC] px-3 text-xs font-semibold text-[#6C63FF] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]">Apply</button>
+          <Input id="r-min" type="number" min={0} max={100} placeholder="Min %" value={minPct} onChange={(e) => setMinPct(e.target.value)} aria-label="Minimum percentage" className="h-10 w-20 px-3 text-xs" />
+          <span className="text-xs text-[#64748B]">–</span>
+          <Input id="r-max" type="number" min={0} max={100} placeholder="Max %" value={maxPct} onChange={(e) => setMaxPct(e.target.value)} aria-label="Maximum percentage" className="h-10 w-20 px-3 text-xs" />
+          <button type="button" onClick={applyFilters} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-10")}>Apply</button>
         </div>
       </div>
-      {filterError && <p role="alert" className="mb-3 text-xs font-medium text-[#3D4852]">{filterError}</p>}
+      {filterError && <p role="alert" className="mb-3 text-xs font-medium text-[#EF4444]">{filterError}</p>}
 
       {isPending ? (
         <div role="status" aria-busy="true" aria-label="Loading results" className="space-y-2 py-2">
-          {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-10 animate-pulse rounded-2xl bg-[#E0E5EC] shadow-inset-small" />)}
+          {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-10 animate-pulse rounded-lg bg-[#F1F5F9]" />)}
         </div>
       ) : isError ? (
         <ErrorState error={error as unknown as NormalizedApiError | undefined} />
       ) : items.length === 0 ? (
-        <p className="py-8 text-center text-sm text-[#6B7280]">No results yet.</p>
+        <p className="py-8 text-center text-sm text-[#64748B]">No results yet.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <caption className="mb-3 flex items-center gap-2 px-1 text-left text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+            <caption className="mb-3 flex items-center gap-2 px-1 text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
               <span>Students ({totalElements})</span>
-              {isFetching && <span role="status" aria-label="Updating" className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#6C63FF]" />}
+              {isFetching && <span role="status" aria-label="Updating" className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#0052FF]" />}
             </caption>
             <thead>
-              <tr className="text-left text-xs uppercase tracking-wider text-[#6B7280]">
+              <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
                 <th scope="col" className={`${sortHeaderClass} px-3 pb-3`} onClick={() => toggleSort("studentCode")}>Code {sort === "studentCode" ? (direction === "ASC" ? "↑" : "↓") : ""}</th>
                 <th scope="col" className={`${sortHeaderClass} px-3 pb-3`} onClick={() => toggleSort("studentName")}>Name {sort === "studentName" ? (direction === "ASC" ? "↑" : "↓") : ""}</th>
                 <th scope="col" className={`${sortHeaderClass} px-3 pb-3`} onClick={() => toggleSort("percentage")}>% {sort === "percentage" ? (direction === "ASC" ? "↑" : "↓") : ""}</th>
@@ -155,7 +155,7 @@ export function ResultsTable({ sessionId }: { sessionId: number }) {
 
       {!isPending && !isError && items.length > 0 && (
         <div className="mt-4 flex items-center justify-between px-1 pt-4">
-          <p className="text-xs font-medium text-[#6B7280]" aria-live="polite">{totalElements} students · Page {page + 1} of {Math.max(totalPages, 1)}</p>
+          <p className="text-xs font-medium text-[#64748B]" aria-live="polite">{totalElements} students · Page {page + 1} of {Math.max(totalPages, 1)}</p>
           <div className="flex gap-2">
             <button type="button" onClick={() => setPage((p) => p - 1)} disabled={page <= 0} aria-label="Previous page" className={pageBtnClass}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-4 w-4" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg></button>
             <button type="button" onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages - 1} aria-label="Next page" className={pageBtnClass}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-4 w-4" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg></button>
@@ -168,18 +168,18 @@ export function ResultsTable({ sessionId }: { sessionId: number }) {
 
 function ResultRow({ item }: { item: SessionResultItem }) {
   return (
-    <tr className="align-top text-[#3D4852]">
-      <td className="px-3 py-2.5"><span className="rounded-inner bg-[#E0E5EC] px-2 py-0.5 font-mono text-xs shadow-inset-small">{item.studentCode ?? "—"}</span></td>
+    <tr className="border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 hover:bg-[#F1F5F9]">
+      <td className="px-3 py-2.5"><span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs text-[#64748B]">{item.studentCode ?? "—"}</span></td>
       <td className="px-3 py-2.5 font-medium">{item.displayName ?? "—"}</td>
-      <td className="px-3 py-2.5"><span className={`font-bold tabular-nums ${pctTone(item.percentage)}`}>{item.percentage != null ? `${item.percentage}%` : "—"}</span></td>
-      <td className="px-3 py-2.5 tabular-nums text-[#6B7280]">{item.score != null ? `${item.score}/${item.maxScore ?? "—"}` : "—"}</td>
-      <td className="px-3 py-2.5 text-center tabular-nums text-[#6B7280]">{item.attemptCount}</td>
-      <td className="px-3 py-2.5 text-[#6B7280]">{fmtDate(item.submittedAt)}</td>
+      <td className="px-3 py-2.5"><span className={cn("font-bold tabular-nums", pctTone(item.percentage))}>{item.percentage != null ? `${item.percentage}%` : "—"}</span></td>
+      <td className="px-3 py-2.5 tabular-nums text-[#64748B]">{item.score != null ? `${item.score}/${item.maxScore ?? "—"}` : "—"}</td>
+      <td className="px-3 py-2.5 text-center tabular-nums text-[#64748B]">{item.attemptCount}</td>
+      <td className="px-3 py-2.5 text-[#64748B]">{fmtDate(item.submittedAt)}</td>
     </tr>
   );
 }
 
 function ErrorState({ error }: { error: NormalizedApiError | undefined }) {
   const msg = error?.kind === "api" ? (error.message || "Couldn't load results.") : "Network error.";
-  return <div role="alert" className="rounded-2xl bg-[#E0E5EC] p-4 text-sm font-medium text-[#3D4852] shadow-inset-deep">{msg}</div>;
+  return <div role="alert" className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-4 text-sm font-medium text-[#EF4444]">{msg}</div>;
 }

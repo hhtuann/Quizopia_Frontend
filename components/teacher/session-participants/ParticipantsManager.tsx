@@ -7,6 +7,8 @@ import {
   useParticipantsQuery,
   useUnblockMutation,
 } from "@/hooks/queries/use-exam-session-participants";
+import { Badge, SectionLabel, buttonVariants, cardVariants } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 import type {
   ExamSessionParticipantResponse,
   ParticipantStatus,
@@ -21,11 +23,9 @@ const MANAGE_STATES: ExamSessionStatus[] = ["DRAFT", "SCHEDULED", "OPEN"];
 const STATUS_OPTIONS: ParticipantStatus[] = ["ELIGIBLE", "BLOCKED"];
 
 const selectClass =
-  "h-11 rounded-2xl bg-[#E0E5EC] px-4 pr-9 text-sm text-[#3D4852] outline-none shadow-inset-pressed focus-visible:shadow-inset-deep focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] transition-all duration-300";
-const actionBtn =
-  "inline-flex h-9 items-center justify-center rounded-2xl bg-[#E0E5EC] px-3 text-xs font-semibold shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0";
+  "h-11 rounded-lg border border-[#E2E8F0] bg-transparent px-4 pr-9 text-sm text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
 const pageBtnClass =
-  "inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#E0E5EC] shadow-extruded-small text-[#3D4852] outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover active:translate-y-[0.5px] active:shadow-inset-small focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#64748B] outline-none transition-all duration-200 hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
@@ -97,9 +97,12 @@ export function ParticipantsManager({
   };
 
   return (
-    <div className="space-y-5">
+    <div className="mt-6 space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h2 className="font-display text-lg font-bold tracking-tight text-[#3D4852]">Participants</h2>
+        <div>
+          <SectionLabel className="mb-2">Participants</SectionLabel>
+          <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">Participants</h2>
+        </div>
         <div>
           <label htmlFor="participant-status-filter" className="sr-only">Filter participants by status</label>
           <select
@@ -117,7 +120,7 @@ export function ParticipantsManager({
       </div>
 
       {notice && (
-        <div role="alert" className="flex items-start gap-2 rounded-2xl bg-[#E0E5EC] p-4 text-sm font-medium text-[#3D4852] shadow-inset-deep">
+        <div role="alert" className="flex items-start gap-2 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-4 text-sm font-medium text-[#EF4444]">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
           </svg>
@@ -127,7 +130,7 @@ export function ParticipantsManager({
 
       {canAdd && <AddParticipantsForm sessionId={sessionId} />}
 
-      <div className="rounded-container bg-[#E0E5EC] p-4 shadow-extruded sm:p-6">
+      <div className={cn(cardVariants(), "p-4 sm:p-6")}>
         {isPending ? (
           <Skeleton />
         ) : isError ? (
@@ -140,7 +143,7 @@ export function ParticipantsManager({
 
         {!isPending && !isError && items.length > 0 && (
           <div className="mt-4 flex items-center justify-between px-1 pt-4">
-            <p className="text-xs font-medium text-[#6B7280]" aria-live="polite">
+            <p className="text-xs font-medium text-[#64748B]" aria-live="polite">
               {totalElements} participant{totalElements === 1 ? "" : "s"} · Page {page + 1} of {Math.max(totalPages, 1)}
             </p>
             <div className="flex gap-2">
@@ -174,12 +177,12 @@ function ParticipantsTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <caption className="mb-3 flex items-center gap-2 px-1 text-left text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+        <caption className="mb-3 flex items-center gap-2 px-1 text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
           <span>Participants ({items.length})</span>
-          {refreshing && <span role="status" aria-label="Updating" className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#6C63FF]" />}
+          {refreshing && <span role="status" aria-label="Updating" className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#0052FF]" />}
         </caption>
         <thead>
-          <tr className="text-left text-xs uppercase tracking-wider text-[#6B7280]">
+          <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
             <th scope="col" className="px-3 pb-3 font-semibold">Student</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Name</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Status</th>
@@ -190,29 +193,32 @@ function ParticipantsTable({
         </thead>
         <tbody>
           {items.map((p) => (
-            <tr key={p.id} className="align-top text-[#3D4852]">
+            <tr key={p.id} className="border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 hover:bg-[#F1F5F9]">
               <td className="px-3 py-3">
-                <span className="rounded-inner bg-[#E0E5EC] px-2 py-1 font-mono text-xs shadow-inset-small">{p.studentCode}</span>
+                <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B]">{p.studentCode}</span>
               </td>
               <td className="px-3 py-3 font-medium">{p.displayName}</td>
               <td className="px-3 py-3">
-                <span className={`inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wide ${p.status === "ELIGIBLE" ? "text-[#38B2AC]" : "text-[#A0AEC0]"}`}>
+                <Badge variant={p.status === "ELIGIBLE" ? "success" : "default"} className="gap-1">
                   {p.status === "ELIGIBLE" ? (
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
                   ) : (
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" /></svg>
                   )}
                   {p.status}
-                </span>
+                </Badge>
               </td>
-              <td className="px-3 py-3 text-[#6B7280]">{formatDateTime(p.addedAt)}</td>
-              <td className="px-3 py-3 text-[#6B7280]">{formatDateTime(p.blockedAt)}</td>
+              <td className="px-3 py-3 text-[#64748B]">{formatDateTime(p.addedAt)}</td>
+              <td className="px-3 py-3 text-[#64748B]">{formatDateTime(p.blockedAt)}</td>
               <td className="px-3 py-3 text-right">
                 <button
                   type="button"
                   onClick={() => onToggle(p)}
                   disabled={!canManage || busy}
-                  className={actionBtn + (p.status === "ELIGIBLE" ? " text-[#6B7280]" : " text-[#6C63FF]")}
+                  className={cn(
+                    buttonVariants({ variant: p.status === "ELIGIBLE" ? "outline" : "primary", size: "sm" }),
+                    "h-9 px-3"
+                  )}
                 >
                   {p.status === "ELIGIBLE" ? "Block" : "Unblock"}
                 </button>
@@ -229,7 +235,7 @@ function Skeleton() {
   return (
     <div role="status" aria-busy="true" aria-label="Loading participants" className="space-y-3 py-2">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="h-10 animate-pulse rounded-2xl bg-[#E0E5EC] shadow-inset-small" />
+        <div key={i} className="h-10 animate-pulse rounded-lg bg-[#F1F5F9]" />
       ))}
       <span className="sr-only">Loading…</span>
     </div>
@@ -256,7 +262,7 @@ function ErrorState({ error }: { error: NormalizedApiError | undefined }) {
     message = "Something went wrong. Please try again.";
   }
   return (
-    <div role="alert" className="flex items-start gap-3 rounded-2xl bg-[#E0E5EC] p-5 text-sm font-medium text-[#3D4852] shadow-inset-deep">
+    <div role="alert" className="flex items-start gap-3 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-5 text-sm font-medium text-[#EF4444]">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
       <span>{message}</span>
     </div>
@@ -266,8 +272,8 @@ function ErrorState({ error }: { error: NormalizedApiError | undefined }) {
 function EmptyState({ filtered }: { filtered: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
-      <p className="font-display text-base font-bold text-[#3D4852]">No participants</p>
-      <p className="mt-1 text-sm text-[#6B7280]">{filtered ? "No participants match this filter." : "Add participants above."}</p>
+      <p className="font-display text-base font-bold text-[#0F172A]">No participants</p>
+      <p className="mt-1 text-sm text-[#64748B]">{filtered ? "No participants match this filter." : "Add participants above."}</p>
     </div>
   );
 }
