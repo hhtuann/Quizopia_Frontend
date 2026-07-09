@@ -31,9 +31,9 @@ export default function ExamDetailPage() {
 function Skeleton() {
   return (
     <div role="status" aria-busy="true" aria-label="Loading exam" className="space-y-4">
-      <div className="h-8 w-64 animate-pulse rounded-2xl bg-[#E0E5EC] shadow-inset-small" />
-      <div className="h-40 animate-pulse rounded-container bg-[#E0E5EC] shadow-extruded" />
-      <div className="h-40 animate-pulse rounded-container bg-[#E0E5EC] shadow-extruded" />
+      <div className="h-8 w-64 animate-pulse rounded-lg bg-[#F1F5F9]" />
+      <div className="h-40 animate-pulse rounded-xl border border-[#E2E8F0] bg-[#F1F5F9]" />
+      <div className="h-40 animate-pulse rounded-xl border border-[#E2E8F0] bg-[#F1F5F9]" />
       <span className="sr-only">Loading…</span>
     </div>
   );
@@ -42,7 +42,7 @@ function Skeleton() {
 function NotFound() {
   return (
     <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#E0E5EC] text-[#6B7280] shadow-inset-deep">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#F1F5F9] text-[#64748B]">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
@@ -59,13 +59,13 @@ function NotFound() {
           />
         </svg>
       </div>
-      <p className="font-display text-lg font-bold text-[#3D4852]">Exam not found</p>
-      <p className="mt-1 text-sm text-[#6B7280]">
+      <p className="font-display text-lg font-bold text-[#0F172A]">Exam not found</p>
+      <p className="mt-1 text-sm text-[#64748B]">
         This exam may have been removed or you don&apos;t have access to it.
       </p>
       <Link
         href="/exams"
-        className="mt-5 inline-flex h-11 items-center justify-center rounded-2xl bg-[#E0E5EC] px-5 text-sm font-semibold text-[#6C63FF] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
+        className="mt-5 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
       >
         Back to exams
       </Link>
@@ -98,7 +98,7 @@ function LoadError({ error }: { error: NormalizedApiError | undefined }) {
   return (
     <div
       role="alert"
-      className="flex items-start gap-3 rounded-container bg-[#E0E5EC] p-5 text-sm font-medium text-[#3D4852] shadow-extruded"
+      className="flex items-start gap-3 rounded-xl border border-[#EF4444]/30 bg-[#EF4444]/5 p-5 text-sm font-medium text-[#EF4444]"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -119,7 +119,7 @@ function LoadError({ error }: { error: NormalizedApiError | undefined }) {
         <span>{message}</span>
         <Link
           href="/exams"
-          className="mt-3 inline-flex h-11 items-center justify-center rounded-2xl bg-[#E0E5EC] px-5 text-sm font-semibold text-[#6C63FF] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
+          className="mt-3 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
         >
           Back to exams
         </Link>

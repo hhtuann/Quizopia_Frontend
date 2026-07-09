@@ -7,6 +7,8 @@ import {
   useCreateNextDraftMutation,
   usePublishExamMutation,
 } from "@/hooks/queries/use-exams";
+import { Badge, Button, SectionLabel, cardVariants } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 import type {
   PublishedExamSummary,
   TeacherExamEditorResponse,
@@ -14,9 +16,6 @@ import type {
 import type { NormalizedApiError } from "@/lib/api";
 import { DraftEditor } from "./DraftEditor";
 import { ConfirmDialog } from "./ConfirmDialog";
-
-const primaryBtn =
-  "neumorphic-active-press inline-flex h-11 items-center justify-center rounded-button bg-[#6C63FF] px-6 text-sm font-semibold text-white shadow-extruded-small outline-none transition-all duration-300 hover:bg-[#8B84FF] active:translate-y-[0.5px] focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] disabled:cursor-not-allowed disabled:opacity-60";
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -66,6 +65,12 @@ function describeActionError(err: unknown): { conflict?: boolean; message: strin
   }
   return { message: "Something went wrong. Please try again." };
 }
+
+const NOTICE_STYLES: Record<Notice["kind"], string> = {
+  success: "border-[#10B981]/30 bg-[#10B981]/5 text-[#10B981]",
+  conflict: "border-[#F59E0B]/30 bg-[#F59E0B]/5 text-[#0F172A]",
+  error: "border-[#EF4444]/30 bg-[#EF4444]/5 text-[#EF4444]",
+};
 
 /**
  * Top-level teacher exam editor. Renders exam metadata, the read-only
@@ -133,7 +138,7 @@ export function ExamEditor({ data }: { data: TeacherExamEditorResponse }) {
       <div className="mb-6">
         <Link
           href="/exams"
-          className="inline-flex items-center gap-1.5 rounded-inner text-xs font-semibold uppercase tracking-wider text-[#6B7280] outline-none transition-all duration-300 hover:text-[#3D4852] focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
+          className="inline-flex items-center gap-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-[#64748B] outline-none transition-colors hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -148,22 +153,19 @@ export function ExamEditor({ data }: { data: TeacherExamEditorResponse }) {
           </svg>
           All exams
         </Link>
-        <h1 className="mt-3 font-display text-2xl font-extrabold tracking-tight text-[#3D4852] sm:text-3xl">
+        <SectionLabel className="mb-3 mt-3">Exam editor</SectionLabel>
+        <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
           {data.title}
         </h1>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[#6B7280]">
-          <span className="rounded-inner bg-[#E0E5EC] px-2 py-0.5 font-mono text-xs shadow-inset-small">
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[#64748B]">
+          <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs text-[#64748B]">
             {data.code}
           </span>
           <span>{data.subject.code} — {data.subject.name}</span>
           {data.purpose && <span>· {data.purpose.title}</span>}
-          <span
-            className={`rounded-inner bg-[#E0E5EC] px-2 py-0.5 text-xs font-semibold uppercase tracking-wide shadow-inset-small ${
-              data.status === "READY" ? "text-[#38B2AC]" : "text-[#6B7280]"
-            }`}
-          >
+          <Badge variant={data.status === "READY" ? "success" : "default"}>
             {data.status}
-          </span>
+          </Badge>
           <span className="text-xs">v{data.currentVersionNumber ?? "—"}</span>
         </div>
       </div>
@@ -171,9 +173,10 @@ export function ExamEditor({ data }: { data: TeacherExamEditorResponse }) {
       {notice && (
         <div
           role={notice.kind === "success" ? "status" : "alert"}
-          className={`mb-6 flex items-start gap-2 rounded-2xl bg-[#E0E5EC] p-4 text-sm font-medium shadow-inset-deep ${
-            notice.kind === "success" ? "text-[#38B2AC]" : "text-[#3D4852]"
-          }`}
+          className={cn(
+            "mb-6 flex items-start gap-2 rounded-lg border p-4 text-sm font-medium",
+            NOTICE_STYLES[notice.kind]
+          )}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -196,20 +199,19 @@ export function ExamEditor({ data }: { data: TeacherExamEditorResponse }) {
 
       {/* Publish action — only when a draft exists. */}
       {draft && (
-        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-container bg-[#E0E5EC] p-4 shadow-extruded">
-          <button
+        <div className={cn(cardVariants(), "mb-6 flex flex-wrap items-center gap-3 p-4")}>
+          <Button
             type="button"
             onClick={() => {
               setNotice(null);
               setConfirmOpen(true);
             }}
             disabled={!canPublish || publishMut.isPending}
-            className={primaryBtn}
           >
             {publishMut.isPending ? "Publishing…" : "Publish draft"}
-          </button>
+          </Button>
           {!canPublish && (
-            <span className="text-xs font-medium text-[#6B7280]">
+            <span className="text-xs font-medium text-[#64748B]">
               Save at least one question before publishing.
             </span>
           )}
@@ -217,32 +219,32 @@ export function ExamEditor({ data }: { data: TeacherExamEditorResponse }) {
       )}
 
       {/* tfMatrixScoring — read-only */}
-      <details className="mb-6 rounded-container bg-[#E0E5EC] p-4 shadow-extruded">
-        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+      <details className={cn(cardVariants(), "mb-6 p-4")}>
+        <summary className="cursor-pointer font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
           True/False matrix scoring (read-only)
         </summary>
-        <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#E0E5EC] p-3 text-xs text-[#3D4852] shadow-inset-pressed">
+        <pre className="mt-3 overflow-x-auto rounded-lg bg-[#F1F5F9] p-3 text-xs text-[#0F172A]">
           {JSON.stringify(data.currentDraftVersion?.tfMatrixScoring ?? null, null, 2)}
         </pre>
       </details>
 
       {/* Published versions — read-only */}
-      <div className="mb-6 rounded-container bg-[#E0E5EC] p-5 shadow-extruded">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+      <div className={cn(cardVariants(), "mb-6 p-5")}>
+        <h2 className="mb-3 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
           Published versions ({data.publishedVersions.length})
         </h2>
         {data.publishedVersions.length === 0 ? (
-          <p className="text-sm text-[#6B7280]">No published versions yet.</p>
+          <p className="text-sm text-[#64748B]">No published versions yet.</p>
         ) : (
           <ul className="space-y-2">
             {data.publishedVersions.map((v) => (
               <li
                 key={v.versionNumber}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl bg-[#E0E5EC] px-3 py-2 text-sm shadow-inset-small"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-3 py-2 text-sm"
               >
-                <span className="font-semibold text-[#3D4852]">v{v.versionNumber}</span>
-                <span className="text-[#6B7280]">published {formatDate(v.publishedAt)}</span>
-                <span className="text-[#6B7280]">· {v.totalPoints} points</span>
+                <span className="font-semibold text-[#0F172A]">v{v.versionNumber}</span>
+                <span className="text-[#64748B]">published {formatDate(v.publishedAt)}</span>
+                <span className="text-[#64748B]">· {v.totalPoints} points</span>
               </li>
             ))}
           </ul>
@@ -253,22 +255,22 @@ export function ExamEditor({ data }: { data: TeacherExamEditorResponse }) {
       {draft ? (
         <DraftEditor examId={data.id} draft={draft} />
       ) : (
-        <div className="rounded-container bg-[#E0E5EC] p-8 text-center shadow-extruded">
-          <p className="font-display text-lg font-bold text-[#3D4852]">No active draft</p>
-          <p className="mt-1 text-sm text-[#6B7280]">
+        <div className={cn(cardVariants(), "p-8 text-center")}>
+          <p className="font-display text-lg font-bold text-[#0F172A]">No active draft</p>
+          <p className="mt-1 text-sm text-[#64748B]">
             {hasPublished
               ? "Create a new draft to edit — it clones the latest published version."
               : "A draft is needed before you can publish."}
           </p>
           {hasPublished && (
-            <button
+            <Button
               type="button"
               onClick={onCreateDraft}
               disabled={createDraftMut.isPending}
-              className={`mt-5 ${primaryBtn}`}
+              className="mt-5"
             >
               {createDraftMut.isPending ? "Creating…" : "Create new draft"}
-            </button>
+            </Button>
           )}
         </div>
       )}

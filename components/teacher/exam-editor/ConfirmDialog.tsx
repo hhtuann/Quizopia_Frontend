@@ -1,16 +1,12 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-
-const primaryBtn =
-  "neumorphic-active-press inline-flex h-11 items-center justify-center rounded-button bg-[#6C63FF] px-5 text-sm font-semibold text-white shadow-extruded-small outline-none transition-all duration-300 hover:bg-[#8B84FF] active:translate-y-[0.5px] focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] disabled:cursor-not-allowed disabled:opacity-60";
-
-const secondaryBtn =
-  "inline-flex h-11 items-center justify-center rounded-button bg-[#E0E5EC] px-5 text-sm font-semibold text-[#3D4852] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]";
+import { buttonVariants, cardVariants } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 
 /**
- * Small neumorphic confirmation dialog. Used for irreversible actions (publish
- * = immutable snapshot). a11y baseline: focus moves to the safe (Cancel)
+ * Small confirmation dialog. Used for irreversible actions (publish =
+ * immutable snapshot). a11y baseline: focus moves to the safe (Cancel)
  * button on open, Esc + click-outside cancel, `role=dialog`/`aria-modal`,
  * labelled by the title.
  */
@@ -60,22 +56,22 @@ export function ConfirmDialog({
       aria-labelledby={titleId}
     >
       <div
-        className="absolute inset-0 bg-[#3D4852]/30 backdrop-blur-sm"
+        className="absolute inset-0 bg-[#0F172A]/40 backdrop-blur-sm"
         onClick={onCancel}
         aria-hidden="true"
       />
-      <div className="relative w-full max-w-md rounded-container bg-[#E0E5EC] p-6 shadow-extruded">
-        <h2 id={titleId} className="font-display text-lg font-bold tracking-tight text-[#3D4852]">
+      <div className={cn(cardVariants({ variant: "elevated" }), "relative w-full max-w-md p-6")}>
+        <h2 id={titleId} className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
           {title}
         </h2>
         {description && (
-          <div className="mt-2 text-sm font-medium text-[#6B7280]">{description}</div>
+          <div className="mt-2 text-sm font-medium text-[#64748B]">{description}</div>
         )}
         <div className="mt-6 flex flex-wrap justify-end gap-2">
-          <button ref={cancelRef} type="button" onClick={onCancel} className={secondaryBtn}>
+          <button ref={cancelRef} type="button" onClick={onCancel} className={buttonVariants({ variant: "outline" })}>
             {cancelLabel}
           </button>
-          <button type="button" onClick={onConfirm} disabled={busy} className={primaryBtn}>
+          <button type="button" onClick={onConfirm} disabled={busy} className={buttonVariants({ variant: "primary" })}>
             {busy ? (busyLabel || "…") : confirmLabel}
           </button>
         </div>

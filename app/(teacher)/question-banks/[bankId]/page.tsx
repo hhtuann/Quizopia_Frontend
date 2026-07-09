@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useBankQuestionsQuery } from "@/hooks/queries/use-question-banks";
 import { QuestionImport } from "@/components/teacher/QuestionImport";
+import { Badge, Input, SectionLabel, cardVariants } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 import type {
   Difficulty,
   QuestionStatus,
@@ -15,14 +17,11 @@ import type { NormalizedApiError } from "@/lib/api";
 
 const PAGE_SIZE = 10;
 
-const inputClass =
-  "w-full h-11 rounded-2xl bg-[#E0E5EC] px-4 text-sm text-[#3D4852] placeholder-[#A0AEC0] outline-none shadow-inset-pressed focus-visible:shadow-inset-deep focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] transition-all duration-300";
-
 const selectClass =
-  "h-11 rounded-2xl bg-[#E0E5EC] px-4 pr-9 text-sm text-[#3D4852] outline-none shadow-inset-pressed focus-visible:shadow-inset-deep focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] transition-all duration-300";
+  "h-11 w-full rounded-lg border border-[#E2E8F0] bg-transparent px-4 pr-9 text-sm text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
 
 const pageBtnClass =
-  "inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#E0E5EC] shadow-extruded-small text-[#3D4852] outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover active:translate-y-[0.5px] active:shadow-inset-small focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-extruded-small";
+  "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#64748B] outline-none transition-all duration-200 hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
 const TYPE_LABEL: Record<QuestionType, string> = {
   SINGLE_CHOICE: "Single",
@@ -97,7 +96,7 @@ export default function BankQuestionsPage() {
       <div className="mb-6">
         <Link
           href="/question-banks"
-          className="inline-flex items-center gap-1.5 rounded-inner text-xs font-semibold uppercase tracking-wider text-[#6B7280] outline-none transition-all duration-300 hover:text-[#3D4852] focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
+          className="inline-flex items-center gap-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-[#64748B] outline-none transition-colors hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -112,10 +111,11 @@ export default function BankQuestionsPage() {
           </svg>
           All banks
         </Link>
-        <h1 className="mt-3 font-display text-2xl font-extrabold tracking-tight text-[#3D4852] sm:text-3xl">
+        <SectionLabel className="mb-3 mt-3">Questions</SectionLabel>
+        <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
           Questions
         </h1>
-        <p className="mt-2 text-sm font-medium text-[#6B7280]">
+        <p className="mt-2 text-sm font-medium text-[#64748B]">
           Question bank <span className="font-mono">#{validId ? bankIdNum : "?"}</span>
         </p>
       </div>
@@ -132,13 +132,13 @@ export default function BankQuestionsPage() {
           <label htmlFor="q-search" className="sr-only">
             Search questions by content or code
           </label>
-          <input
+          <Input
             id="q-search"
             type="search"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search questions…"
-            className={inputClass}
+            className="h-11"
           />
         </div>
         <div>
@@ -185,7 +185,7 @@ export default function BankQuestionsPage() {
         </div>
       </div>
 
-      <div className="rounded-container bg-[#E0E5EC] p-4 shadow-extruded sm:p-6">
+      <div className={cn(cardVariants(), "p-4 sm:p-6")}>
         {!validId ? (
           <NotFound />
         ) : isPending ? (
@@ -211,6 +211,12 @@ export default function BankQuestionsPage() {
   );
 }
 
+function statusVariant(status: QuestionStatus): "default" | "success" | "warn" {
+  if (status === "ACTIVE") return "success";
+  if (status === "DRAFT") return "warn";
+  return "default";
+}
+
 function QuestionsTable({
   items,
   refreshing,
@@ -221,18 +227,18 @@ function QuestionsTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <caption className="mb-3 flex items-center gap-2 px-1 text-left text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+        <caption className="mb-3 flex items-center gap-2 px-1 text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
           <span>Questions ({items.length})</span>
           {refreshing && (
             <span
               role="status"
               aria-label="Updating"
-              className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#6C63FF]"
+              className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#0052FF]"
             />
           )}
         </caption>
         <thead>
-          <tr className="text-left text-xs uppercase tracking-wider text-[#6B7280]">
+          <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
             <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Type</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Content</th>
@@ -244,34 +250,30 @@ function QuestionsTable({
         </thead>
         <tbody>
           {items.map((q) => (
-            <tr key={q.id} className="align-top text-[#3D4852]">
+            <tr key={q.id} className="border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 hover:bg-[#F1F5F9]">
               <td className="px-3 py-3">
-                <span className="rounded-inner bg-[#E0E5EC] px-2 py-1 font-mono text-xs shadow-inset-small">
+                <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B]">
                   {q.code}
                 </span>
               </td>
               <td className="px-3 py-3">
-                <span className="rounded-inner bg-[#E0E5EC] px-2 py-1 text-xs font-semibold shadow-inset-small">
-                  {TYPE_LABEL[q.questionType]}
-                </span>
+                <Badge variant="accent">{TYPE_LABEL[q.questionType]}</Badge>
               </td>
               <td className="px-3 py-3">
-                <span className="block max-w-sm text-[#3D4852] line-clamp-2">
+                <span className="block max-w-sm text-[#0F172A] line-clamp-2">
                   {q.content}
                 </span>
               </td>
-              <td className="px-3 py-3 capitalize text-[#6B7280]">
+              <td className="px-3 py-3 capitalize text-[#64748B]">
                 {(q.difficulty as Difficulty).toLowerCase()}
               </td>
               <td className="px-3 py-3 text-right font-semibold tabular-nums">
                 {q.defaultPoints}
               </td>
               <td className="px-3 py-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
-                  {q.status}
-                </span>
+                <Badge variant={statusVariant(q.status)}>{q.status}</Badge>
               </td>
-              <td className="px-3 py-3 text-[#6B7280]">{formatDate(q.createdAt)}</td>
+              <td className="px-3 py-3 text-[#64748B]">{formatDate(q.createdAt)}</td>
             </tr>
           ))}
         </tbody>
@@ -283,7 +285,7 @@ function QuestionsTable({
 function NotFound() {
   return (
     <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#E0E5EC] text-[#6B7280] shadow-inset-deep">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#F1F5F9] text-[#64748B]">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
@@ -300,15 +302,15 @@ function NotFound() {
           />
         </svg>
       </div>
-      <p className="font-display text-lg font-bold text-[#3D4852]">
+      <p className="font-display text-lg font-bold text-[#0F172A]">
         Question bank not found
       </p>
-      <p className="mt-1 text-sm text-[#6B7280]">
+      <p className="mt-1 text-sm text-[#64748B]">
         This bank may have been removed or you don&apos;t have access to it.
       </p>
       <Link
         href="/question-banks"
-        className="mt-5 inline-flex h-11 items-center justify-center rounded-2xl bg-[#E0E5EC] px-5 text-sm font-semibold text-[#6C63FF] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
+        className="mt-5 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
       >
         Back to banks
       </Link>
@@ -322,7 +324,7 @@ function ListSkeleton({ label }: { label: string }) {
       {Array.from({ length: 5 }).map((_, i) => (
         <div
           key={i}
-          className="h-12 animate-pulse rounded-2xl bg-[#E0E5EC] shadow-inset-small"
+          className="h-12 animate-pulse rounded-lg bg-[#F1F5F9]"
         />
       ))}
       <span className="sr-only">Loading…</span>
@@ -360,7 +362,7 @@ function ErrorState({ error }: { error: NormalizedApiError | undefined }) {
     <div className="flex flex-col items-start gap-3">
       <div
         role="alert"
-        className="flex w-full items-start gap-3 rounded-2xl bg-[#E0E5EC] p-5 text-sm font-medium text-[#3D4852] shadow-inset-deep"
+        className="flex w-full items-start gap-3 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-5 text-sm font-medium text-[#EF4444]"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -382,7 +384,7 @@ function ErrorState({ error }: { error: NormalizedApiError | undefined }) {
       {showBack && (
         <Link
           href="/question-banks"
-          className="inline-flex h-11 items-center justify-center rounded-2xl bg-[#E0E5EC] px-5 text-sm font-semibold text-[#6C63FF] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
+          className="inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
         >
           Back to banks
         </Link>
@@ -394,7 +396,7 @@ function ErrorState({ error }: { error: NormalizedApiError | undefined }) {
 function EmptyState({ hasFilters }: { hasFilters: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#E0E5EC] text-[#6B7280] shadow-inset-deep">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#F1F5F9] text-[#64748B]">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
@@ -411,8 +413,8 @@ function EmptyState({ hasFilters }: { hasFilters: boolean }) {
           />
         </svg>
       </div>
-      <p className="font-display text-lg font-bold text-[#3D4852]">No questions here</p>
-      <p className="mt-1 text-sm text-[#6B7280]">
+      <p className="font-display text-lg font-bold text-[#0F172A]">No questions here</p>
+      <p className="mt-1 text-sm text-[#64748B]">
         {hasFilters
           ? "No questions match your filters."
           : "This question bank has no questions yet."}
@@ -436,7 +438,7 @@ function Pagination({
   const nextDisabled = page >= totalPages - 1;
   return (
     <div className="mt-4 flex items-center justify-between px-1 pt-4">
-      <p className="text-xs font-medium text-[#6B7280]" aria-live="polite">
+      <p className="text-xs font-medium text-[#64748B]" aria-live="polite">
         {totalElements} question{totalElements === 1 ? "" : "s"} · Page {page + 1} of{" "}
         {Math.max(totalPages, 1)}
       </p>

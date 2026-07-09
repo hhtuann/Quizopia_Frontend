@@ -2,6 +2,8 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import { useImportQuestionsMutation } from "@/hooks/queries/use-question-import";
+import { Button, SectionLabel, cardVariants } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 import {
   downloadImportTemplate,
   type ImportResponse,
@@ -11,11 +13,8 @@ import type { NormalizedApiError } from "@/lib/api";
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MiB (backend is the source of truth).
 
-const secondaryBtn =
-  "inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[#E0E5EC] px-5 text-sm font-semibold text-[#3D4852] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover active:translate-y-[0.5px] active:shadow-inset-small focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-extruded-small";
-
 const fileInputClass =
-  "block w-full rounded-2xl bg-[#E0E5EC] p-2 text-sm text-[#6B7280] shadow-inset-pressed outline-none focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] file:mr-3 file:inline-flex file:h-11 file:cursor-pointer file:items-center file:rounded-2xl file:border-0 file:bg-[#E0E5EC] file:px-5 file:font-semibold file:text-[#6C63FF] file:shadow-extruded-small file:outline-none file:transition-all file:duration-300 hover:file:-translate-y-0.5 hover:file:shadow-extruded-hover disabled:opacity-60";
+  "block w-full rounded-lg border border-[#E2E8F0] bg-white p-2 text-sm text-[#64748B] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2 file:mr-3 file:inline-flex file:h-11 file:cursor-pointer file:items-center file:rounded-lg file:border-0 file:bg-gradient-to-r file:from-[#0052FF] file:to-[#4D7CFF] file:px-5 file:font-semibold file:text-white file:outline-none file:transition-all file:duration-200 hover:file:brightness-110 disabled:opacity-60";
 
 /**
  * Maps a file-level error (NormalizedApiError) to a friendly message.
@@ -123,24 +122,25 @@ export function QuestionImport({ bankId }: { bankId: number }) {
   const busy = uploading || downloading;
 
   return (
-    <section className="rounded-container bg-[#E0E5EC] p-6 shadow-extruded">
+    <section className={cn(cardVariants(), "p-6")}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-display text-lg font-bold tracking-tight text-[#3D4852]">
+          <SectionLabel className="mb-2">Import</SectionLabel>
+          <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
             Import questions
           </h2>
-          <p className="mt-1 text-xs font-medium text-[#6B7280]">
+          <p className="mt-1 text-xs font-medium text-[#64748B]">
             Upload an .xlsx workbook (max 5 MB). Validation happens server-side.
           </p>
         </div>
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={handleDownload}
           disabled={busy}
-          className={secondaryBtn}
         >
           {downloading ? "Preparing…" : "Download template"}
-        </button>
+        </Button>
       </div>
 
       {downloadError && <Alert role="alert">{downloadError}</Alert>}
@@ -165,7 +165,7 @@ export function QuestionImport({ bankId }: { bankId: number }) {
             className={fileInputClass}
           />
           {uploading && (
-            <p role="status" className="mt-3 pl-1 text-xs font-medium text-[#6B7280]">
+            <p role="status" className="mt-3 pl-1 text-xs font-medium text-[#64748B]">
               Importing…
             </p>
           )}
@@ -191,9 +191,12 @@ function ResultView({
       {/* Summary banner (partial success is still a 200, not an ApiError). */}
       <div
         role="status"
-        className={`mb-4 rounded-2xl bg-[#E0E5EC] p-4 text-sm font-medium shadow-inset-deep ${
-          allValid ? "text-[#38B2AC]" : "text-[#3D4852]"
-        }`}
+        className={cn(
+          "mb-4 rounded-lg border p-4 text-sm font-medium",
+          allValid
+            ? "border-[#10B981]/30 bg-[#10B981]/5 text-[#10B981]"
+            : "border-[#F59E0B]/30 bg-[#F59E0B]/5 text-[#0F172A]"
+        )}
       >
         {allValid ? (
           <span>Imported all {result.totalRows} rows.</span>
@@ -201,7 +204,7 @@ function ResultView({
           <span>
             Imported <strong className="font-bold">{result.importedRows}</strong> of{" "}
             <strong className="font-bold">{result.totalRows}</strong> rows ·{" "}
-            <span className="text-[#6B7280]">{result.invalidRows} had errors.</span>
+            <span className="text-[#64748B]">{result.invalidRows} had errors.</span>
           </span>
         )}
       </div>
@@ -210,9 +213,9 @@ function ResultView({
         <RowErrorsTable errors={result.errors} />
       )}
 
-      <button type="button" onClick={onReset} disabled={resetting} className={secondaryBtn}>
+      <Button type="button" variant="outline" onClick={onReset} disabled={resetting}>
         Upload another
-      </button>
+      </Button>
     </div>
   );
 }
@@ -221,11 +224,11 @@ function RowErrorsTable({ errors }: { errors: RowError[] }) {
   return (
     <div className="mb-4 overflow-x-auto">
       <table className="w-full text-sm">
-        <caption className="mb-3 px-1 text-left text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+        <caption className="mb-3 px-1 text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
           Row errors ({errors.length})
         </caption>
         <thead>
-          <tr className="text-left text-xs uppercase tracking-wider text-[#6B7280]">
+          <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
             <th scope="col" className="px-3 pb-3 font-semibold">Row</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Field</th>
@@ -235,18 +238,18 @@ function RowErrorsTable({ errors }: { errors: RowError[] }) {
         </thead>
         <tbody>
           {errors.map((e, i) => (
-            <tr key={`${e.rowNumber}-${i}`} className="align-top text-[#3D4852]">
+            <tr key={`${e.rowNumber}-${i}`} className="border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 hover:bg-[#F1F5F9]">
               <td className="px-3 py-2 tabular-nums">{e.rowNumber}</td>
               <td className="px-3 py-2 font-mono text-xs">
                 {e.questionCode ?? "—"}
               </td>
-              <td className="px-3 py-2 text-[#6B7280]">{e.field ?? "—"}</td>
+              <td className="px-3 py-2 text-[#64748B]">{e.field ?? "—"}</td>
               <td className="px-3 py-2">
-                <span className="rounded-inner bg-[#E0E5EC] px-2 py-0.5 text-xs font-semibold shadow-inset-small">
+                <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs text-[#64748B]">
                   {e.code}
                 </span>
               </td>
-              <td className="px-3 py-2 text-[#6B7280]">{e.message}</td>
+              <td className="px-3 py-2 text-[#64748B]">{e.message}</td>
             </tr>
           ))}
         </tbody>
@@ -259,7 +262,7 @@ function Alert({ children, role }: { children: React.ReactNode; role: "alert" })
   return (
     <div
       role={role}
-      className="mt-4 flex items-start gap-3 rounded-2xl bg-[#E0E5EC] p-4 text-sm font-medium text-[#3D4852] shadow-inset-deep"
+      className="mt-4 flex items-start gap-3 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-4 text-sm font-medium text-[#EF4444]"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"

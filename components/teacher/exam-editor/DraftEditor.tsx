@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useUpdateDraftCompositionMutation } from "@/hooks/queries/use-exams";
+import { Button, Input, cardVariants, buttonVariants } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 import type { ExamDraftVersionResponse } from "@/lib/api/exams";
 import {
   nextUid,
@@ -15,17 +17,8 @@ import {
 import { QuestionPicker } from "./QuestionPicker";
 import { QuestionAnswerView } from "./QuestionAnswerView";
 
-const inputClass =
-  "w-full h-11 rounded-button bg-[#E0E5EC] px-4 text-sm text-[#3D4852] placeholder-[#A0AEC0] outline-none shadow-inset-pressed focus-visible:shadow-inset-deep focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] transition-all duration-300";
-
-const pointsClass =
-  "w-24 h-10 rounded-button bg-[#E0E5EC] px-3 text-sm text-[#3D4852] placeholder-[#A0AEC0] outline-none shadow-inset-pressed focus-visible:shadow-inset-deep focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] transition-all duration-300";
-
 const iconBtn =
-  "inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-[#E0E5EC] text-[#6B7280] shadow-inset-small outline-none transition-all duration-300 hover:text-[#3D4852] focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] disabled:opacity-40";
-
-const primaryBtn =
-  "neumorphic-active-press inline-flex h-11 items-center justify-center rounded-button bg-[#6C63FF] px-6 text-sm font-semibold text-white shadow-extruded-small outline-none transition-all duration-300 hover:bg-[#8B84FF] active:translate-y-[0.5px] focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#64748B] outline-none transition-all duration-200 hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:opacity-40";
 
 const TYPE_LABEL: Record<string, string> = {
   SINGLE_CHOICE: "Single",
@@ -167,36 +160,36 @@ export function DraftEditor({
     <section className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-display text-lg font-bold tracking-tight text-[#3D4852]">
+          <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
             Draft composition
           </h2>
-          <p className="mt-1 text-xs font-medium text-[#6B7280]">
+          <p className="mt-1 text-xs font-medium text-[#64748B]">
             Version {draft.versionNumber} · {sections.length} section
             {sections.length === 1 ? "" : "s"} · positions follow insertion order.
           </p>
         </div>
-        <button type="button" onClick={handleSave} disabled={!canSave} className={primaryBtn}>
+        <Button type="button" onClick={handleSave} disabled={!canSave}>
           {mutation.isPending ? "Saving…" : "Save draft"}
-        </button>
+        </Button>
       </div>
 
       {savedNotice && (
         <div
           role="status"
-          className="rounded-2xl bg-[#E0E5EC] p-4 text-sm font-semibold text-[#38B2AC] shadow-inset-pressed"
+          className="rounded-lg border border-[#10B981]/30 bg-[#10B981]/5 p-4 text-sm font-semibold text-[#10B981]"
         >
           Draft saved. Answer snapshots for newly added questions are now pinned.
         </div>
       )}
       {validationError && dirty && (
-        <div role="status" className="rounded-2xl bg-[#E0E5EC] p-4 text-sm font-medium text-[#3D4852] shadow-inset-pressed">
+        <div role="status" className="rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-4 text-sm font-medium text-[#0F172A]">
           {validationError}
         </div>
       )}
       {saveError && (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-2xl bg-[#E0E5EC] p-4 text-sm font-medium text-[#3D4852] shadow-inset-deep"
+          className="flex items-start gap-2 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-4 text-sm font-medium text-[#EF4444]"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -218,16 +211,16 @@ export function DraftEditor({
       )}
 
       {sections.map((section, sIndex) => (
-        <div key={section.uid} className="rounded-container bg-[#E0E5EC] p-5 shadow-extruded">
+        <div key={section.uid} className={cn(cardVariants(), "p-5")}>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <span className="rounded-inner bg-[#E0E5EC] px-2 py-1 text-xs font-bold uppercase tracking-wider text-[#6B7280] shadow-inset-small">
+            <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs font-bold uppercase tracking-wider text-[#64748B]">
               Section {sIndex + 1}
             </span>
             <button
               type="button"
               onClick={() => removeSection(section.uid)}
               aria-label={`Remove section ${sIndex + 1}`}
-              className={iconBtn + " hover:text-[#6C63FF]"}
+              className={cn(iconBtn, "hover:text-[#EF4444]")}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -243,26 +236,26 @@ export function DraftEditor({
             </button>
           </div>
 
-          <label className="mb-1.5 block pl-1 text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+          <label className="mb-1.5 block pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
             Title
           </label>
-          <input
+          <Input
             type="text"
             value={section.title}
             onChange={(e) => patchSection(section.uid, { title: e.target.value })}
             placeholder="Section title"
             aria-invalid={section.title.trim() === ""}
-            className={inputClass + " mb-4"}
+            className="mb-4"
           />
 
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+            <p className="font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
               Questions ({section.questions.length})
             </p>
             <button
               type="button"
               onClick={() => setPickerFor(section.uid)}
-              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-2xl bg-[#E0E5EC] px-3 text-xs font-semibold text-[#6C63FF] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -290,13 +283,13 @@ export function DraftEditor({
           )}
 
           {section.questions.length === 0 ? (
-            <p className="rounded-2xl bg-[#E0E5EC] px-4 py-6 text-center text-xs text-[#6B7280] shadow-inset-small">
+            <p className="rounded-lg border border-dashed border-[#E2E8F0] bg-[#F1F5F9]/50 px-4 py-6 text-center text-xs text-[#64748B]">
               No questions yet. Use “Add from bank”.
             </p>
           ) : (
             <ul className="space-y-3">
               {section.questions.map((q, qIndex) => (
-                <li key={q.uid} className="rounded-2xl bg-[#E0E5EC] p-4 shadow-inset-pressed">
+                <li key={q.uid} className="rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] p-4">
                   <div className="flex items-start gap-3">
                     <div className="flex flex-col gap-1">
                       <button
@@ -304,7 +297,7 @@ export function DraftEditor({
                         onClick={() => moveQuestion(section.uid, qIndex, -1)}
                         disabled={qIndex === 0}
                         aria-label="Move up"
-                        className={iconBtn + " h-7 w-7"}
+                        className={cn(iconBtn, "h-7 w-7")}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" />
@@ -315,7 +308,7 @@ export function DraftEditor({
                         onClick={() => moveQuestion(section.uid, qIndex, 1)}
                         disabled={qIndex === section.questions.length - 1}
                         aria-label="Move down"
-                        className={iconBtn + " h-7 w-7"}
+                        className={cn(iconBtn, "h-7 w-7")}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
@@ -325,28 +318,28 @@ export function DraftEditor({
 
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-inner bg-[#E0E5EC] px-1.5 py-0.5 font-mono text-[10px] shadow-inset-small">
+                        <span className="rounded-md border border-[#E2E8F0] bg-white px-1.5 py-0.5 font-mono text-[10px] text-[#64748B]">
                           {q.code}
                         </span>
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-[#6B7280]">
+                        <span className="font-mono text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">
                           {TYPE_LABEL[q.type] ?? q.type}
                         </span>
                         {q.difficulty && (
-                          <span className="text-[10px] capitalize text-[#6B7280]">
+                          <span className="text-[10px] capitalize text-[#64748B]">
                             {q.difficulty.toLowerCase()}
                           </span>
                         )}
                       </div>
-                      <p className="mt-1.5 text-sm text-[#3D4852]">{q.content}</p>
+                      <p className="mt-1.5 text-sm text-[#0F172A]">{q.content}</p>
                       <div className="mt-3">
                         <QuestionAnswerView question={q} />
                       </div>
                     </div>
 
                     <div className="flex flex-col items-end gap-2">
-                      <label className="flex items-center gap-2 text-xs font-semibold text-[#6B7280]">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-[#64748B]">
                         Points
-                        <input
+                        <Input
                           type="number"
                           inputMode="decimal"
                           min={0}
@@ -358,14 +351,14 @@ export function DraftEditor({
                             setPoints(section.uid, q.uid, v === "" ? null : Number(v));
                           }}
                           aria-label={`Points for ${q.code}`}
-                          className={pointsClass}
+                          className="w-24 h-10 px-3"
                         />
                       </label>
                       <button
                         type="button"
                         onClick={() => removeQuestion(section.uid, q.uid)}
                         aria-label={`Remove ${q.code}`}
-                        className={iconBtn + " h-7 w-7 hover:text-[#6C63FF]"}
+                        className={cn(iconBtn, "h-7 w-7 hover:text-[#EF4444]")}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -383,7 +376,7 @@ export function DraftEditor({
       <button
         type="button"
         onClick={addSection}
-        className="inline-flex h-11 items-center justify-center gap-1.5 rounded-button bg-[#E0E5EC] px-5 text-sm font-semibold text-[#6C63FF] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
+        className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
       >
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-4 w-4" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />

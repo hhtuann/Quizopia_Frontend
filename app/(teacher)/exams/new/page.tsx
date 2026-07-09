@@ -10,24 +10,17 @@ import { createExam, type CreateExamRequest } from "@/lib/api/exams";
 import { useSubjectsQuery } from "@/hooks/queries/use-subjects";
 import { useExamPurposesQuery } from "@/hooks/queries/use-exams";
 import { createExamSchema, type CreateExamValues } from "@/lib/validation/exam-schemas";
+import { Button, Input, SectionLabel, buttonVariants, cardVariants } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 import type { NormalizedApiError } from "@/lib/api";
 
-const labelClass = "mb-2 block pl-1 text-xs font-semibold uppercase tracking-wider text-[#6B7280]";
-
-const inputClass =
-  "w-full h-12 rounded-button bg-[#E0E5EC] px-4 text-sm text-[#3D4852] placeholder-[#A0AEC0] outline-none shadow-inset-pressed focus-visible:shadow-inset-deep focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] transition-all duration-300";
+const labelClass = "mb-2 block pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]";
 
 const textareaClass =
-  "w-full min-h-[96px] rounded-button bg-[#E0E5EC] px-4 py-3 text-sm text-[#3D4852] placeholder-[#A0AEC0] outline-none shadow-inset-pressed focus-visible:shadow-inset-deep focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] transition-all duration-300 resize-y";
+  "w-full min-h-[96px] rounded-lg border border-[#E2E8F0] bg-transparent px-4 py-3 text-sm text-[#0F172A] placeholder:text-[#64748B]/50 outline-none transition-all duration-200 resize-y focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
 
 const selectClass =
-  "h-12 w-full rounded-button bg-[#E0E5EC] px-4 pr-9 text-sm text-[#3D4852] outline-none shadow-inset-pressed focus-visible:shadow-inset-deep focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] transition-all duration-300";
-
-const primaryBtn =
-  "neumorphic-active-press inline-flex h-12 items-center justify-center rounded-button bg-[#6C63FF] px-6 text-sm font-semibold text-white shadow-extruded-small outline-none transition-all duration-300 hover:bg-[#8B84FF] active:translate-y-[0.5px] focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] disabled:cursor-not-allowed disabled:opacity-60";
-
-const secondaryBtn =
-  "inline-flex h-12 items-center justify-center rounded-button bg-[#E0E5EC] px-6 text-sm font-semibold text-[#3D4852] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]";
+  "h-12 w-full rounded-lg border border-[#E2E8F0] bg-transparent px-4 pr-9 text-sm text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
 
 function describeCreateError(
   err: unknown
@@ -117,7 +110,7 @@ export default function NewExamPage() {
       <div className="mb-6">
         <Link
           href="/exams"
-          className="inline-flex items-center gap-1.5 rounded-inner text-xs font-semibold uppercase tracking-wider text-[#6B7280] outline-none transition-all duration-300 hover:text-[#3D4852] focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
+          className="inline-flex items-center gap-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-[#64748B] outline-none transition-colors hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -132,16 +125,17 @@ export default function NewExamPage() {
           </svg>
           All exams
         </Link>
-        <h1 className="mt-3 font-display text-2xl font-extrabold tracking-tight text-[#3D4852] sm:text-3xl">
+        <SectionLabel className="mb-3 mt-3">New exam</SectionLabel>
+        <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
           Create exam
         </h1>
       </div>
 
-      <div className="max-w-2xl rounded-container bg-[#E0E5EC] p-8 shadow-extruded sm:p-10">
+      <div className={cn(cardVariants({ variant: "elevated" }), "max-w-2xl p-8 sm:p-10")}>
         {formError && (
           <div
             role="alert"
-            className="mb-6 flex items-start gap-2 rounded-button bg-[#E0E5EC] p-4 text-sm font-medium text-[#3D4852] shadow-inset-deep"
+            className="mb-6 flex items-start gap-2 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-4 text-sm font-medium text-[#EF4444]"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -173,7 +167,7 @@ export default function NewExamPage() {
                 disabled={subjectsPending}
                 aria-invalid={!!errors.subjectId}
                 aria-describedby={errors.subjectId ? "exam-subject-error" : undefined}
-                className={`${selectClass} ${errors.subjectId ? "shadow-inset-deep" : ""} disabled:opacity-70`}
+                className={cn(selectClass, errors.subjectId && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]", "disabled:opacity-70")}
                 {...register("subjectId", { valueAsNumber: true })}
               >
                 <option value="">
@@ -186,7 +180,7 @@ export default function NewExamPage() {
                 ))}
               </select>
               {subjectsError && (
-                <p className="mt-1.5 pl-1 text-xs font-medium text-[#3D4852]">
+                <p className="mt-1.5 pl-1 text-xs font-medium text-[#EF4444]">
                   Couldn&apos;t load subjects.
                 </p>
               )}
@@ -195,14 +189,14 @@ export default function NewExamPage() {
 
             <div>
               <label htmlFor="exam-purpose" className={labelClass}>
-                Purpose <span className="font-normal normal-case text-[#A0AEC0]">(optional)</span>
+                Purpose <span className="font-normal normal-case text-[#64748B]/60">(optional)</span>
               </label>
               <select
                 id="exam-purpose"
                 disabled={purposesPending}
                 aria-invalid={!!errors.purposeId}
                 aria-describedby={errors.purposeId ? "exam-purpose-error" : undefined}
-                className={`${selectClass} ${errors.purposeId ? "shadow-inset-deep" : ""} disabled:opacity-70`}
+                className={cn(selectClass, errors.purposeId && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]", "disabled:opacity-70")}
                 {...register("purposeId")}
               >
                 <option value="">
@@ -215,7 +209,7 @@ export default function NewExamPage() {
                 ))}
               </select>
               {purposesError && (
-                <p className="mt-1.5 pl-1 text-xs font-medium text-[#3D4852]">
+                <p className="mt-1.5 pl-1 text-xs font-medium text-[#EF4444]">
                   Couldn&apos;t load purposes.
                 </p>
               )}
@@ -227,13 +221,13 @@ export default function NewExamPage() {
             <label htmlFor="exam-code" className={labelClass}>
               Code
             </label>
-            <input
+            <Input
               id="exam-code"
               type="text"
               placeholder="e.g. MIDTERM-MATH"
               aria-invalid={!!errors.code}
               aria-describedby={errors.code ? "exam-code-error" : undefined}
-              className={`${inputClass} ${errors.code ? "shadow-inset-deep" : ""}`}
+              className={cn(errors.code && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")}
               {...register("code")}
             />
             <FieldError id="exam-code-error" message={errors.code?.message} />
@@ -243,13 +237,13 @@ export default function NewExamPage() {
             <label htmlFor="exam-title" className={labelClass}>
               Title
             </label>
-            <input
+            <Input
               id="exam-title"
               type="text"
               placeholder="Đề giữa kỳ Toán 2026"
               aria-invalid={!!errors.title}
               aria-describedby={errors.title ? "exam-title-error" : undefined}
-              className={`${inputClass} ${errors.title ? "shadow-inset-deep" : ""}`}
+              className={cn(errors.title && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")}
               {...register("title")}
             />
             <FieldError id="exam-title-error" message={errors.title?.message} />
@@ -257,24 +251,24 @@ export default function NewExamPage() {
 
           <div>
             <label htmlFor="exam-description" className={labelClass}>
-              Description <span className="font-normal normal-case text-[#A0AEC0]">(optional)</span>
+              Description <span className="font-normal normal-case text-[#64748B]/60">(optional)</span>
             </label>
             <textarea
               id="exam-description"
               placeholder="What is this exam for?"
               aria-invalid={!!errors.description}
               aria-describedby={errors.description ? "exam-description-error" : undefined}
-              className={`${textareaClass} ${errors.description ? "shadow-inset-deep" : ""}`}
+              className={cn(textareaClass, errors.description && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")}
               {...register("description")}
             />
             <FieldError id="exam-description-error" message={errors.description?.message} />
           </div>
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
-            <button type="submit" disabled={isSubmitting} className={primaryBtn}>
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Creating…" : "Create exam"}
-            </button>
-            <Link href="/exams" className={secondaryBtn}>
+            </Button>
+            <Link href="/exams" className={buttonVariants({ variant: "outline" })}>
               Cancel
             </Link>
           </div>
@@ -290,7 +284,7 @@ function FieldError({ id, message }: { id: string; message?: string }) {
     <p
       id={id}
       role="alert"
-      className="mt-1.5 flex items-center gap-1.5 pl-1 text-xs font-semibold text-[#3D4852]"
+      className="mt-1.5 flex items-center gap-1.5 pl-1 text-xs font-semibold text-[#EF4444]"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
