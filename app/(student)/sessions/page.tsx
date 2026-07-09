@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAvailableSessionsQuery } from "@/hooks/queries/use-student-attempts";
 import { useStartAttemptMutation } from "@/hooks/queries/use-student-attempt";
+import { Badge, Button, SectionLabel, buttonVariants, cardVariants } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 import type { AvailableSessionItem } from "@/lib/api/student-attempts";
 import type { NormalizedApiError } from "@/lib/api";
 
@@ -28,10 +30,10 @@ function sessionFlag(item: AvailableSessionItem): { label: string; tone: Tone } 
   return { label: `Starts ${formatDateTime(item.startsAt)}`, tone: "muted" };
 }
 
-function toneClass(tone: Tone): string {
-  if (tone === "accent") return "text-[#6C63FF]";
-  if (tone === "active") return "text-[#38B2AC]";
-  return "text-[#6B7280]";
+function flagVariant(tone: Tone): "accent" | "success" | "default" {
+  if (tone === "accent") return "accent";
+  if (tone === "active") return "success";
+  return "default";
 }
 
 /** Map a start-attempt error to a short message. */
@@ -66,25 +68,23 @@ export default function StudentSessionsPage() {
   return (
     <div>
       <div className="mb-6 select-none">
-        <h1 className="font-display text-2xl font-extrabold tracking-tight text-[#3D4852] sm:text-3xl">
+        <SectionLabel className="mb-3">Take an exam</SectionLabel>
+        <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
           Available sessions
         </h1>
-        <p className="mt-2 text-sm font-medium text-[#6B7280]">
+        <p className="mt-2 text-sm font-medium text-[#64748B]">
           Exam sessions you can take.
         </p>
       </div>
 
       {data?.serverTime && (
-        <p className="mb-6 pl-1 text-xs font-medium text-[#6B7280]" aria-live="polite">
+        <p className="mb-6 pl-1 text-xs font-medium text-[#64748B]" aria-live="polite">
           Server time: {formatDateTime(data.serverTime)}
         </p>
       )}
 
       <div className="mb-6 flex justify-end">
-        <Link
-          href="/history"
-          className="inline-flex h-11 items-center justify-center rounded-2xl bg-[#E0E5EC] px-5 text-sm font-semibold text-[#6C63FF] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
-        >
+        <Link href="/history" className={buttonVariants({ variant: "outline" })}>
           My attempts
         </Link>
       </div>
@@ -112,54 +112,52 @@ function SessionCard({ item }: { item: AvailableSessionItem }) {
   const startMut = useStartAttemptMutation();
   const [startError, setStartError] = useState<string | null>(null);
   return (
-    <div className="rounded-container bg-[#E0E5EC] p-6 shadow-extruded">
+    <div className={cn(cardVariants({ variant: "elevated" }), "p-6")}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-display text-lg font-bold tracking-tight text-[#3D4852]">
+          <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
             {item.exam.title}
           </h2>
-          <p className="mt-0.5 text-sm text-[#6B7280]">{item.exam.subjectName}</p>
+          <p className="mt-0.5 text-sm text-[#64748B]">{item.exam.subjectName}</p>
         </div>
-        <span className="rounded-inner bg-[#E0E5EC] px-2 py-1 font-mono text-xs shadow-inset-small">
+        <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B]">
           {item.code}
         </span>
       </div>
 
-      <p className="mb-4 text-sm font-medium text-[#3D4852]">{item.title}</p>
+      <p className="mb-4 text-sm font-medium text-[#0F172A]">{item.title}</p>
 
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
         <div>
-          <dt className="font-semibold uppercase tracking-wider text-[#6B7280]">Window</dt>
-          <dd className="mt-0.5 text-[#3D4852]">
+          <dt className="font-mono uppercase tracking-[0.1em] text-[#64748B]">Window</dt>
+          <dd className="mt-0.5 text-[#0F172A]">
             {formatDateTime(item.startsAt)} → {formatDateTime(item.endsAt)}
           </dd>
         </div>
         <div>
-          <dt className="font-semibold uppercase tracking-wider text-[#6B7280]">Duration</dt>
-          <dd className="mt-0.5 text-[#3D4852]">
+          <dt className="font-mono uppercase tracking-[0.1em] text-[#64748B]">Duration</dt>
+          <dd className="mt-0.5 text-[#0F172A]">
             {item.durationMinutes != null ? `${item.durationMinutes} min` : "—"}
           </dd>
         </div>
         <div>
-          <dt className="font-semibold uppercase tracking-wider text-[#6B7280]">Attempts</dt>
-          <dd className="mt-0.5 text-[#3D4852]">
+          <dt className="font-mono uppercase tracking-[0.1em] text-[#64748B]">Attempts</dt>
+          <dd className="mt-0.5 text-[#0F172A]">
             {item.attemptsUsed}
             {item.maxAttempts != null ? ` / ${item.maxAttempts}` : ""} used ·{" "}
             <span className="font-semibold">{item.remainingAttempts} left</span>
           </dd>
         </div>
         <div>
-          <dt className="font-semibold uppercase tracking-wider text-[#6B7280]">Status</dt>
+          <dt className="font-mono uppercase tracking-[0.1em] text-[#64748B]">Status</dt>
           <dd className="mt-0.5">
-            <span className={`font-bold uppercase tracking-wide ${toneClass(flag.tone)}`}>
-              {flag.label}
-            </span>
+            <Badge variant={flagVariant(flag.tone)}>{flag.label}</Badge>
           </dd>
         </div>
       </dl>
 
       {item.canResume && item.activeAttemptDeadlineAt && (
-        <p className="mt-4 rounded-2xl bg-[#E0E5EC] px-4 py-2 text-xs font-medium text-[#6B7280] shadow-inset-small">
+        <p className="mt-4 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-4 py-2 text-xs font-medium text-[#64748B]">
           Active attempt deadline: {formatDateTime(item.activeAttemptDeadlineAt)}
         </p>
       )}
@@ -168,7 +166,7 @@ function SessionCard({ item }: { item: AvailableSessionItem }) {
       {(item.canStartNow || (item.canResume && item.activeAttemptId !== null)) && (
         <div className="mt-4 flex flex-wrap gap-3">
           {item.canStartNow && (
-            <button
+            <Button
               type="button"
               disabled={startMut.isPending}
               onClick={async () => {
@@ -180,16 +178,15 @@ function SessionCard({ item }: { item: AvailableSessionItem }) {
                   setStartError(describeStartError(err));
                 }
               }}
-              className="neumorphic-active-press inline-flex h-11 items-center justify-center rounded-button bg-[#6C63FF] px-5 text-sm font-semibold text-white shadow-extruded-small outline-none transition-all duration-300 hover:bg-[#8B84FF] active:translate-y-[0.5px] focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {startMut.isPending ? "Starting…" : "Start attempt"}
-            </button>
+            </Button>
           )}
           {item.canResume && item.activeAttemptId !== null && (
             <button
               type="button"
               onClick={() => router.push(`/attempts/${item.activeAttemptId}`)}
-              className="neumorphic-active-press inline-flex h-11 items-center justify-center rounded-button bg-[#E0E5EC] px-5 text-sm font-semibold text-[#6C63FF] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
+              className={buttonVariants({ variant: "outline" })}
             >
               Resume attempt
             </button>
@@ -197,7 +194,7 @@ function SessionCard({ item }: { item: AvailableSessionItem }) {
         </div>
       )}
       {startError && (
-        <p role="alert" className="mt-3 rounded-2xl bg-[#E0E5EC] px-4 py-2 text-xs font-medium text-[#3D4852] shadow-inset-deep">
+        <p role="alert" className="mt-3 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 px-4 py-2 text-xs font-medium text-[#EF4444]">
           {startError}
         </p>
       )}
@@ -209,7 +206,7 @@ function Skeleton() {
   return (
     <div role="status" aria-busy="true" aria-label="Loading available sessions" className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="h-44 animate-pulse rounded-container bg-[#E0E5EC] shadow-extruded" />
+        <div key={i} className="h-44 animate-pulse rounded-xl border border-[#E2E8F0] bg-[#F1F5F9]" />
       ))}
       <span className="sr-only">Loading…</span>
     </div>
@@ -238,7 +235,7 @@ function ErrorState({ error }: { error: NormalizedApiError | undefined }) {
     message = "Something went wrong. Please try again.";
   }
   return (
-    <div role="alert" className="flex items-start gap-3 rounded-container bg-[#E0E5EC] p-5 text-sm font-medium text-[#3D4852] shadow-extruded">
+    <div role="alert" className="flex items-start gap-3 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-5 text-sm font-medium text-[#EF4444]">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
       </svg>
@@ -250,13 +247,13 @@ function ErrorState({ error }: { error: NormalizedApiError | undefined }) {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#E0E5EC] text-[#6B7280] shadow-inset-deep">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#F1F5F9] text-[#64748B]">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="h-7 w-7" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0V18a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 18v.75m-18 0h18" />
         </svg>
       </div>
-      <p className="font-display text-lg font-bold text-[#3D4852]">No sessions available</p>
-      <p className="mt-1 text-sm text-[#6B7280]">Check back later for new exam sessions.</p>
+      <p className="font-display text-lg font-bold text-[#0F172A]">No sessions available</p>
+      <p className="mt-1 text-sm text-[#64748B]">Check back later for new exam sessions.</p>
     </div>
   );
 }

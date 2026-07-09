@@ -10,6 +10,8 @@ import {
 } from "@/hooks/queries/use-student-attempt";
 import { AttemptShell } from "@/components/student/AttemptShell";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
+import { Button, SectionLabel, cardVariants } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 import { useAutosaveAnswers } from "@/lib/attempt/use-autosave";
 import { useAnswerStore } from "@/lib/attempt/answer-store";
 import { useStompConnection } from "@/lib/realtime/use-stomp-connection";
@@ -37,7 +39,7 @@ export default function AttemptPage() {
       <div className="mb-6">
         <Link
           href="/sessions"
-          className="inline-flex items-center gap-1.5 rounded-inner text-xs font-semibold uppercase tracking-wider text-[#6B7280] outline-none transition-all duration-300 hover:text-[#3D4852] focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
+          className="inline-flex items-center gap-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-[#64748B] outline-none transition-colors hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
@@ -163,32 +165,33 @@ function InProgressShell({
     <SubmitResultCard result={submitResult} />
   ) : (
     <div className="flex flex-col items-center gap-3">
-      <button
+      <Button
         type="button"
+        size="lg"
         disabled={!canSubmit || submitMut.isPending}
         onClick={() => setConfirmOpen(true)}
-        className="neumorphic-active-press inline-flex h-12 items-center justify-center gap-2 rounded-button bg-[#E0E5EC] px-6 text-sm font-bold text-[#3D4852] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover active:translate-y-[0.5px] active:shadow-inset-small focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] disabled:cursor-not-allowed disabled:opacity-50"
+        className="gap-2"
       >
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-4 w-4" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
         </svg>
         {submitMut.isPending ? "Submitting…" : "Submit attempt"}
-      </button>
+      </Button>
       {submitHint && (
-        <p className="text-xs font-medium text-[#6B7280]">{submitHint}</p>
+        <p className="text-xs font-medium text-[#64748B]">{submitHint}</p>
       )}
       {submitError && (
-        <div role="alert" className="flex flex-col items-center gap-2 rounded-2xl bg-[#E0E5EC] p-4 text-sm font-medium text-[#3D4852] shadow-inset-deep">
+        <div role="alert" className="flex flex-col items-center gap-2 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-4 text-sm font-medium text-[#EF4444]">
           <span>{submitError}</span>
           {showRetry && (
-            <button
+            <Button
               type="button"
+              size="sm"
               onClick={handleRetry}
               disabled={submitMut.isPending}
-              className="neumorphic-active-press inline-flex h-10 items-center justify-center rounded-button bg-[#6C63FF] px-4 text-xs font-semibold text-white shadow-extruded-small outline-none transition-all duration-300 hover:bg-[#8B84FF] focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitMut.isPending ? "Retrying…" : "Retry"}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -231,27 +234,28 @@ function generateSubmitKey(): string {
 /** Score display card after a successful submit. */
 function SubmitResultCard({ result }: { result: SubmitResponse }) {
   return (
-    <div className="rounded-container bg-[#E0E5EC] p-8 text-center shadow-extruded">
-      <h2 className="font-display text-2xl font-extrabold tracking-tight text-[#38B2AC]">
+    <div className={cn(cardVariants({ variant: "elevated" }), "p-8 text-center")}>
+      <SectionLabel className="mb-3">Submitted</SectionLabel>
+      <h2 className="font-display text-2xl font-extrabold tracking-tight text-[#10B981]">
         Submitted!
       </h2>
       {result.score != null && result.maxScore != null ? (
-        <p className="mt-3 text-4xl font-extrabold text-[#3D4852]">
+        <p className="mt-3 text-4xl font-extrabold text-[#0F172A]">
           {result.score}
-          <span className="text-xl text-[#6B7280]"> / {result.maxScore}</span>
+          <span className="text-xl text-[#64748B]"> / {result.maxScore}</span>
         </p>
       ) : (
-        <p className="mt-3 text-lg font-semibold text-[#6B7280]">Score: —</p>
+        <p className="mt-3 text-lg font-semibold text-[#64748B]">Score: —</p>
       )}
       {result.percentage != null && (
-        <p className="mt-1 text-sm font-medium text-[#6C63FF]">{result.percentage}%</p>
+        <p className="mt-1 text-sm font-medium text-[#0052FF]">{result.percentage}%</p>
       )}
-      <p className="mt-4 text-xs text-[#6B7280]">
+      <p className="mt-4 text-xs text-[#64748B]">
         Attempt #{result.attemptNumber ?? "—"}
       </p>
       <Link
         href={`/attempts/${result.attemptId}/result`}
-        className="mt-4 inline-flex h-11 items-center justify-center rounded-2xl bg-[#E0E5EC] px-5 text-sm font-semibold text-[#6C63FF] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]"
+        className="mt-4 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
       >
         View detailed result →
       </Link>
@@ -262,9 +266,9 @@ function SubmitResultCard({ result }: { result: SubmitResponse }) {
 function Skeleton() {
   return (
     <div role="status" aria-busy="true" aria-label="Loading attempt" className="space-y-4">
-      <div className="h-16 animate-pulse rounded-container bg-[#E0E5EC] shadow-extruded" />
-      <div className="h-48 animate-pulse rounded-container bg-[#E0E5EC] shadow-extruded" />
-      <div className="h-48 animate-pulse rounded-container bg-[#E0E5EC] shadow-extruded" />
+      <div className="h-16 animate-pulse rounded-xl border border-[#E2E8F0] bg-[#F1F5F9]" />
+      <div className="h-48 animate-pulse rounded-xl border border-[#E2E8F0] bg-[#F1F5F9]" />
+      <div className="h-48 animate-pulse rounded-xl border border-[#E2E8F0] bg-[#F1F5F9]" />
       <span className="sr-only">Loading…</span>
     </div>
   );
@@ -273,14 +277,14 @@ function Skeleton() {
 function NotFound() {
   return (
     <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#E0E5EC] text-[#6B7280] shadow-inset-deep">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#F1F5F9] text-[#64748B]">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="h-7 w-7" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
         </svg>
       </div>
-      <p className="font-display text-lg font-bold text-[#3D4852]">Attempt not found</p>
-      <p className="mt-1 text-sm text-[#6B7280]">This attempt may have been removed or you don&apos;t have access.</p>
-      <Link href="/sessions" className="mt-5 inline-flex h-11 items-center justify-center rounded-2xl bg-[#E0E5EC] px-5 text-sm font-semibold text-[#6C63FF] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]">
+      <p className="font-display text-lg font-bold text-[#0F172A]">Attempt not found</p>
+      <p className="mt-1 text-sm text-[#64748B]">This attempt may have been removed or you don&apos;t have access.</p>
+      <Link href="/sessions" className="mt-5 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
         Back to sessions
       </Link>
     </div>
@@ -309,13 +313,13 @@ function LoadError({ error }: { error: NormalizedApiError | undefined }) {
     message = "Something went wrong. Please try again.";
   }
   return (
-    <div role="alert" className="flex items-start gap-3 rounded-container bg-[#E0E5EC] p-5 text-sm font-medium text-[#3D4852] shadow-extruded">
+    <div role="alert" className="flex items-start gap-3 rounded-xl border border-[#EF4444]/30 bg-[#EF4444]/5 p-5 text-sm font-medium text-[#EF4444]">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
       </svg>
       <div>
         <span>{message}</span>
-        <Link href="/sessions" className="mt-3 inline-flex h-11 items-center justify-center rounded-2xl bg-[#E0E5EC] px-5 text-sm font-semibold text-[#6C63FF] shadow-extruded-small outline-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-extruded-hover focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC]">
+        <Link href="/sessions" className="mt-3 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
           Back to sessions
         </Link>
       </div>

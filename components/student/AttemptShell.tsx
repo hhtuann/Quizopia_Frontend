@@ -3,6 +3,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { AttemptDetailResponse, DetailQuestionView } from "@/lib/api/student-attempt";
 import { useAnswerStore } from "@/lib/attempt/answer-store";
+import { cardVariants } from "@/components/ui";
+import { cn } from "@/lib/utils/cn";
 import { SingleChoiceQuestion } from "./questions/SingleChoiceQuestion";
 import { MultipleChoiceQuestion } from "./questions/MultipleChoiceQuestion";
 import { TrueFalseMatrixQuestion } from "./questions/TrueFalseMatrixQuestion";
@@ -37,7 +39,7 @@ function QuestionRenderer({ question }: { question: DetailQuestionView }) {
     case "NUMERIC_FILL":
       return <NumericFillQuestion question={question} />;
     default:
-      return <p className="text-sm text-[#A0AEC0]">Unsupported question type: {question.questionType}</p>;
+      return <p className="text-sm text-[#94A3B8]">Unsupported question type: {question.questionType}</p>;
   }
 }
 
@@ -98,28 +100,33 @@ export function AttemptShell({
   return (
     <div>
       {/* Status bar: timer + progress + attempt info */}
-      <div className="mb-6 flex flex-wrap items-center gap-4 rounded-container bg-[#E0E5EC] p-4 shadow-extruded">
+      <div className={cn(cardVariants(), "mb-6 flex flex-wrap items-center gap-4 p-4")}>
         <div
           role="timer"
           aria-live="off"
-          className={`rounded-inner px-3 py-1.5 text-sm font-bold tabular-nums shadow-inset-small ${
-            expired ? "text-[#A0AEC0]" : remainingMs < 300000 ? "text-[#6C63FF]" : "text-[#38B2AC]"
-          }`}
+          className={cn(
+            "rounded-lg border px-3 py-1.5 font-mono text-sm font-bold tabular-nums",
+            expired
+              ? "border-[#E2E8F0] bg-[#F1F5F9] text-[#94A3B8]"
+              : remainingMs < 300000
+              ? "border-[#0052FF]/30 bg-[#0052FF]/5 text-[#0052FF]"
+              : "border-[#10B981]/30 bg-[#10B981]/5 text-[#10B981]"
+          )}
         >
           ⏱ {formatRemaining(remainingMs)}
         </div>
-        <div role="status" className="text-sm font-medium text-[#6B7280]">
+        <div role="status" className="text-sm font-medium text-[#64748B]">
           {detail.answeredCount} / {detail.totalQuestions} answered
         </div>
         {autosaveStatus && <AutosaveIndicator status={autosaveStatus} />}
         {wsStatus && <WsIndicator status={wsStatus} />}
-        <div className="ml-auto text-xs font-medium text-[#6B7280]">
+        <div className="ml-auto text-xs font-medium text-[#64748B]">
           Attempt #{detail.attemptNumber ?? "—"} · {detail.status.replace("_", " ")}
         </div>
       </div>
 
       {expired && (
-        <div role="alert" className="mb-6 rounded-2xl bg-[#E0E5EC] p-4 text-sm font-medium text-[#3D4852] shadow-inset-deep">
+        <div role="alert" className="mb-6 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-4 text-sm font-medium text-[#0F172A]">
           Time has expired. Submitting will be handled automatically once the feature is wired.
         </div>
       )}
@@ -127,16 +134,16 @@ export function AttemptShell({
       {/* Questions */}
       <div className="space-y-6">
         {sorted.map((q, i) => (
-          <div key={q.attemptQuestionId} className="rounded-container bg-[#E0E5EC] p-6 shadow-extruded">
+          <div key={q.attemptQuestionId} className={cn(cardVariants(), "p-6")}>
             <div className="mb-4 flex items-center gap-2">
-              <span className="rounded-inner bg-[#E0E5EC] px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-[#6B7280] shadow-inset-small">
+              <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-wider text-[#64748B]">
                 Q{i + 1}
               </span>
-              <span className="text-xs font-medium text-[#6B7280]">
+              <span className="font-mono text-xs font-medium text-[#64748B]">
                 {TYPE_LABEL[q.questionType] ?? q.questionType} · {q.defaultPoints} pts
               </span>
             </div>
-            <h3 className="mb-4 text-sm font-semibold text-[#3D4852]">{q.content}</h3>
+            <h3 className="mb-4 text-sm font-semibold text-[#0F172A]">{q.content}</h3>
             <QuestionRenderer question={q} />
           </div>
         ))}
@@ -144,7 +151,7 @@ export function AttemptShell({
 
       {submitSlot && <div className="mt-6">{submitSlot}</div>}
 
-      <p className="mt-6 text-center text-xs text-[#A0AEC0]">
+      <p className="mt-6 text-center text-xs text-[#94A3B8]">
         Answers are saved automatically.
       </p>
     </div>
@@ -153,16 +160,16 @@ export function AttemptShell({
 
 function WsIndicator({ status }: { status: "connecting" | "connected" | "disconnected" }) {
   const config = {
-    connected: { label: "Live", tone: "text-[#38B2AC]" },
-    connecting: { label: "Connecting…", tone: "text-[#6C63FF]" },
-    disconnected: { label: "Offline", tone: "text-[#A0AEC0]" },
+    connected: { label: "Live", tone: "text-[#10B981]" },
+    connecting: { label: "Connecting…", tone: "text-[#0052FF]" },
+    disconnected: { label: "Offline", tone: "text-[#94A3B8]" },
   } as const;
   const { label, tone } = config[status];
   return (
     <span
       role="status"
       aria-live="polite"
-      className={`text-xs font-semibold ${tone}${status === "connecting" ? " animate-pulse" : ""}`}
+      className={cn("text-xs font-semibold", tone, status === "connecting" && "animate-pulse")}
     >
       ● {label}
     </span>
@@ -171,18 +178,18 @@ function WsIndicator({ status }: { status: "connecting" | "connected" | "disconn
 
 function AutosaveIndicator({ status }: { status: AutosaveStatus }) {
   const config: Record<AutosaveStatus, { label: string; tone: string }> = {
-    idle: { label: "All changes saved", tone: "text-[#38B2AC]" },
-    saving: { label: "Saving…", tone: "text-[#6C63FF]" },
-    saved: { label: "Saved", tone: "text-[#38B2AC]" },
-    error: { label: "Save failed — will retry", tone: "text-[#6B7280]" },
-    blocked: { label: "Saving stopped — exam over or submitted", tone: "text-[#A0AEC0]" },
+    idle: { label: "All changes saved", tone: "text-[#10B981]" },
+    saving: { label: "Saving…", tone: "text-[#0052FF]" },
+    saved: { label: "Saved", tone: "text-[#10B981]" },
+    error: { label: "Save failed — will retry", tone: "text-[#64748B]" },
+    blocked: { label: "Saving stopped — exam over or submitted", tone: "text-[#94A3B8]" },
   };
   const { label, tone } = config[status];
   return (
     <span
       role="status"
       aria-live="polite"
-      className={`text-xs font-semibold ${tone}${status === "saving" ? " animate-pulse" : ""}`}
+      className={cn("text-xs font-semibold", tone, status === "saving" && "animate-pulse")}
     >
       {label}
     </span>

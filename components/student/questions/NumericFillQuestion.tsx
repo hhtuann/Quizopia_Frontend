@@ -1,6 +1,7 @@
 "use client";
 
 import { useAnswerStore } from "@/lib/attempt/answer-store";
+import { cn } from "@/lib/utils/cn";
 import type { DetailQuestionView, NumericAnswerPayload } from "@/lib/api/student-attempt";
 
 /**
@@ -40,18 +41,19 @@ export function NumericFillQuestion({ question }: { question: DetailQuestionView
             setAnswer(question.attemptQuestionId, { value: e.target.value })
           }
           placeholder="____"
-          className="h-12 w-32 rounded-button bg-[#E0E5EC] px-4 text-center font-mono text-lg text-[#3D4852] placeholder-[#A0AEC0] outline-none shadow-inset-pressed focus-visible:shadow-inset-deep focus-visible:ring-2 focus-visible:ring-[#6C63FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#E0E5EC] transition-all duration-300"
+          className="h-12 w-32 rounded-lg border border-[#E2E8F0] bg-transparent px-4 text-center font-mono text-lg text-[#0F172A] placeholder:text-[#64748B]/50 outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2"
         />
         <span
-          className={`text-xs font-semibold tabular-nums ${
-            value.length === 4 ? "text-[#38B2AC]" : "text-[#A0AEC0]"
-          }`}
+          className={cn(
+            "text-xs font-semibold tabular-nums",
+            value.length === 4 ? "text-[#10B981]" : "text-[#94A3B8]"
+          )}
         >
           {value.length}/4
         </span>
       </div>
       {question.roundingInstruction && (
-        <p className="mt-2 rounded-2xl bg-[#E0E5EC] px-4 py-2 text-xs font-medium text-[#6B7280] shadow-inset-small">
+        <p className="mt-2 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-4 py-2 text-xs font-medium text-[#64748B]">
           {question.roundingInstruction}
         </p>
       )}

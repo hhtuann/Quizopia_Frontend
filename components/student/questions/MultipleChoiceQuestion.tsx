@@ -1,6 +1,7 @@
 "use client";
 
 import { useAnswerStore } from "@/lib/attempt/answer-store";
+import { cn } from "@/lib/utils/cn";
 import type { DetailQuestionView, MultipleAnswerPayload } from "@/lib/api/student-attempt";
 
 export function MultipleChoiceQuestion({ question }: { question: DetailQuestionView }) {
@@ -20,26 +21,29 @@ export function MultipleChoiceQuestion({ question }: { question: DetailQuestionV
   return (
     <fieldset className="space-y-2">
       <legend className="sr-only">{question.content}</legend>
-      <p className="pl-1 text-xs text-[#6B7280]">Select all that apply.</p>
+      <p className="pl-1 text-xs text-[#64748B]">Select all that apply.</p>
       {question.options.map((opt) => {
         const active = selectedKeys.includes(opt.optionKey);
         return (
           <label
             key={opt.optionKey}
-            className={`flex cursor-pointer items-center gap-3 rounded-2xl bg-[#E0E5EC] px-4 py-3 shadow-inset-small outline-none transition-all duration-300 hover:shadow-inset-pressed focus-within:ring-2 focus-within:ring-[#6C63FF] focus-within:ring-offset-2 focus-within:ring-offset-[#E0E5EC] ${
-              active ? "shadow-inset-deep" : ""
-            }`}
+            className={cn(
+              "flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 outline-none transition-all duration-200 focus-within:ring-2 focus-within:ring-[#0052FF] focus-within:ring-offset-2",
+              active
+                ? "border-[#0052FF] bg-[#0052FF]/5"
+                : "border-[#E2E8F0] bg-white hover:bg-[#F1F5F9]"
+            )}
           >
             <input
               type="checkbox"
               checked={active}
               onChange={() => toggle(opt.optionKey)}
-              className="h-4 w-4 accent-[#6C63FF]"
+              className="h-4 w-4 accent-[#0052FF]"
             />
-            <span className="rounded-inner bg-[#E0E5EC] px-1.5 py-0.5 font-mono text-xs font-bold shadow-inset-small">
+            <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-1.5 py-0.5 font-mono text-xs font-bold text-[#64748B]">
               {opt.optionKey}
             </span>
-            <span className={`text-sm ${active ? "font-semibold text-[#6C63FF]" : "text-[#3D4852]"}`}>
+            <span className={cn("text-sm", active ? "font-semibold text-[#0052FF]" : "text-[#0F172A]")}>
               {opt.content}
             </span>
           </label>
