@@ -77,6 +77,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/question-banks", label: "Question banks", icon: BankIcon, roles: ["TEACHER"], description: "Build and organize reusable collections of questions." },
   { href: "/exams", label: "Exams", icon: ExamIcon, roles: ["TEACHER", "ACADEMIC_ADMIN"], description: "Assemble exams from your question banks." },
   { href: "/exam-sessions", label: "Exam sessions", icon: ClockIcon, roles: ["TEACHER", "ACADEMIC_ADMIN"], description: "Schedule live sessions and monitor participants." },
+  { href: "/classes", label: "Classes", icon: UsersIcon, roles: ["TEACHER", "ACADEMIC_ADMIN"], description: "Manage your classes and student rosters." },
   { href: "/admin", label: "Admin Dashboard", icon: AdminShieldIcon, roles: ["ACADEMIC_ADMIN", "SYSTEM_ADMIN"], exact: true },
   { href: "/admin/subjects", label: "Subjects", icon: ClipboardListIcon, roles: ["ACADEMIC_ADMIN"], description: "Manage subjects across your school." },
   { href: "/admin/users", label: "Users", icon: UsersIcon, roles: ["SYSTEM_ADMIN"], description: "Manage user accounts and roles." },
