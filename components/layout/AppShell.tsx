@@ -43,7 +43,7 @@ export default function AppShell({ children }: AppShellProps) {
 
       {/* Mobile navigation drawer (same items as the desktop sidebar) */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-x-0 top-20 z-30 animate-fadeIn p-4 md:hidden">
+        <div className="fixed inset-x-0 top-20 z-30 p-4 md:hidden">
           <nav
             id="mobile-navigation"
             role="navigation"

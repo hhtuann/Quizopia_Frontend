@@ -64,7 +64,7 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
 
           {/* Logo brand — click returns to the Dashboard */}
           <Link href="/" aria-label="Go to dashboard" className="flex items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFAFA]">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] text-white shadow-[0_4px_14px_rgba(0,82,255,0.25)] animate-float">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] text-white shadow-[0_4px_14px_rgba(0,82,255,0.25)]">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"

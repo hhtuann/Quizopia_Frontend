@@ -1,48 +1,12 @@
 @import "tailwindcss";
 
 @theme {
-  /* ===== Neumorphic tokens (OLD — kept for FE1–FE15b; removed in FE-R5) ===== */
-  --color-background: #E0E5EC;
-  --color-foreground: #3D4852;
-  --color-muted: #6B7280;
-  --color-accent: #6C63FF;
-  --color-accent-light: #8B84FF;
-  --color-accent-secondary: #38B2AC;
-
-  /* Typography — updated to DESIGN_NEXT fonts (old fonts no longer loaded) */
+  /* ===== Typography (DESIGN_NEXT — Calistoga display + Inter UI + JetBrains mono) ===== */
   --font-display: var(--font-calistoga), serif;
   --font-sans: var(--font-inter), sans-serif;
   --font-mono: var(--font-jetbrains-mono), monospace;
 
-  /* Radius System */
-  --radius-container: 32px;
-  --radius-button: 16px;
-  --radius-inner: 12px;
-
-  /* Shadows (Soft UI Physics) */
-  --shadow-extruded: 9px 9px 16px rgba(163, 177, 198, 0.6), -9px -9px 16px rgba(255, 255, 255, 0.5);
-  --shadow-extruded-hover: 12px 12px 20px rgba(163, 177, 198, 0.7), -12px -12px 20px rgba(255, 255, 255, 0.6);
-  --shadow-extruded-small: 5px 5px 10px rgba(163, 177, 198, 0.6), -5px -5px 10px rgba(255, 255, 255, 0.5);
-  --shadow-inset-pressed: inset 6px 6px 10px rgba(163, 177, 198, 0.6), inset -6px -6px 10px rgba(255, 255, 255, 0.5);
-  --shadow-inset-deep: inset 10px 10px 20px rgba(163, 177, 198, 0.7), inset -10px -10px 20px rgba(255, 255, 255, 0.6);
-  --shadow-inset-small: inset 3px 3px 6px rgba(163, 177, 198, 0.6), inset -3px -3px 6px rgba(255, 255, 255, 0.5);
-
-  /* Animation & Keyframes */
-  --animate-float: float 3s ease-in-out infinite;
-  --animate-fadeIn: fadeIn 0.3s ease-out;
-
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-8px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  /* ===== DESIGN_NEXT tokens (Minimalist Modern — additive, FE-R1) ===== */
-  /* Colors (prefixed --color-next-* to avoid conflicts with neumorphic) */
+  /* ===== DESIGN_NEXT color tokens (Minimalist Modern) ===== */
   --color-next-background: #FAFAFA;
   --color-next-foreground: #0F172A;
   --color-next-muted: #F1F5F9;
@@ -58,28 +22,20 @@
   --color-next-warn: #F59E0B;
   --color-next-destructive: #EF4444;
 
-  /* DESIGN_NEXT Shadows */
+  /* ===== DESIGN_NEXT accent shadows ===== */
   --shadow-accent: 0 4px 14px rgba(0, 82, 255, 0.25);
   --shadow-accent-lg: 0 8px 24px rgba(0, 82, 255, 0.35);
 }
 
-/* ===== Custom Base Styles ===== */
+/* ===== Base Styles ===== */
 body {
-  background-color: var(--color-background);
-  color: var(--color-foreground);
+  background-color: var(--color-next-background);
+  color: var(--color-next-foreground);
   font-family: var(--font-sans);
   overflow-x: hidden;
 }
 
-/* ===== Neumorphic Utilities (OLD — kept for FE1–FE15b) ===== */
-.neumorphic-active-press {
-  transition: all 0.3s ease-out;
-}
-.neumorphic-active-press:active {
-  transform: translateY(1px);
-}
-
-/* ===== DESIGN_NEXT Utilities (FE-R1) ===== */
+/* ===== DESIGN_NEXT Utilities ===== */
 .gradient-text {
   background: linear-gradient(to right, #0052FF, #4D7CFF);
   -webkit-background-clip: text;
@@ -92,5 +48,3 @@ body {
   background-size: 32px 32px;
   opacity: 0.03;
 }
-
-

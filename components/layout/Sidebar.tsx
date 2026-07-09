@@ -49,7 +49,7 @@ export default function Sidebar() {
       {/* Minimalist brand accent (replaces the neumorphic Q graphic) */}
       <div className="flex flex-1 items-end justify-center pb-4">
         <div className="flex w-full flex-col items-center gap-3 rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-[0_4px_6px_rgba(0,0,0,0.07)]">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] font-display text-xl text-white shadow-[0_4px_14px_rgba(0,82,255,0.25)] animate-float">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] font-display text-xl text-white shadow-[0_4px_14px_rgba(0,82,255,0.25)]">
             Q
           </div>
           <div className="flex items-center gap-2">
