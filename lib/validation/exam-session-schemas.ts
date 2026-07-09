@@ -38,6 +38,11 @@ export const createSessionSchema = z
       .number({ message: "Max attempts must be at least 1." })
       .int("Max attempts must be a whole number.")
       .min(1, "Max attempts must be at least 1."),
+    // PUBLIC = all same-school students; CLASS_RESTRICTED = assigned classes only (default).
+    visibility: z.enum(["PUBLIC", "CLASS_RESTRICTED"]),
+    // Classrooms assigned when CLASS_RESTRICTED. Required-meaningful only then; the
+    // create form validates "≥1 class when restricted" in onSubmit (component logic).
+    classroomIds: z.array(z.number().int().positive()).optional(),
   })
   .refine((data) => new Date(data.endsAt) > new Date(data.startsAt), {
     message: "End time must be after the start time.",

@@ -21,7 +21,7 @@ import { updateSessionSchema, type UpdateSessionValues } from "@/lib/validation/
 import { Badge, Button, Input, SectionLabel, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
-import { ParticipantsManager } from "@/components/teacher/session-participants/ParticipantsManager";
+import { ClassAssignment } from "@/components/teacher/ClassAssignment";
 import { LiveMonitor } from "@/components/teacher/LiveMonitor";
 import { ReportingSection } from "@/components/teacher/reporting/ReportingSection";
 import type { NormalizedApiError } from "@/lib/api";
@@ -167,6 +167,9 @@ function DetailView({ data }: { data: ExamSessionDetailResponse }) {
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">{data.title}</h1>
           <Badge variant={statusVariant(data.status)}>{data.status}</Badge>
+          <Badge variant={data.visibility === "PUBLIC" ? "accent" : "default"}>
+            {data.visibility === "PUBLIC" ? "Public" : "Class-restricted"}
+          </Badge>
           <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs text-[#64748B]">{data.code}</span>
         </div>
       </div>
@@ -212,7 +215,7 @@ function DetailView({ data }: { data: ExamSessionDetailResponse }) {
           ))}
         </dl>
         <p className="mt-6 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-4 py-3 text-xs font-medium text-[#64748B]">
-          Manage participant access in the section below.
+          Class access is managed in the section below.
         </p>
       </div>
 
@@ -270,7 +273,7 @@ function DetailView({ data }: { data: ExamSessionDetailResponse }) {
       {/* Results & statistics (FE15b) */}
       <ReportingSection sessionId={data.id} />
 
-      <ParticipantsManager sessionId={data.id} sessionStatus={data.status} />
+      <ClassAssignment sessionId={data.id} visibility={data.visibility} />
 
       {/* Confirm for close/cancel (irreversible-ish actions). */}
       <ConfirmDialog

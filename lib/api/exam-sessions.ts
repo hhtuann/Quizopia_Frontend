@@ -21,6 +21,9 @@ export type ExamSessionStatus =
   | "CLOSED"
   | "CANCELLED";
 
+/** Backend `SessionVisibility` (V10). PUBLIC = all same-school students; CLASS_RESTRICTED = assigned classes only. */
+export type SessionVisibility = "PUBLIC" | "CLASS_RESTRICTED";
+
 /** Backend record `ExamSessionListItem`. */
 export interface ExamSessionListItem {
   id: number;
@@ -52,6 +55,7 @@ export interface ExamSessionDetailResponse {
   participantCount: number;
   version: number | null;
   createdAt: string;
+  visibility: SessionVisibility;
 }
 
 export interface ExamSessionListParams {
@@ -78,6 +82,10 @@ export interface CreateExamSessionRequest {
   startsAt: string;
   endsAt: string;
   maxAttempts: number;
+  /** PUBLIC = all same-school students; CLASS_RESTRICTED (default) = assigned classes only. */
+  visibility?: SessionVisibility;
+  /** Classrooms assigned when CLASS_RESTRICTED. Ignored when PUBLIC. */
+  classroomIds?: number[];
 }
 
 /** `GET /api/exam-sessions/my` — sessions owned by the caller (TEACHER). */
@@ -101,6 +109,47 @@ export function createSession(
   req: CreateExamSessionRequest
 ): Promise<ExamSessionDetailResponse> {
   return http.post<ExamSessionDetailResponse>("/api/exam-sessions", req);
+}
+
+// ============================================================
+// Class assignment (visibility = CLASS_RESTRICTED)
+// ============================================================
+
+/** Backend record `SessionClassesResponse.ClassSummary`. */
+export interface SessionClassSummary {
+  id: number;
+  code: string;
+  name: string;
+}
+
+/** Backend record `SessionClassesResponse` (GET/PUT .../classes). */
+export interface SessionClassesResponse {
+  items: SessionClassSummary[];
+}
+
+/** Body for `PUT /api/exam-sessions/{sessionId}/classes` — REPLACE semantics (clears old, sets new). */
+export interface AssignSessionClassesRequest {
+  classroomIds: number[];
+}
+
+/** `PUT /api/exam-sessions/{sessionId}/classes` → SessionClassesResponse (replace). */
+export function assignSessionClasses(
+  sessionId: number,
+  classroomIds: number[]
+): Promise<SessionClassesResponse> {
+  return http.put<SessionClassesResponse>(
+    `/api/exam-sessions/${sessionId}/classes`,
+    { classroomIds }
+  );
+}
+
+/** `GET /api/exam-sessions/{sessionId}/classes` → SessionClassesResponse. */
+export function getSessionClasses(
+  sessionId: number
+): Promise<SessionClassesResponse> {
+  return http.get<SessionClassesResponse>(
+    `/api/exam-sessions/${sessionId}/classes`
+  );
 }
 
 // ============================================================

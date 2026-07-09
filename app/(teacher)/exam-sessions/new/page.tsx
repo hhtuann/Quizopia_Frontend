@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createSession, type CreateExamSessionRequest } from "@/lib/api/exam-sessions";
+import { createSession, type CreateExamSessionRequest, type SessionVisibility } from "@/lib/api/exam-sessions";
 import { useExamsQuery, useExamEditorQuery } from "@/hooks/queries/use-exams";
+import { useMyClassroomsQuery } from "@/hooks/queries/use-classrooms";
 import { createSessionSchema, type CreateSessionValues } from "@/lib/validation/exam-session-schemas";
 import { Button, Input, SectionLabel, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
@@ -61,7 +62,7 @@ export default function NewExamSessionPage() {
     formState: { errors, isSubmitting },
   } = useForm<CreateSessionValues>({
     resolver: zodResolver(createSessionSchema),
-    defaultValues: { examId: NaN, examVersionNumber: NaN, code: "", title: "", startsAt: "", endsAt: "", maxAttempts: 1 },
+    defaultValues: { examId: NaN, examVersionNumber: NaN, code: "", title: "", startsAt: "", endsAt: "", maxAttempts: 1, visibility: "CLASS_RESTRICTED" as const },
   });
 
   const examId = useWatch({ control, name: "examId" });
@@ -73,12 +74,22 @@ export default function NewExamSessionPage() {
   );
   const publishedVersions = editorData?.publishedVersions ?? [];
 
+  // Visibility + class assignment (FE-CLASSES-2).
+  const { data: classroomsData } = useMyClassroomsQuery();
+  const classrooms = classroomsData?.items ?? [];
+  const [selectedClassIds, setSelectedClassIds] = useState<number[]>([]);
+  const visibility: SessionVisibility = useWatch({ control, name: "visibility" }) ?? "CLASS_RESTRICTED";
+
   const mutation = useMutation({
     mutationFn: (req: CreateExamSessionRequest) => createSession(req),
   });
 
   const onSubmit = async (values: CreateSessionValues) => {
     setFormError(null);
+    if (values.visibility === "CLASS_RESTRICTED" && selectedClassIds.length === 0) {
+      setFormError("Select at least one class for a class-restricted session, or choose Public visibility.");
+      return;
+    }
     const req: CreateExamSessionRequest = {
       examId: values.examId,
       examVersionNumber: values.examVersionNumber,
@@ -88,6 +99,8 @@ export default function NewExamSessionPage() {
       startsAt: new Date(values.startsAt).toISOString(),
       endsAt: new Date(values.endsAt).toISOString(),
       maxAttempts: values.maxAttempts,
+      visibility: values.visibility,
+      classroomIds: values.visibility === "CLASS_RESTRICTED" ? selectedClassIds : [],
     };
     try {
       await mutation.mutateAsync(req);
@@ -200,6 +213,76 @@ export default function NewExamSessionPage() {
               <FieldError id="session-endsAt-error" message={errors.endsAt?.message} />
             </div>
           </div>
+
+          {/* Visibility (FE-CLASSES-2) */}
+          <fieldset>
+            <legend className={labelClass}>Visibility</legend>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {([
+                { value: "CLASS_RESTRICTED" as const, label: "Class-restricted", hint: "Only students in selected classes" },
+                { value: "PUBLIC" as const, label: "Public", hint: "All students in your school" },
+              ]).map((opt) => {
+                const selected = visibility === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setValue("visibility", opt.value, { shouldValidate: false })}
+                    className={cn(
+                      "flex flex-col items-start gap-0.5 rounded-lg border p-4 text-left outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2",
+                      selected ? "border-[#0052FF] bg-[#0052FF]/5 text-[#0052FF]" : "border-[#E2E8F0] bg-white text-[#64748B] hover:bg-[#F1F5F9] hover:text-[#0F172A]"
+                    )}
+                  >
+                    <span className="text-sm font-bold">{opt.label}</span>
+                    <span className="text-xs font-medium opacity-80">{opt.hint}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          {/* Class multi-select (CLASS_RESTRICTED only) */}
+          {visibility === "CLASS_RESTRICTED" && (
+            <fieldset>
+              <legend className={labelClass}>Classes</legend>
+              {classrooms.length === 0 ? (
+                <p className="pl-1 text-xs text-[#64748B]">
+                  You have no classes yet. Create one first (Classes page) or choose Public visibility.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {classrooms.map((c) => {
+                    const checked = selectedClassIds.includes(c.id);
+                    return (
+                      <label
+                        key={c.id}
+                        className={cn(
+                          "flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm outline-none transition-all duration-200 focus-within:ring-2 focus-within:ring-[#0052FF] focus-within:ring-offset-2",
+                          checked ? "border-[#0052FF] bg-[#0052FF]/5" : "border-[#E2E8F0] bg-white hover:bg-[#F1F5F9]"
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() =>
+                            setSelectedClassIds((prev) =>
+                              prev.includes(c.id) ? prev.filter((id) => id !== c.id) : [...prev, c.id]
+                            )
+                          }
+                          className="h-4 w-4 accent-[#0052FF]"
+                        />
+                        <span className="min-w-0">
+                          <span className="block font-semibold text-[#0F172A]">{c.name}</span>
+                          <span className="block text-xs text-[#64748B]">{c.code} · {c.memberCount} members</span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </fieldset>
+          )}
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Creating…" : "Create session"}</Button>

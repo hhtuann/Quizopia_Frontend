@@ -2,8 +2,10 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  assignSessionClasses,
   cancelSession,
   closeSession,
+  getSessionClasses,
   getSessionDetail,
   listMySessions,
   openSession,
@@ -72,6 +74,28 @@ export function useSessionActionMutation(sessionId: number) {
       }
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exam-sessions", sessionId, "detail"] });
+      queryClient.invalidateQueries({ queryKey: ["exam-sessions"] });
+    },
+  });
+}
+
+/** Assigned classes for a session (visibility = CLASS_RESTRICTED). */
+export function useSessionClassesQuery(sessionId: number) {
+  return useQuery({
+    queryKey: ["exam-sessions", sessionId, "classes"],
+    queryFn: () => getSessionClasses(sessionId),
+    enabled: !!sessionId,
+  });
+}
+
+/** REPLACE the assigned classes (PUT .../classes). Invalidates classes + detail/list. */
+export function useAssignClassesMutation(sessionId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (classroomIds: number[]) => assignSessionClasses(sessionId, classroomIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exam-sessions", sessionId, "classes"] });
       queryClient.invalidateQueries({ queryKey: ["exam-sessions", sessionId, "detail"] });
       queryClient.invalidateQueries({ queryKey: ["exam-sessions"] });
     },
