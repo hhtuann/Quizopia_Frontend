@@ -224,9 +224,6 @@ function RowErrorsTable({ errors }: { errors: RowError[] }) {
   return (
     <div className="mb-4 overflow-x-auto">
       <table className="w-full text-sm">
-        <caption className="mb-3 px-1 text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
-          Row errors ({errors.length})
-        </caption>
         <thead>
           <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
             <th scope="col" className="px-3 pb-3 font-semibold">Row</th>
@@ -238,14 +235,14 @@ function RowErrorsTable({ errors }: { errors: RowError[] }) {
         </thead>
         <tbody>
           {errors.map((e, i) => (
-            <tr key={`${e.rowNumber}-${i}`} className="border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 hover:bg-[#F1F5F9]">
+            <tr key={`${e.rowNumber}-${i}`} className="border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 group hover:bg-[#F1F5F9]">
               <td className="px-3 py-2 tabular-nums">{e.rowNumber}</td>
               <td className="px-3 py-2 font-mono text-xs">
                 {e.questionCode ?? "—"}
               </td>
               <td className="px-3 py-2 text-[#64748B]">{e.field ?? "—"}</td>
               <td className="px-3 py-2">
-                <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs text-[#64748B]">
+                <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs text-[#64748B] transition-colors group-hover:text-[#0052FF]">
                   {e.code}
                 </span>
               </td>

@@ -11,7 +11,7 @@ import type { NormalizedApiError } from "@/lib/api";
 const PAGE_SIZE = 10;
 
 const pageBtnClass =
-  "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#64748B] outline-none transition-all duration-200 hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#64748B] outline-none transition-all duration-200 group hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
 function formatDate(iso: string): string {
   // useQuery data renders client-only (post-hydration) → safe to format here.
@@ -48,7 +48,7 @@ export default function QuestionBanksPage() {
     [page, search]
   );
 
-  const { data, isPending, isError, error, isFetching } =
+  const { data, isPending, isError, error } =
     useQuestionBanksQuery(params);
   const items = data?.items ?? [];
   const totalPages = data?.totalPages ?? 0;
@@ -107,7 +107,7 @@ export default function QuestionBanksPage() {
         ) : items.length === 0 ? (
           <EmptyState search={search} />
         ) : (
-          <BanksTable items={items} refreshing={isFetching} />
+          <BanksTable items={items} />
         )}
 
         {!isPending && !isError && items.length > 0 && (
@@ -126,24 +126,12 @@ export default function QuestionBanksPage() {
 
 function BanksTable({
   items,
-  refreshing,
 }: {
   items: QuestionBankListItem[];
-  refreshing: boolean;
 }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <caption className="mb-3 flex items-center gap-2 px-1 text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
-          <span>Your question banks ({items.length})</span>
-          {refreshing && (
-            <span
-              role="status"
-              aria-label="Updating"
-              className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#0052FF]"
-            />
-          )}
-        </caption>
         <thead>
           <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
             <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
@@ -155,16 +143,16 @@ function BanksTable({
         </thead>
         <tbody>
           {items.map((bank) => (
-            <tr key={bank.id} className="border-b border-[#E2E8F0] text-[#0F172A] transition-colors last:border-0 hover:bg-[#F1F5F9]">
+            <tr key={bank.id} className="relative border-b border-[#E2E8F0] text-[#0F172A] transition-colors last:border-0 group hover:bg-[#F1F5F9]">
               <td className="px-3 py-3 align-top">
-                <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B]">
+                <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B] whitespace-nowrap transition-colors group-hover:text-[#0052FF]">
                   {bank.code}
                 </span>
               </td>
               <td className="px-3 py-3 align-top">
                 <Link
                   href={`/question-banks/${bank.id}`}
-                  className="rounded font-semibold text-[#0F172A] outline-none transition-colors hover:text-[#0052FF] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
+                  className="after:absolute after:inset-0 rounded font-semibold text-[#0F172A] outline-none transition-colors group-hover:text-[#0052FF] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
                 >
                   {bank.name}
                 </Link>

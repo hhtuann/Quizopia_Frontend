@@ -10,7 +10,7 @@ import type { NormalizedApiError } from "@/lib/api";
 
 const PAGE_SIZE = 10;
 const pageBtnClass =
-  "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#64748B] outline-none transition-all duration-200 hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#64748B] outline-none transition-all duration-200 group hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
@@ -64,9 +64,6 @@ export default function StudentHistoryPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <caption className="mb-3 px-1 text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
-                Attempts ({items.length})
-              </caption>
               <thead>
                 <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
                   <th scope="col" className="px-3 pb-3 font-semibold">Session</th>
@@ -81,11 +78,19 @@ export default function StudentHistoryPage() {
               </thead>
               <tbody>
                 {items.map((a) => (
-                  <tr key={a.attemptId} className="border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 hover:bg-[#F1F5F9]">
+                  <tr key={a.attemptId} className="relative border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 group hover:bg-[#F1F5F9]">
                     <td className="px-3 py-3">
-                      <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B]">
-                        {a.sessionCode}
-                      </span>
+                      <Link
+                        href={a.status === "SUBMITTED" || a.status === "GRADED"
+                          ? `/attempts/${a.attemptId}/result`
+                          : `/attempts/${a.attemptId}`}
+                        className="after:absolute after:inset-0 transition-colors group-hover:text-[#0052FF]"
+                        aria-label={`Open ${a.sessionTitle}`}
+                      >
+                        <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B] whitespace-nowrap transition-colors group-hover:text-[#0052FF]">
+                          {a.sessionCode}
+                        </span>
+                      </Link>
                       <span className="mt-1 block text-xs text-[#64748B]">{a.sessionTitle}</span>
                     </td>
                     <td className="px-3 py-3 text-center tabular-nums text-[#64748B]">

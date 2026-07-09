@@ -38,10 +38,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${calistoga.variable} ${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      {/* DESIGN_NEXT body — globals.css body rule sets bg #FAFAFA + foreground #0F172A. */}
-      <body className="min-h-full flex flex-col bg-[#FAFAFA] text-[#0F172A] font-sans selection:bg-[#0052FF]/20">
+      {/* DESIGN_NEXT body — globals.css body rule sets bg #FAFAFA + foreground #0F172A.
+          suppressHydrationWarning: browser extensions (Bitdefender, Grammarly, etc.) inject
+          attributes (__processed_*, bis_register) into <body>/<html> before React hydrates,
+          causing false hydration mismatches. This is the standard Next.js fix. */}
+      <body suppressHydrationWarning className="min-h-full flex flex-col bg-[#FAFAFA] text-[#0F172A] font-sans selection:bg-[#0052FF]/20">
         <QueryProvider>
           <AuthProvider>{children}</AuthProvider>
         </QueryProvider>

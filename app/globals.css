@@ -48,3 +48,14 @@ body {
   background-size: 32px 32px;
   opacity: 0.03;
 }
+
+/* ===== Table row hover: code badge + row links + titles shift to accent color ===== */
+tbody tr:hover .font-mono {
+  color: var(--color-next-accent);
+  transition: color 0.2s ease-out;
+}
+tbody tr:hover td a,
+tbody tr:hover td.font-semibold {
+  color: var(--color-next-accent);
+  transition: color 0.2s ease-out;
+}

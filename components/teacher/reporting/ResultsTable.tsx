@@ -8,7 +8,7 @@ import type { ResultDirection, ResultSort, SessionResultItem } from "@/lib/api/t
 import type { NormalizedApiError } from "@/lib/api";
 
 const pageBtnClass =
-  "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#64748B] outline-none transition-all duration-200 hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#64748B] outline-none transition-all duration-200 group hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 const selectClass =
   "h-10 rounded-lg border border-[#E2E8F0] bg-transparent px-3 pr-8 text-xs text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
 const sortHeaderClass =
@@ -63,7 +63,7 @@ export function ResultsTable({ sessionId }: { sessionId: number }) {
     return params;
   }, [params, minPct, maxPct]);
 
-  const { data, isPending, isError, error, isFetching } = useSessionResultsQuery(
+  const { data, isPending, isError, error } = useSessionResultsQuery(
     sessionId,
     (validatedParams ?? {}) as Parameters<typeof useSessionResultsQuery>[1]
   );
@@ -132,10 +132,6 @@ export function ResultsTable({ sessionId }: { sessionId: number }) {
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <caption className="mb-3 flex items-center gap-2 px-1 text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
-              <span>Students ({totalElements})</span>
-              {isFetching && <span role="status" aria-label="Updating" className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#0052FF]" />}
-            </caption>
             <thead>
               <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
                 <th scope="col" className={`${sortHeaderClass} px-3 pb-3`} onClick={() => toggleSort("studentCode")}>Code {sort === "studentCode" ? (direction === "ASC" ? "↑" : "↓") : ""}</th>
@@ -168,9 +164,9 @@ export function ResultsTable({ sessionId }: { sessionId: number }) {
 
 function ResultRow({ item }: { item: SessionResultItem }) {
   return (
-    <tr className="border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 hover:bg-[#F1F5F9]">
-      <td className="px-3 py-2.5"><span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs text-[#64748B]">{item.studentCode ?? "—"}</span></td>
-      <td className="px-3 py-2.5 font-medium">{item.displayName ?? "—"}</td>
+    <tr className="border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 group hover:bg-[#F1F5F9]">
+      <td className="px-3 py-2.5"><span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs text-[#64748B] transition-colors group-hover:text-[#0052FF]">{item.studentCode ?? "—"}</span></td>
+      <td className="px-3 py-2.5 font-medium transition-colors group-hover:text-[#0052FF]">{item.displayName ?? "—"}</td>
       <td className="px-3 py-2.5"><span className={cn("font-bold tabular-nums", pctTone(item.percentage))}>{item.percentage != null ? `${item.percentage}%` : "—"}</span></td>
       <td className="px-3 py-2.5 tabular-nums text-[#64748B]">{item.score != null ? `${item.score}/${item.maxScore ?? "—"}` : "—"}</td>
       <td className="px-3 py-2.5 text-center tabular-nums text-[#64748B]">{item.attemptCount}</td>

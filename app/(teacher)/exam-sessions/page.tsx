@@ -14,7 +14,7 @@ const selectClass =
   "h-11 w-full rounded-lg border border-[#E2E8F0] bg-transparent px-4 pr-9 text-sm text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
 
 const pageBtnClass =
-  "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#64748B] outline-none transition-all duration-200 hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#64748B] outline-none transition-all duration-200 group hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
 const STATUS_OPTIONS: ExamSessionStatus[] = ["DRAFT", "SCHEDULED", "OPEN", "CLOSED", "CANCELLED"];
 
@@ -67,7 +67,7 @@ export default function ExamSessionsPage() {
     [page, search, status]
   );
 
-  const { data, isPending, isError, error, isFetching } = useExamSessionsQuery(params);
+  const { data, isPending, isError, error } = useExamSessionsQuery(params);
   const items = data?.items ?? [];
   const totalPages = data?.totalPages ?? 0;
   const totalElements = data?.totalElements ?? 0;
@@ -140,7 +140,7 @@ export default function ExamSessionsPage() {
         ) : items.length === 0 ? (
           <EmptyState hasFilters={!!search || !!status} />
         ) : (
-          <SessionsTable items={items} refreshing={isFetching} />
+          <SessionsTable items={items} />
         )}
 
         {!isPending && !isError && items.length > 0 && (
@@ -151,16 +151,10 @@ export default function ExamSessionsPage() {
   );
 }
 
-function SessionsTable({ items, refreshing }: { items: ExamSessionListItem[]; refreshing: boolean }) {
+function SessionsTable({ items }: { items: ExamSessionListItem[] }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <caption className="mb-3 flex items-center gap-2 px-1 text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
-          <span>Your sessions ({items.length})</span>
-          {refreshing && (
-            <span role="status" aria-label="Updating" className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#0052FF]" />
-          )}
-        </caption>
         <thead>
           <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
             <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
@@ -174,16 +168,16 @@ function SessionsTable({ items, refreshing }: { items: ExamSessionListItem[]; re
         </thead>
         <tbody>
           {items.map((s) => (
-            <tr key={s.id} className="border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 hover:bg-[#F1F5F9]">
+            <tr key={s.id} className="relative border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 group hover:bg-[#F1F5F9]">
               <td className="px-3 py-3">
                 <Link
                   href={`/exam-sessions/${s.id}`}
-                  className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B] outline-none transition-colors hover:text-[#0052FF] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
+                  className="after:absolute after:inset-0 rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B] whitespace-nowrap transition-colors group-group-hover:text-[#0052FF] outline-none transition-colors group-hover:text-[#0052FF] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
                 >
                   {s.code}
                 </Link>
               </td>
-              <td className="px-3 py-3 font-semibold">{s.title}</td>
+              <td className="px-3 py-3 font-semibold transition-colors group-hover:text-[#0052FF]">{s.title}</td>
               <td className="px-3 py-3 text-[#64748B]">
                 exam #{s.examId} · v{s.examVersionNumber}
               </td>
