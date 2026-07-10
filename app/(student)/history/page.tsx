@@ -69,7 +69,6 @@ export default function StudentHistoryPage() {
                   <th scope="col" className="px-3 pb-3 font-semibold">Submitted</th>
                   <th scope="col" className="px-3 pb-3 font-semibold">Deadline</th>
                   <th scope="col" className="px-3 pb-3 font-semibold">Created</th>
-                  <th scope="col" className="px-3 pb-3 font-semibold"></th>
                 </tr>
               </thead>
               <tbody>
@@ -80,14 +79,11 @@ export default function StudentHistoryPage() {
                         href={a.status === "SUBMITTED" || a.status === "GRADED"
                           ? `/attempts/${a.attemptId}/result`
                           : `/attempts/${a.attemptId}`}
-                        className="after:absolute after:inset-0 transition-colors group-hover:text-[#0052FF]"
+                        className="after:absolute after:inset-0 font-medium transition-colors group-hover:text-[#0052FF]"
                         aria-label={`Open ${a.sessionTitle}`}
                       >
-                        <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B] whitespace-nowrap transition-colors group-hover:text-[#0052FF]">
-                          {a.sessionCode}
-                        </span>
+                        {a.sessionTitle}
                       </Link>
-                      <span className="mt-1 block text-xs text-[#64748B]">{a.sessionTitle}</span>
                     </td>
                     <td className="px-3 py-3 text-center tabular-nums text-[#64748B]">
                       {a.attemptNumber ?? "—"}
@@ -99,16 +95,6 @@ export default function StudentHistoryPage() {
                     <td className="px-3 py-3 text-[#64748B]">{formatDateTime(a.submittedAt)}</td>
                     <td className="px-3 py-3 text-[#64748B]">{formatDateTime(a.deadlineAt)}</td>
                     <td className="px-3 py-3 text-[#64748B]">{formatDateTime(a.createdAt)}</td>
-                    <td className="px-3 py-3">
-                      {(a.status === "SUBMITTED" || a.status === "GRADED") && (
-                        <Link
-                          href={`/attempts/${a.attemptId}/result`}
-                          className="inline-flex items-center gap-1 rounded text-xs font-semibold text-[#0052FF] outline-none transition-colors hover:underline focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
-                        >
-                          View result →
-                        </Link>
-                      )}
-                    </td>
                   </tr>
                 ))}
               </tbody>
