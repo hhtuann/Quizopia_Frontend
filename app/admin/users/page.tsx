@@ -142,10 +142,10 @@ function UsersAdmin() {
                 <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
                   <th scope="col" className="px-3 pb-3 font-semibold">Username</th>
                   <th scope="col" className="px-3 pb-3 font-semibold">Name</th>
-                  <th scope="col" className="px-3 pb-3 font-semibold">Status</th>
-                  <th scope="col" className="px-3 pb-3 font-semibold">Roles</th>
-                  <th scope="col" className="px-3 pb-3 font-semibold">Created</th>
-                  <th scope="col" className="px-3 pb-3 text-right font-semibold">Actions</th>
+                  <th scope="col" className="px-3 pb-3 text-center font-semibold">Status</th>
+                  <th scope="col" className="px-3 pb-3 text-center font-semibold">Roles</th>
+                  <th scope="col" className="px-3 pb-3 text-center font-semibold">Created</th>
+                  <th scope="col" className="px-3 pb-3 text-center font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -158,32 +158,32 @@ function UsersAdmin() {
                       <span className="font-medium">{u.displayName}</span>
                       <span className="mt-0.5 block max-w-[180px] truncate text-xs text-[#64748B]">{u.email}</span>
                     </td>
-                    <td className="px-3 py-3 align-top"><Badge variant={statusVariant(u.status)}>{u.status}</Badge></td>
-                    <td className="px-3 py-3 align-top">
+                    <td className="px-3 py-3 text-center align-top"><Badge variant={statusVariant(u.status)}>{u.status}</Badge></td>
+                    <td className="px-3 py-3 text-center align-top">
                       <RoleCell userId={u.id} roles={u.roles} allRoles={roles.map((r) => r.code)} />
                     </td>
-                    <td className="px-3 py-3 align-top text-[#64748B]">{formatDate(u.createdAt)}</td>
+                    <td className="px-3 py-3 text-center align-top text-[#64748B]">{formatDate(u.createdAt)}</td>
                     <td className="px-3 py-3 align-top">
-                      <div className="flex flex-wrap items-center justify-end gap-1.5">
+                      <div className="flex flex-wrap items-center justify-center gap-1.5">
                         {/* Contextual status buttons */}
                         {(u.status === "ACTIVE" || u.status === "LOCKED") && (
                           <button type="button" disabled={statusBusy} onClick={() => setConfirmTarget({ action: "disable", userId: u.id, displayName: u.displayName })}
-                            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8 text-[#EF4444] hover:bg-[#EF4444]/5")}>Disable</button>
+                            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8 min-w-[72px] text-[#EF4444] hover:bg-[#EF4444]/5")}>Disable</button>
                         )}
                         {u.status === "ACTIVE" && (
                           <button type="button" disabled={statusBusy} onClick={() => setConfirmTarget({ action: "lock", userId: u.id, displayName: u.displayName })}
-                            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8")}>Lock</button>
+                            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8 min-w-[72px]")}>Lock</button>
                         )}
                         {u.status === "LOCKED" && (
                           <button type="button" disabled={statusBusy} onClick={() => runStatus("unlock", u.id)}
-                            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8")}>Unlock</button>
+                            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8 min-w-[72px]")}>Unlock</button>
                         )}
                         {(u.status === "DISABLED" || u.status === "PENDING") && (
                           <button type="button" disabled={statusBusy} onClick={() => runStatus("activate", u.id)}
-                            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8")}>Activate</button>
+                            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8 min-w-[72px]")}>Activate</button>
                         )}
                         {/* Edit */}
-                        <button type="button" onClick={() => setEditTarget(u)} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8")}>Edit</button>
+                        <button type="button" onClick={() => setEditTarget(u)} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8 min-w-[72px]")}>Edit</button>
                       </div>
                     </td>
                   </tr>

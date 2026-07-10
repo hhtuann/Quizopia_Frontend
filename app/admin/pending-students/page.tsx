@@ -14,10 +14,10 @@ const PAGE_SIZE = 20;
 const pageBtnClass =
   "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#64748B] outline-none transition-all duration-200 hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
-function formatDate(iso: string): string {
+function formatDateTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  return d.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function describeAssignError(err: unknown): string {
@@ -202,8 +202,8 @@ function PendingTable({
             <th scope="col" className="px-3 pb-3 font-semibold">Username</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Name</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Email</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Registered</th>
-            <th scope="col" className="px-3 pb-3 text-right font-semibold">Action</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Registered</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -216,8 +216,8 @@ function PendingTable({
               </td>
               <td className="px-3 py-3 align-top font-medium">{s.displayName}</td>
               <td className="px-3 py-3 align-top text-[#64748B]">{s.email}</td>
-              <td className="px-3 py-3 align-top text-[#64748B]">{formatDate(s.registeredAt)}</td>
-              <td className="px-3 py-3 text-right align-top">
+              <td className="px-3 py-3 text-center align-top text-[#64748B]">{formatDateTime(s.registeredAt)}</td>
+              <td className="px-3 py-3 text-center align-top">
                 <Button type="button" size="sm" onClick={() => onAssign(s)}>
                   Assign
                 </Button>

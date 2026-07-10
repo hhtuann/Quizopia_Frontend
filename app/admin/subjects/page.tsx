@@ -261,9 +261,9 @@ function SubjectsTable({
           <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
             <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Name</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Grade level</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Status</th>
-            <th scope="col" className="px-3 pb-3 text-right font-semibold">Actions</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Grade level</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Status</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -277,14 +277,14 @@ function SubjectsTable({
                   </span>
                 </td>
                 <td className="px-3 py-3 align-top font-medium">{s.name}</td>
-                <td className="px-3 py-3 align-top text-[#64748B]">
+                <td className="px-3 py-3 text-center align-top text-[#64748B]">
                   {glMap.get(s.gradeLevelId)?.name ?? `#${s.gradeLevelId}`}
                 </td>
-                <td className="px-3 py-3 align-top">
+                <td className="px-3 py-3 text-center align-top">
                   <Badge variant={statusVariant(status)}>{status}</Badge>
                 </td>
-                <td className="px-3 py-3 align-top">
-                  <div className="flex items-center justify-end gap-2">
+                <td className="px-3 py-3 text-center align-top">
+                  <div className="flex items-center justify-center gap-2">
                     <button
                       type="button"
                       onClick={() => onEdit(s)}
