@@ -203,7 +203,7 @@ function DetailView({ data }: { data: ExamSessionDetailResponse }) {
 
       {/* Read-only facts */}
       <div className={cn(cardVariants(), "mb-6 p-6")}>
-        <h2 className="mb-4 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">Session details</h2>
+        <h2 className="mb-4 font-display text-lg font-bold tracking-tight text-[#0F172A]">Session details</h2>
         <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
           {facts.map((r) => (
             <div key={r.label} className="flex flex-col">
@@ -219,25 +219,25 @@ function DetailView({ data }: { data: ExamSessionDetailResponse }) {
 
       {/* Lifecycle — state-gated buttons. */}
       <div className={cn(cardVariants(), "mb-6 p-6")}>
-        <h2 className="mb-4 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">Lifecycle</h2>
-        <div className="flex flex-wrap gap-3">
+        <h2 className="mb-4 font-display text-lg font-bold tracking-tight text-[#0F172A]">Lifecycle</h2>
+        <div className="flex flex-col gap-3">
           {data.status === "DRAFT" && (
-            <>
+            <div className="flex flex-wrap gap-3">
               <Button type="button" onClick={() => runAction("schedule")} disabled={actionMut.isPending}>
                 {actionMut.isPending ? "Working…" : "Schedule"}
               </Button>
               <Button type="button" variant="outline" onClick={() => setConfirmAction("cancel")} disabled={actionMut.isPending}>
                 Cancel session
               </Button>
-            </>
+            </div>
           )}
           {data.status === "SCHEDULED" && (
-            <>
+            <div className="flex flex-col gap-3">
               <p className="text-sm text-[#64748B]">This session will open automatically when the start time arrives.</p>
-              <Button type="button" variant="outline" onClick={() => setConfirmAction("cancel")} disabled={actionMut.isPending}>
+              <Button type="button" variant="outline" onClick={() => setConfirmAction("cancel")} disabled={actionMut.isPending} className="self-start">
                 Cancel session
               </Button>
-            </>
+            </div>
           )}
           {data.status === "OPEN" && (
             <Button type="button" variant="outline" onClick={() => setConfirmAction("close")} disabled={actionMut.isPending}>
@@ -269,7 +269,9 @@ function DetailView({ data }: { data: ExamSessionDetailResponse }) {
       {/* Results & statistics (FE15b) */}
       <ReportingSection sessionId={data.id} />
 
-      <ClassAssignment sessionId={data.id} visibility={data.visibility} />
+      <div className="mt-6">
+        <ClassAssignment sessionId={data.id} visibility={data.visibility} />
+      </div>
 
       {/* Confirm for close/cancel (irreversible-ish actions). */}
       <ConfirmDialog
