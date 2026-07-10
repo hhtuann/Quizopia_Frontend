@@ -52,7 +52,7 @@ export function QuestionAnswerView({ question }: { question: LocalQuestion }) {
                 className={`ml-auto inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
                   correct
                     ? "border-[#10B981]/30 bg-[#10B981]/5 text-[#10B981]"
-                    : "border-[#94A3B8]/30 bg-[#94A3B8]/5 text-[#64748B]"
+                    : "border-[#EF4444]/30 bg-[#EF4444]/5 text-[#EF4444]"
                 }`}
               >
                 {correct ? "True" : "False"}
