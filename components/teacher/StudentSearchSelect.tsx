@@ -68,6 +68,8 @@ export function StudentSearchSelect({
       });
       setResult(res);
       setSelected([]);
+      // Auto-dismiss the inline result after 4 seconds.
+      setTimeout(() => setResult(null), 4000);
       onResult(res);
     } catch {
       setError("Could not add students. Please try again.");

@@ -74,6 +74,13 @@ function DetailView({ classroom }: { classroom: ClassroomDetailView }) {
   const [editOpen, setEditOpen] = useState(false);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; message: string } | null>(null);
 
+  // Auto-dismiss notices after 4 seconds.
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 4000);
+    return () => clearTimeout(t);
+  }, [notice]);
+
   return (
     <div>
       <header className="mb-6">
