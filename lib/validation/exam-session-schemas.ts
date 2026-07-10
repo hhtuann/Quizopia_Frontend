@@ -30,9 +30,9 @@ export const createSessionSchema = z
     startsAt: z.string().min(1, "Start time is required."),
     endsAt: z.string().min(1, "End time is required."),
     maxAttempts: z
-      .number({ message: "Max attempts must be at least 1." })
+      .number({ message: "Max attempts is required." })
       .int("Max attempts must be a whole number.")
-      .min(1, "Max attempts must be at least 1."),
+      .min(0, "Max attempts must be 0 or more (0 = unlimited)."),
     // PUBLIC = all same-school students; CLASS_RESTRICTED = assigned classes only (default).
     visibility: z.enum(["PUBLIC", "CLASS_RESTRICTED"]),
     // Classrooms assigned when CLASS_RESTRICTED. Required-meaningful only then; the
@@ -64,9 +64,9 @@ export const updateSessionSchema = z
     startsAt: z.string().min(1, "Start time is required."),
     endsAt: z.string().min(1, "End time is required."),
     maxAttempts: z
-      .number({ message: "Max attempts must be at least 1." })
+      .number({ message: "Max attempts is required." })
       .int("Max attempts must be a whole number.")
-      .min(1, "Max attempts must be at least 1."),
+      .min(0, "Max attempts must be 0 or more (0 = unlimited)."),
   })
   .refine((data) => new Date(data.endsAt) > new Date(data.startsAt), {
     message: "End time must be after the start time.",

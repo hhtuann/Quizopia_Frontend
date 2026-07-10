@@ -181,8 +181,8 @@ export default function NewExamSessionPage() {
           </div>
 
           <div>
-            <label htmlFor="session-maxAttempts" className={labelClass}>Max attempts</label>
-            <Input id="session-maxAttempts" type="number" min={1} step={1} aria-invalid={!!errors.maxAttempts} aria-describedby={errors.maxAttempts ? "session-maxAttempts-error" : undefined} className={cn(errors.maxAttempts && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")} {...register("maxAttempts", { valueAsNumber: true })} />
+            <label htmlFor="session-maxAttempts" className={labelClass}>Max attempts <span className="font-normal normal-case text-[#64748B]/60">(0 = unlimited)</span></label>
+            <Input id="session-maxAttempts" type="number" min={0} step={1} aria-invalid={!!errors.maxAttempts} aria-describedby={errors.maxAttempts ? "session-maxAttempts-error" : undefined} className={cn(errors.maxAttempts && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")} {...register("maxAttempts", { valueAsNumber: true })} />
             <FieldError id="session-maxAttempts-error" message={errors.maxAttempts?.message} />
           </div>
 
