@@ -57,6 +57,7 @@ function EditForm({
   onSaved: (message: string) => void;
 }) {
   const isTF = question.questionType === "TRUE_FALSE_MATRIX";
+  const isSingle = question.questionType === "SINGLE_CHOICE";
   const isChoice = question.questionType === "SINGLE_CHOICE" || question.questionType === "MULTIPLE_CHOICE";
   const isNumeric = question.questionType === "NUMERIC_FILL";
 
@@ -91,9 +92,6 @@ function EditForm({
 
     if (isChoice) {
       const correctCount = options.filter((o) => o.isCorrect).length;
-      if (question.questionType === "SINGLE_CHOICE" && correctCount !== 1) {
-        setValError("Single choice requires exactly 1 correct answer."); return;
-      }
       if (question.questionType === "MULTIPLE_CHOICE" && correctCount < 2) {
         setValError("Multiple choice requires at least 2 correct answers."); return;
       }
@@ -182,6 +180,17 @@ function EditForm({
                       className={cn("rounded-md border px-3 py-1.5 text-xs font-bold transition-colors", !opt.isCorrect ? "border-[#EF4444] bg-[#EF4444]/10 text-[#EF4444]" : "border-[#E2E8F0] text-[#64748B] hover:bg-[#F1F5F9]")}
                     >False</button>
                   </div>
+                ) : isSingle ? (
+                  <label className="flex shrink-0 cursor-pointer items-center gap-1.5 px-2">
+                    <input
+                      type="radio"
+                      name="single-correct"
+                      checked={opt.isCorrect}
+                      onChange={() => setOptions((prev) => prev.map((o, i) => ({ ...o, isCorrect: i === idx })))}
+                      className="h-4 w-4 accent-[#0052FF]"
+                    />
+                    <span className="text-xs font-semibold text-[#64748B]">Correct</span>
+                  </label>
                 ) : (
                   <label className="flex shrink-0 cursor-pointer items-center gap-1.5 px-2">
                     <input type="checkbox" checked={opt.isCorrect} onChange={() => toggleOption(idx)} className="h-4 w-4 accent-[#0052FF]" />
