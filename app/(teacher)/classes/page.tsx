@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCreateClassroomMutation, useMyClassroomsQuery } from "@/hooks/queries/use-classrooms";
-import { Badge, Button, Input, SectionLabel, buttonVariants, cardVariants } from "@/components/ui";
+import { Badge, Button, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { createClassroomSchema, type CreateClassroomValues } from "@/lib/validation/classroom-schemas";
 import type { ClassroomResponse, ClassroomStatus } from "@/lib/api/classrooms";
@@ -55,7 +55,6 @@ export default function ClassesPage() {
     <div>
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div className="select-none">
-          <SectionLabel className="mb-3">Classes</SectionLabel>
           <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
             My Classes
           </h1>

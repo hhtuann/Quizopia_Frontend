@@ -10,7 +10,7 @@ import { createExam, type CreateExamRequest } from "@/lib/api/exams";
 import { useSubjectsQuery } from "@/hooks/queries/use-subjects";
 import { useExamPurposesQuery } from "@/hooks/queries/use-exams";
 import { createExamSchema, type CreateExamValues } from "@/lib/validation/exam-schemas";
-import { Button, Input, SectionLabel, buttonVariants, cardVariants } from "@/components/ui";
+import { Button, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { NormalizedApiError } from "@/lib/api";
 
@@ -125,8 +125,7 @@ export default function NewExamPage() {
           </svg>
           All exams
         </Link>
-        <SectionLabel className="mb-3 mt-3">New exam</SectionLabel>
-        <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
+        <h1 className="mt-3 font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
           Create exam
         </h1>
       </div>

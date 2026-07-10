@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useAssignClassesMutation, useSessionClassesQuery } from "@/hooks/queries/use-exam-sessions";
 import { useMyClassroomsQuery } from "@/hooks/queries/use-classrooms";
-import { Badge, Button, SectionLabel, buttonVariants, cardVariants } from "@/components/ui";
+import { Badge, Button, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { SessionVisibility } from "@/lib/api/exam-sessions";
 
@@ -29,7 +29,6 @@ export function ClassAssignment({
   if (isPublic) {
     return (
       <div className={cn(cardVariants(), "mb-6 p-6")}>
-        <SectionLabel className="mb-3">Visibility</SectionLabel>
         <div className="flex flex-wrap items-center gap-3">
           <Badge variant="accent">Public</Badge>
           <p className="text-sm font-medium text-[#64748B]">
@@ -45,7 +44,6 @@ export function ClassAssignment({
       <div className={cn(cardVariants(), "mb-6 p-6")}>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <SectionLabel className="mb-2">Class access</SectionLabel>
             <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">Assigned classes</h2>
             <p className="mt-1 text-xs text-[#64748B]">
               Only students in these classes can see this session.

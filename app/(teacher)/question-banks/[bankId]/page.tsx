@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useBankQuestionsQuery } from "@/hooks/queries/use-question-banks";
 import { QuestionImport } from "@/components/teacher/QuestionImport";
-import { Badge, Input, SectionLabel, cardVariants } from "@/components/ui";
+import { Badge, Input, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type {
   Difficulty,
@@ -111,8 +111,7 @@ export default function BankQuestionsPage() {
           </svg>
           All banks
         </Link>
-        <SectionLabel className="mb-3 mt-3">Questions</SectionLabel>
-        <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
+        <h1 className="mt-3 font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
           Questions
         </h1>
         <p className="mt-2 text-sm font-medium text-[#64748B]">

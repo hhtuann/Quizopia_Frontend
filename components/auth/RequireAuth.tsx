@@ -2,7 +2,7 @@
 
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Card, SectionLabel } from "@/components/ui";
+import { Card } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 
 /**
@@ -55,9 +55,6 @@ export function RequireAuth({
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#FAFAFA] px-4">
         <Card variant="elevated" className="max-w-md p-8 text-center">
-          <SectionLabel className="mb-4">
-            Restricted
-          </SectionLabel>
           <h1 className="font-display text-2xl tracking-tight text-[#0F172A]">
             Access denied
           </h1>

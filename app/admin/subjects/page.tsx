@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
-import { Badge, Button, Input, SectionLabel, buttonVariants, cardVariants } from "@/components/ui";
+import { Badge, Button, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import {
   useCreateSubjectMutation,
@@ -152,8 +152,7 @@ function SubjectAdmin() {
             </svg>
             Admin dashboard
           </Link>
-          <SectionLabel className="mb-3 mt-3">Subjects</SectionLabel>
-          <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
+          <h1 className="mt-3 font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
             Subjects
           </h1>
           <p className="mt-2 text-sm font-medium text-[#64748B]">

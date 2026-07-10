@@ -5,7 +5,6 @@ import { useParams } from "next/navigation";
 import { useAttemptDetailQuery } from "@/hooks/queries/use-student-attempt";
 import { useAttemptResultQuery } from "@/hooks/queries/use-student-results";
 import { AttemptResultView } from "@/components/student/AttemptResultView";
-import { SectionLabel } from "@/components/ui";
 import type { NormalizedApiError } from "@/lib/api";
 
 export default function AttemptResultPage() {
@@ -36,8 +35,7 @@ export default function AttemptResultPage() {
           </svg>
           Back to history
         </Link>
-        <SectionLabel className="mb-3 mt-3">Result</SectionLabel>
-        <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
+        <h1 className="mt-3 font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
           Your result
         </h1>
       </div>

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useMyAttemptsQuery } from "@/hooks/queries/use-student-attempts";
-import { Badge, SectionLabel, buttonVariants, cardVariants } from "@/components/ui";
+import { Badge, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { AttemptStatus } from "@/lib/api/student-attempts";
 import type { NormalizedApiError } from "@/lib/api";
@@ -41,7 +41,6 @@ export default function StudentHistoryPage() {
     <div>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div className="select-none">
-          <SectionLabel className="mb-3">History</SectionLabel>
           <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
             My attempts
           </h1>

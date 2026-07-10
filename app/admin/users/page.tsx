@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
-import { Badge, Button, Input, SectionLabel, buttonVariants, cardVariants } from "@/components/ui";
+import { Badge, Button, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import {
   useActivateUserMutation, useAssignRoleMutation, useCreateUserMutation,
@@ -115,8 +115,7 @@ function UsersAdmin() {
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
             Admin dashboard
           </Link>
-          <SectionLabel className="mb-3 mt-3">Users</SectionLabel>
-          <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">User Management</h1>
+          <h1 className="mt-3 font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">User Management</h1>
         </div>
         <Button type="button" onClick={() => setCreateOpen(true)} className="gap-1.5">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-4 w-4" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>

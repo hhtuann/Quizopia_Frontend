@@ -9,7 +9,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createBank, type CreateQuestionBankRequest } from "@/lib/api/question-banks";
 import { useSubjectsQuery } from "@/hooks/queries/use-subjects";
 import { createBankSchema, type CreateBankValues } from "@/lib/validation/question-bank-schemas";
-import { Button, Input, SectionLabel, buttonVariants, cardVariants } from "@/components/ui";
+import { Button, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { NormalizedApiError } from "@/lib/api";
 
@@ -113,8 +113,7 @@ export default function NewQuestionBankPage() {
           </svg>
           All banks
         </Link>
-        <SectionLabel className="mb-3 mt-3">New bank</SectionLabel>
-        <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
+        <h1 className="mt-3 font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
           Create question bank
         </h1>
       </div>

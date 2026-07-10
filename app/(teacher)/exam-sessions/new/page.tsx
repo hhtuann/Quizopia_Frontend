@@ -10,7 +10,7 @@ import { createSession, type CreateExamSessionRequest, type SessionVisibility } 
 import { useExamsQuery, useExamEditorQuery } from "@/hooks/queries/use-exams";
 import { useMyClassroomsQuery } from "@/hooks/queries/use-classrooms";
 import { createSessionSchema, type CreateSessionValues } from "@/lib/validation/exam-session-schemas";
-import { Button, Input, SectionLabel, buttonVariants, cardVariants } from "@/components/ui";
+import { Button, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { NormalizedApiError } from "@/lib/api";
 
@@ -122,8 +122,7 @@ export default function NewExamSessionPage() {
           </svg>
           All sessions
         </Link>
-        <SectionLabel className="mb-3 mt-3">New session</SectionLabel>
-        <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">Create exam session</h1>
+        <h1 className="mt-3 font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">Create exam session</h1>
       </div>
 
       <div className={cn(cardVariants({ variant: "elevated" }), "max-w-2xl p-8 sm:p-10")}>

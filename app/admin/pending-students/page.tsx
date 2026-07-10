@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAssignSchoolMutation, usePendingStudentsQuery } from "@/hooks/queries/use-student-onboarding";
 import { useSchoolsQuery } from "@/hooks/queries/use-schools";import { RequireAuth } from "@/components/auth/RequireAuth";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
-import { Button, Input, SectionLabel, cardVariants } from "@/components/ui";
+import { Button, Input, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { PendingStudentItem } from "@/lib/api/student-onboarding";
 import type { NormalizedApiError } from "@/lib/api";
@@ -109,8 +109,7 @@ function PendingStudentsList() {
           </svg>
           Admin dashboard
         </Link>
-        <SectionLabel className="mb-3 mt-3">Onboarding</SectionLabel>
-        <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
+        <h1 className="mt-3 font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
           Pending Students
         </h1>
         <p className="mt-2 text-sm font-medium text-[#64748B]">

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { exportSessionResults } from "@/lib/api/teacher-reporting";
-import { Button, SectionLabel } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { ResultsTable } from "./ResultsTable";
 import { StatisticsPanel } from "./StatisticsPanel";
 
@@ -39,7 +39,6 @@ export function ReportingSection({ sessionId }: { sessionId: number }) {
     <div className="mt-6 space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <SectionLabel className="mb-2">Reporting</SectionLabel>
           <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
             Results &amp; statistics
           </h2>

@@ -18,7 +18,7 @@ import type {
   UpdateExamSessionRequest,
 } from "@/lib/api/exam-sessions";
 import { updateSessionSchema, type UpdateSessionValues } from "@/lib/validation/exam-session-schemas";
-import { Badge, Button, Input, SectionLabel, cardVariants } from "@/components/ui";
+import { Badge, Button, Input, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
 import { ClassAssignment } from "@/components/teacher/ClassAssignment";
@@ -196,7 +196,6 @@ function DetailView({ data }: { data: ExamSessionDetailResponse }) {
         <ConfigForm key={data.version ?? 0} session={data} />
       ) : (
         <div className={cn(cardVariants(), "mb-6 p-6")}>
-          <SectionLabel className="mb-3">Locked</SectionLabel>
           <p className="text-sm font-medium text-[#64748B]">
             Configuration is locked — the session is <span className="font-semibold text-[#0F172A]">{data.status}</span>.
           </p>

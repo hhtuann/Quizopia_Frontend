@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuestionBanksQuery } from "@/hooks/queries/use-question-banks";
-import { Input, SectionLabel, buttonVariants, cardVariants } from "@/components/ui";
+import { Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { QuestionBankListItem } from "@/lib/api/question-banks";
 import type { NormalizedApiError } from "@/lib/api";
@@ -58,7 +58,6 @@ export default function QuestionBanksPage() {
     <div>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
         <div className="select-none">
-          <SectionLabel className="mb-3">Question banks</SectionLabel>
           <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
             Question Banks
           </h1>

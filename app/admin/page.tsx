@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
-import { Badge, SectionLabel, cardVariants } from "@/components/ui";
+import { Badge, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -20,7 +20,6 @@ export default function AdminDashboardPage() {
   return (
     <div>
       <header className="mb-10 select-none">
-        <SectionLabel className="mb-4">Admin</SectionLabel>
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="font-display text-3xl tracking-tight text-[#0F172A] sm:text-4xl">
             Admin <span className="gradient-text">Dashboard</span>

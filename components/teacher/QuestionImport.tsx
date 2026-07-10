@@ -2,7 +2,7 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import { useImportQuestionsMutation } from "@/hooks/queries/use-question-import";
-import { Button, SectionLabel, cardVariants } from "@/components/ui";
+import { Button, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import {
   downloadImportTemplate,
@@ -125,7 +125,6 @@ export function QuestionImport({ bankId }: { bankId: number }) {
     <section className={cn(cardVariants(), "p-6")}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <SectionLabel className="mb-2">Import</SectionLabel>
           <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
             Import questions
           </h2>

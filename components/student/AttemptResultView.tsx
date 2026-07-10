@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { AttemptDetailResponse } from "@/lib/api/student-attempt";
 import type { AttemptResultResponse } from "@/lib/api/student-results";
 import { useMyBestResultQuery } from "@/hooks/queries/use-student-results";
-import { Badge, SectionLabel, cardVariants } from "@/components/ui";
+import { Badge, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -158,7 +158,6 @@ export function AttemptResultView({
       {/* Per-question results */}
       {!notGraded && sorted.length > 0 && (
         <div>
-          <SectionLabel className="mb-4">Breakdown ({sorted.length})</SectionLabel>
           <div className="space-y-4">
             {sorted.map((qr, i) => {
               const detailQ = detailMap.get(qr.attemptQuestionId);

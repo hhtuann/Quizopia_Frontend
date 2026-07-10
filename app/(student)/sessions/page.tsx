@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAvailableSessionsQuery } from "@/hooks/queries/use-student-attempts";
 import { useStartAttemptMutation } from "@/hooks/queries/use-student-attempt";
-import { Badge, Button, SectionLabel, buttonVariants, cardVariants } from "@/components/ui";
+import { Badge, Button, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { AvailableSessionItem } from "@/lib/api/student-attempts";
 import type { NormalizedApiError } from "@/lib/api";
@@ -68,7 +68,6 @@ export default function StudentSessionsPage() {
   return (
     <div>
       <div className="mb-6 select-none">
-        <SectionLabel className="mb-3">Take an exam</SectionLabel>
         <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
           Available sessions
         </h1>

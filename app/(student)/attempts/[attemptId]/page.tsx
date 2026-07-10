@@ -10,7 +10,7 @@ import {
 } from "@/hooks/queries/use-student-attempt";
 import { AttemptShell } from "@/components/student/AttemptShell";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
-import { Button, SectionLabel, cardVariants } from "@/components/ui";
+import { Button, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { useAutosaveAnswers } from "@/lib/attempt/use-autosave";
 import { useAnswerStore } from "@/lib/attempt/answer-store";
@@ -235,7 +235,6 @@ function generateSubmitKey(): string {
 function SubmitResultCard({ result }: { result: SubmitResponse }) {
   return (
     <div className={cn(cardVariants({ variant: "elevated" }), "p-8 text-center")}>
-      <SectionLabel className="mb-3">Submitted</SectionLabel>
       <h2 className="font-display text-2xl font-extrabold tracking-tight text-[#10B981]">
         Submitted!
       </h2>

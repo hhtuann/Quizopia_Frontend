@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useExamSessionsQuery } from "@/hooks/queries/use-exam-sessions";
-import { Badge, Input, SectionLabel, buttonVariants, cardVariants } from "@/components/ui";
+import { Badge, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { ExamSessionListItem, ExamSessionStatus } from "@/lib/api/exam-sessions";
 import type { NormalizedApiError } from "@/lib/api";
@@ -76,7 +76,6 @@ export default function ExamSessionsPage() {
     <div>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
         <div className="select-none">
-          <SectionLabel className="mb-3">Delivery</SectionLabel>
           <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
             Exam sessions
           </h1>

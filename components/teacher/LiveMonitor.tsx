@@ -7,7 +7,7 @@ import {
   type WsStatus,
 } from "@/lib/realtime/use-session-events";
 import type { RealtimeEventEnvelope } from "@/lib/realtime/types";
-import { SectionLabel, cardVariants } from "@/components/ui";
+import { cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 
 const EVENT_LABEL: Record<string, string> = {
@@ -63,7 +63,6 @@ export function LiveMonitor({
     <div className={cn(cardVariants(), "mt-6 p-6")}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <SectionLabel className="mb-2">Realtime</SectionLabel>
           <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
             Live monitoring
           </h2>

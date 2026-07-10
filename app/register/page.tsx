@@ -11,7 +11,7 @@ import {
 } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, type RegisterValues } from "@/lib/validation/auth-schemas";
-import { Button, Card, Input, SectionLabel } from "@/components/ui";
+import { Button, Card, Input } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/hooks/useAuth";
 import { RedirectIfAuthenticated } from "@/components/auth/RedirectIfAuthenticated";
@@ -158,9 +158,6 @@ export default function RegisterPage() {
       <main className="flex min-h-screen items-center justify-center bg-[#FAFAFA] px-4 py-12">
         <div className="w-full max-w-lg">
           <div className="mb-8 select-none text-center">
-            <SectionLabel className="mb-4">
-              Get started
-            </SectionLabel>
             <h1 className="font-display text-3xl tracking-tight text-[#0F172A]">
               Create your <span className="gradient-text">account</span>
             </h1>

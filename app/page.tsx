@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import AppShell from "@/components/layout/AppShell";
 import { RequireAuth } from "@/components/auth/RequireAuth";
-import { Badge, SectionLabel, cardVariants } from "@/components/ui";
+import { Badge, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/hooks/useAuth";
 import { navItemsForRoles } from "@/lib/navigation";
@@ -59,9 +59,6 @@ export default function Home() {
       <AppShell>
         {/* Welcome header */}
         <header className="mb-10 select-none">
-          <SectionLabel className="mb-4" pulse>
-            Dashboard
-          </SectionLabel>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="font-display text-3xl tracking-tight text-[#0F172A] sm:text-4xl">
               Welcome back, <span className="gradient-text">{displayName}</span>

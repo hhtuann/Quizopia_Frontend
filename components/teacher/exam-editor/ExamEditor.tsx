@@ -7,7 +7,7 @@ import {
   useCreateNextDraftMutation,
   usePublishExamMutation,
 } from "@/hooks/queries/use-exams";
-import { Badge, Button, SectionLabel, cardVariants } from "@/components/ui";
+import { Badge, Button, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type {
   PublishedExamSummary,
@@ -153,8 +153,7 @@ export function ExamEditor({ data }: { data: TeacherExamEditorResponse }) {
           </svg>
           All exams
         </Link>
-        <SectionLabel className="mb-3 mt-3">Exam editor</SectionLabel>
-        <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
+        <h1 className="mt-3 font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
           {data.title}
         </h1>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[#64748B]">
