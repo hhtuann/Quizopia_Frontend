@@ -146,29 +146,22 @@ export function StudentSearchSelect({
         </div>
       )}
 
-      {/* Add button */}
+      {/* Add button + inline result */}
       <div className="mt-4 flex items-center gap-3">
         <Button type="button" disabled={selected.length === 0 || addMut.isPending} onClick={onAdd}>
           {addMut.isPending ? "Adding…" : `Add ${selected.length > 0 ? `${selected.length} ` : ""}student${selected.length === 1 ? "" : "s"}`}
         </Button>
+        {result && (
+          <span className="text-sm font-medium text-[#10B981]">
+            ✓ Added {result.added} student{result.added === 1 ? "" : "s"}
+            {result.duplicated.length > 0 ? ` · ${result.duplicated.length} already members` : ""}
+            {result.invalid.length > 0 ? ` · ${result.invalid.length} invalid` : ""}
+          </span>
+        )}
       </div>
 
-      {/* Result */}
       {error && (
-        <p role="alert" className="mt-3 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-3 text-xs font-medium text-[#EF4444]">
-          {error}
-        </p>
-      )}
-      {result && (
-        <div role="status" className="mt-3 space-y-1.5 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] p-3 text-xs">
-          <p className="font-semibold text-[#10B981]">Added {result.added} student{result.added === 1 ? "" : "s"}.</p>
-          {result.duplicated.length > 0 && (
-            <p className="text-[#64748B]">Already members: {result.duplicated.join(", ")}</p>
-          )}
-          {result.invalid.length > 0 && (
-            <p className="text-[#64748B]">Not found / not in your school: {result.invalid.join(", ")}</p>
-          )}
-        </div>
+        <p role="alert" className="mt-2 text-xs font-medium text-[#EF4444]">{error}</p>
       )}
     </div>
   );

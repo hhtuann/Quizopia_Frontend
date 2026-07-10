@@ -131,9 +131,7 @@ function DetailView({ classroom }: { classroom: ClassroomDetailView }) {
       <StudentSearchSelect
         classId={classroom.id}
         excludeIds={classroom.members.map((m) => m.studentProfileId)}
-        onResult={(r) =>
-          setNotice({ kind: "success", message: `Added ${r.added} student${r.added === 1 ? "" : "s"}.` })
-        }
+        onResult={() => { /* inline result shown in StudentSearchSelect */ }}
       />
 
       <div className={cn(cardVariants(), "mt-6 p-4 sm:p-6")}>
