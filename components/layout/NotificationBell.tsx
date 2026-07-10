@@ -8,12 +8,12 @@ import { useNotificationsQuery, useUnreadCountQuery, useMarkReadMutation, useMar
 const TYPE_ICON: Record<string, string> = {
   RESULT_GRADED: "✓",
   IMPORT_COMPLETED: "↑",
-  SESSION_ENDED: "⏰",
+  SESSION_ENDED: "■",
   STUDENT_JOINED_CLASS: "+",
   EXAM_SESSION_AVAILABLE: "📝",
   ADDED_TO_CLASS: "+",
   STUDENT_STARTED_EXAM: "▶",
-  NEW_USER_REGISTERED: "👤",
+  NEW_USER_REGISTERED: "★",
   NEW_ACADEMIC_ACTIVITY: "🏫",
   USER_STATUS_CHANGED: "⊘",
 };
