@@ -9,9 +9,9 @@ import type { DetailQuestionView, NumericAnswerPayload } from "@/lib/api/student
  * - `<input type="text">` (NOT type="number").
  * - `maxLength={4}`.
  * - Value is a RAW STRING. NO parseFloat, Number(), toFixed, Math.round, or trim.
- * - The backend grades via `BigDecimal.compareTo == 0` after normalizing
- *   comma→dot; the FE preserves the exact representation the student typed.
- * - `roundingInstruction` is shown (never the expectedAnswer).
+ * - The backend grades by EXACT string equality (1.00 != 1); the FE preserves
+ *   the exact representation the student typed (the rounding hint lives in the
+ *   question content, never the expectedAnswer).
  */
 export function NumericFillQuestion({ question }: { question: DetailQuestionView }) {
   const payload = useAnswerStore(
@@ -52,11 +52,6 @@ export function NumericFillQuestion({ question }: { question: DetailQuestionView
           {value.length}/4
         </span>
       </div>
-      {question.roundingInstruction && (
-        <p className="mt-2 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-4 py-2 text-xs font-medium text-[#64748B]">
-          {question.roundingInstruction}
-        </p>
-      )}
     </div>
   );
 }

@@ -7,10 +7,9 @@ import type { LocalQuestion } from "./types";
  * reused for student-facing UI (FE10). Student views use a separate DTO that
  * never carries the answer key.
  *
- * For SINGLE_CHOICE / MULTIPLE_CHOICE the correct options are marked inline
- * (via `option.isCorrect`). For TRUE_FALSE_MATRIX / NUMERIC_FILL the raw
- * `answerKey` JSON is shown in a <details> block (MVP — avoids deep per-type
- * parsing of a JsonNode whose shape varies).
+ * SINGLE_CHOICE / MULTIPLE_CHOICE mark the correct option(s) inline.
+ * TRUE_FALSE_MATRIX renders the 4 statements with their True/False value
+ * (from `option.isCorrect`). NUMERIC_FILL shows just the `expectedAnswer`.
  */
 export function QuestionAnswerView({ question }: { question: LocalQuestion }) {
   if (!question.hasSnapshot) {
@@ -21,40 +20,60 @@ export function QuestionAnswerView({ question }: { question: LocalQuestion }) {
     );
   }
 
-  if (question.type === "SINGLE_CHOICE" || question.type === "MULTIPLE_CHOICE") {
-    const options = question.options ?? [];
-    if (options.length === 0) {
-      return <p className="pl-1 text-xs text-[#64748B]">No options on this question.</p>;
-    }
+  if (question.type === "NUMERIC_FILL") {
+    const expected = readExpectedAnswer(question.answerKey);
     return (
-      <ul className="space-y-1.5">
-        {options.map((o) => (
+      <div className="rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-3 py-2 text-xs">
+        <span className="font-mono uppercase tracking-wide text-[#64748B]">Expected answer </span>
+        <code className="font-mono font-bold text-[#0052FF]">{expected ?? "—"}</code>
+      </div>
+    );
+  }
+
+  // SINGLE_CHOICE / MULTIPLE_CHOICE / TRUE_FALSE_MATRIX — render options.
+  const options = question.options ?? [];
+  if (options.length === 0) {
+    return <p className="pl-1 text-xs text-[#64748B]">No options on this question.</p>;
+  }
+  const isTrueFalse = question.type === "TRUE_FALSE_MATRIX";
+  return (
+    <ul className="space-y-1.5">
+      {options.map((o) => {
+        const correct = o.isCorrect === true;
+        return (
           <li
             key={o.id}
             className="flex items-center gap-2 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-3 py-1.5 text-xs"
           >
             <span className="font-mono font-semibold text-[#64748B]">{o.optionKey}</span>
             <span className="text-[#0F172A]">{o.content}</span>
-            {o.isCorrect === true && (
+            {isTrueFalse ? (
+              <span
+                className={`ml-auto inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                  correct
+                    ? "border-[#10B981]/30 bg-[#10B981]/5 text-[#10B981]"
+                    : "border-[#94A3B8]/30 bg-[#94A3B8]/5 text-[#64748B]"
+                }`}
+              >
+                {correct ? "True" : "False"}
+              </span>
+            ) : correct ? (
               <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-[#10B981]/30 bg-[#10B981]/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#10B981]">
                 ✓ correct
               </span>
-            )}
+            ) : null}
           </li>
-        ))}
-      </ul>
-    );
-  }
-
-  // TF_MATRIX / NUMERIC_FILL — show the answer-key JSON (teacher verifying).
-  return (
-    <details className="rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-3 py-2">
-      <summary className="cursor-pointer font-mono text-xs font-semibold text-[#0052FF]">
-        Show answer key (teacher)
-      </summary>
-      <pre className="mt-2 overflow-x-auto rounded-md bg-white p-2 text-xs text-[#0F172A]">
-        {JSON.stringify(question.answerKey ?? null, null, 2)}
-      </pre>
-    </details>
+        );
+      })}
+    </ul>
   );
+}
+
+/** Reads the NUMERIC_FILL `expectedAnswer` string from the opaque answerKey JSON. */
+function readExpectedAnswer(answerKey: unknown): string | undefined {
+  if (answerKey && typeof answerKey === "object" && "expectedAnswer" in answerKey) {
+    const value = (answerKey as { expectedAnswer?: unknown }).expectedAnswer;
+    return typeof value === "string" ? value : undefined;
+  }
+  return undefined;
 }

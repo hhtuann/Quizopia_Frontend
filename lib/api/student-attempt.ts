@@ -65,8 +65,6 @@ export interface DetailQuestionView {
   displayOrder: number | null;
   content: string;
   defaultPoints: number;
-  /** NUMERIC_FILL only — never the expectedAnswer. */
-  roundingInstruction: string | null;
   options: AttemptOptionView[];
   savedAnswer: SavedAnswerView | null;
 }
