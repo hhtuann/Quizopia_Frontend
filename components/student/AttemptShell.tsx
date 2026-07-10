@@ -74,10 +74,16 @@ export function AttemptShell({
   }, [detail, hydrate]);
 
   // Disable browser back + right-click during exam.
+  // Hide the main page scrollbar so only the AttemptShell overlay scrolls.
   useEffect(() => {
     const blockCtx = (e: MouseEvent) => e.preventDefault();
     document.addEventListener("contextmenu", blockCtx);
-    return () => document.removeEventListener("contextmenu", blockCtx);
+    const html = document.documentElement;
+    html.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("contextmenu", blockCtx);
+      html.style.overflow = "";
+    };
   }, []);
 
   // Timer
