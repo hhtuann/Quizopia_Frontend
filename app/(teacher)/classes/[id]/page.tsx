@@ -12,6 +12,7 @@ import {
   useUpdateClassroomMutation,
 } from "@/hooks/queries/use-classrooms";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
+import { StudentSearchSelect } from "@/components/teacher/StudentSearchSelect";
 import { Badge, Button, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { updateClassroomSchema, type UpdateClassroomValues } from "@/lib/validation/classroom-schemas";
@@ -153,8 +154,9 @@ function DetailView({ classroom }: { classroom: ClassroomDetailView }) {
         </div>
       )}
 
-      <AddStudentsForm
+      <StudentSearchSelect
         classId={classroom.id}
+        excludeIds={classroom.members.map((m) => m.studentProfileId)}
         onResult={(r) =>
           setNotice({ kind: "success", message: `Added ${r.added} student${r.added === 1 ? "" : "s"}.` })
         }

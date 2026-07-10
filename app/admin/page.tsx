@@ -57,6 +57,12 @@ export default function AdminDashboardPage() {
               title="Reporting"
               description="Drill into a session for results and statistics."
             />
+            <ActionCard
+              href="/admin/pending-students"
+              icon={<UsersIcon />}
+              title="Pending Students"
+              description="Assign unassigned students to a school."
+            />
           </div>
         </section>
       )}

@@ -70,6 +70,12 @@ const UsersIcon = (
   </svg>
 );
 
+const UserPlusIcon = (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={ICON}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+  </svg>
+);
+
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: DashboardIcon, roles: ["STUDENT", "TEACHER", "ACADEMIC_ADMIN", "SYSTEM_ADMIN"], exact: true },
   { href: "/sessions", label: "Available sessions", icon: ExamIcon, roles: ["STUDENT"], description: "Browse open exam sessions and join one when you’re ready." },
@@ -80,6 +86,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/classes", label: "Classes", icon: UsersIcon, roles: ["TEACHER", "ACADEMIC_ADMIN"], description: "Manage your classes and student rosters." },
   { href: "/admin", label: "Admin Dashboard", icon: AdminShieldIcon, roles: ["ACADEMIC_ADMIN", "SYSTEM_ADMIN"], exact: true },
   { href: "/admin/subjects", label: "Subjects", icon: ClipboardListIcon, roles: ["ACADEMIC_ADMIN"], description: "Manage subjects across your school." },
+  { href: "/admin/pending-students", label: "Pending Students", icon: UserPlusIcon, roles: ["ACADEMIC_ADMIN"], description: "Assign pending students to a school." },
   { href: "/admin/users", label: "Users", icon: UsersIcon, roles: ["SYSTEM_ADMIN"], description: "Manage user accounts and roles." },
 ];
 

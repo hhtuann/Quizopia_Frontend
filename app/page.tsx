@@ -8,6 +8,8 @@ import { Badge, SectionLabel, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/hooks/useAuth";
 import { navItemsForRoles } from "@/lib/navigation";
+import { useAvailableSessionsQuery } from "@/hooks/queries/use-student-attempts";
+import type { NormalizedApiError } from "@/lib/api";
 
 /** Friendly labels for the role codes returned by `GET /api/auth/me`. */
 const ROLE_LABELS: Record<string, string> = {
@@ -36,8 +38,17 @@ export default function Home() {
     [user]
   );
 
-  const subtitle =
-    user?.roles?.includes("TEACHER")
+  // ONBOARD-3: detect a student with no school profile. The available-sessions
+  // endpoint returns an API error (not network) when the student has no profile.
+  const isStudent = user?.roles?.includes("STUDENT") ?? false;
+  const sessionsQuery = useAvailableSessionsQuery();
+  const sessionsError = sessionsQuery.error as unknown as NormalizedApiError | undefined;
+  const isPendingStudent =
+    isStudent && sessionsQuery.isError && sessionsError?.kind === "api";
+
+  const subtitle = isPendingStudent
+    ? "Your account is awaiting school assignment."
+    : user?.roles?.includes("TEACHER")
       ? "Manage your question banks, build exams, and run live sessions."
       : user?.roles?.includes("STUDENT")
         ? "Jump into an available session or review your past attempts."
@@ -62,8 +73,30 @@ export default function Home() {
           </p>
         </header>
 
-        {/* Functional action cards */}
-        {cards.length > 0 ? (
+        {/* ONBOARD-3: pending school assignment card (student with no profile). */}
+        {isPendingStudent ? (
+          <section
+            aria-label="Pending school assignment"
+            className={cn(cardVariants({ variant: "elevated" }), "mx-auto max-w-lg p-8 text-center")}
+          >
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-xl bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] text-white shadow-[0_4px_14px_rgba(0,82,255,0.25)]">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="h-7 w-7" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+            </div>
+            <h2 className="font-display text-xl font-bold tracking-tight text-[#0F172A]">
+              Awaiting School Assignment
+            </h2>
+            <p className="mt-2 text-sm font-medium leading-relaxed text-[#64748B]">
+              Your account is pending school assignment. Once an administrator assigns you to a school,
+              you&apos;ll be able to see and attempt exam sessions.
+            </p>
+            <p className="mt-4 text-xs text-[#64748B]">
+              Please contact your school administrator.
+            </p>
+          </section>
+        ) : cards.length > 0 ? (
+          /* Functional action cards */
           <section
             aria-label="Quick actions"
             className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
