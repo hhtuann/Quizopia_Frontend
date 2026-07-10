@@ -144,13 +144,13 @@ function SubjectAdmin() {
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <Link
-            href="/admin"
+            href="/"
             className="inline-flex items-center gap-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-[#64748B] outline-none transition-colors hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
             </svg>
-            Admin dashboard
+            Dashboard
           </Link>
           <h1 className="mt-3 font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
             Subjects
