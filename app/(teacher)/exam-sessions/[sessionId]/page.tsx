@@ -233,9 +233,7 @@ function DetailView({ data }: { data: ExamSessionDetailResponse }) {
           )}
           {data.status === "SCHEDULED" && (
             <>
-              <Button type="button" onClick={() => runAction("open")} disabled={actionMut.isPending}>
-                {actionMut.isPending ? "Working…" : "Open"}
-              </Button>
+              <p className="text-sm text-[#64748B]">This session will open automatically when the start time arrives.</p>
               <Button type="button" variant="outline" onClick={() => setConfirmAction("cancel")} disabled={actionMut.isPending}>
                 Cancel session
               </Button>
