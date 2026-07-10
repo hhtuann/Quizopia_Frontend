@@ -153,7 +153,7 @@ function DetailView({ data }: { data: ExamSessionDetailResponse }) {
   };
 
   const facts: { label: string; value: string }[] = [
-    { label: "Exam", value: `#${data.examId} · Version ${data.examVersionNumber}` },
+    { label: "Exam", value: `${data.examCode ?? "#" + data.examId} · Version ${data.examVersionNumber}` },
     { label: "Opened at", value: formatDateTime(data.openedAt) },
     { label: "Closed at", value: formatDateTime(data.closedAt) },
     { label: "Participants", value: String(data.participantCount) },

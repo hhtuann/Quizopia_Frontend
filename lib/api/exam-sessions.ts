@@ -43,6 +43,7 @@ export interface ExamSessionListItem {
 export interface ExamSessionDetailResponse {
   id: number;
   examId: number;
+  examCode: string | null;
   examVersionNumber: number;
   code: string;
   title: string;
