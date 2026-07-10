@@ -117,9 +117,9 @@ function ClassesTable({ items }: { items: ClassroomResponse[] }) {
           <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
             <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Name</th>
-            <th scope="col" className="px-3 pb-3 text-right font-semibold">Members</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Status</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Created</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Members</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Status</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Created</th>
           </tr>
         </thead>
         <tbody>
@@ -141,11 +141,11 @@ function ClassesTable({ items }: { items: ClassroomResponse[] }) {
                   <span className="mt-0.5 block max-w-md truncate text-xs text-[#64748B]">{c.description}</span>
                 ) : null}
               </td>
-              <td className="px-3 py-3 text-right align-top font-semibold tabular-nums">{c.memberCount}</td>
-              <td className="px-3 py-3 align-top">
+              <td className="px-3 py-3 text-center align-top font-semibold tabular-nums">{c.memberCount}</td>
+              <td className="px-3 py-3 text-center align-top">
                 <Badge variant={statusVariant(c.status)}>{c.status}</Badge>
               </td>
-              <td className="px-3 py-3 align-top text-[#64748B]">{formatDate(c.createdAt)}</td>
+              <td className="px-3 py-3 text-center align-top text-[#64748B]">{formatDate(c.createdAt)}</td>
             </tr>
           ))}
         </tbody>

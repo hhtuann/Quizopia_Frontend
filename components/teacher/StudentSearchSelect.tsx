@@ -146,18 +146,11 @@ export function StudentSearchSelect({
         </div>
       )}
 
-      {/* Add button + inline result */}
-      <div className="mt-4 flex items-center gap-3">
+      {/* Add button */}
+      <div className="mt-4">
         <Button type="button" disabled={selected.length === 0 || addMut.isPending} onClick={onAdd}>
           {addMut.isPending ? "Adding…" : `Add ${selected.length > 0 ? `${selected.length} ` : ""}student${selected.length === 1 ? "" : "s"}`}
         </Button>
-        {result && (
-          <span className="text-sm font-medium text-[#10B981]">
-            ✓ Added {result.added} student{result.added === 1 ? "" : "s"}
-            {result.duplicated.length > 0 ? ` · ${result.duplicated.length} already members` : ""}
-            {result.invalid.length > 0 ? ` · ${result.invalid.length} invalid` : ""}
-          </span>
-        )}
       </div>
 
       {error && (

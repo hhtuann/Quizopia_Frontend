@@ -185,12 +185,12 @@ function ExamsTable({ items }: { items: ExamListItem[] }) {
           <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
             <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Title</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Subject</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Purpose</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Status</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Subject</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Purpose</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Status</th>
             <th scope="col" className="px-3 pb-3 text-center font-semibold">Ver.</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Flags</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Created</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Flags</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Created</th>
           </tr>
         </thead>
         <tbody>
@@ -206,13 +206,13 @@ function ExamsTable({ items }: { items: ExamListItem[] }) {
                   {exam.title}
                 </Link>
               </td>
-              <td className="px-3 py-3 text-[#64748B]">
+              <td className="px-3 py-3 text-center text-[#64748B]">
                 {exam.subject.code} — {exam.subject.name}
               </td>
-              <td className="px-3 py-3 text-[#64748B]">
+              <td className="px-3 py-3 text-center text-[#64748B]">
                 {exam.purpose ? exam.purpose.title : "—"}
               </td>
-              <td className="px-3 py-3">
+              <td className="px-3 py-3 text-center">
                 <Badge variant={exam.status === "READY" ? "success" : "default"}>
                   {exam.status}
                 </Badge>
@@ -220,13 +220,13 @@ function ExamsTable({ items }: { items: ExamListItem[] }) {
               <td className="px-3 py-3 text-center tabular-nums text-[#64748B]">
                 {exam.currentVersionNumber ?? "—"}
               </td>
-              <td className="px-3 py-3">
-                <div className="flex gap-1.5" aria-label={`draft ${exam.hasDraft ? "yes" : "no"}, published ${exam.hasPublished ? "yes" : "no"}`}>
+              <td className="px-3 py-3 text-center">
+                <div className="flex justify-center gap-1.5" aria-label={`draft ${exam.hasDraft ? "yes" : "no"}, published ${exam.hasPublished ? "yes" : "no"}`}>
                   <VersionDot label="D" active={exam.hasDraft} hint="has draft" />
                   <VersionDot label="P" active={exam.hasPublished} hint="has published" />
                 </div>
               </td>
-              <td className="px-3 py-3 text-[#64748B]">{formatDate(exam.createdAt)}</td>
+              <td className="px-3 py-3 text-center text-[#64748B]">{formatDate(exam.createdAt)}</td>
             </tr>
           ))}
         </tbody>

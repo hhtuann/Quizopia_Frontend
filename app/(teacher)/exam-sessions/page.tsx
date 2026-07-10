@@ -158,11 +158,9 @@ function SessionsTable({ items }: { items: ExamSessionListItem[] }) {
           <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
             <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Title</th>
-            <th scope="col" className="px-3 pb-3 text-center font-semibold">Exam</th>
-            <th scope="col" className="px-3 pb-3 text-center font-semibold">Version</th>
             <th scope="col" className="px-3 pb-3 text-center font-semibold">Status</th>
-            <th scope="col" className="px-3 pb-3 text-center font-semibold">Start</th>
-            <th scope="col" className="px-3 pb-3 text-center font-semibold">End</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Start time</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">End time</th>
             <th scope="col" className="px-3 pb-3 text-center font-semibold">Max</th>
             <th scope="col" className="px-3 pb-3 text-center font-semibold">Part.</th>
           </tr>
@@ -183,8 +181,6 @@ function SessionsTable({ items }: { items: ExamSessionListItem[] }) {
                   {s.title}
                 </Link>
               </td>
-              <td className="px-3 py-3 text-center text-[#64748B]">#{s.examId}</td>
-              <td className="px-3 py-3 text-center text-[#64748B]">v{s.examVersionNumber}</td>
               <td className="px-3 py-3 text-center">
                 <Badge variant={statusVariant(s.status)}>{s.status}</Badge>
               </td>
