@@ -130,9 +130,15 @@ function SessionCard({ item }: { item: AvailableSessionItem }) {
         <div>
           <dt className="font-mono uppercase tracking-[0.1em] text-[#64748B]">Attempts</dt>
           <dd className="mt-0.5 text-[#0F172A]">
-            {item.attemptsUsed}
-            {item.maxAttempts != null ? ` / ${item.maxAttempts}` : ""} used ·{" "}
-            <span className="font-semibold">{item.remainingAttempts} left</span>
+            {item.maxAttempts === 0 ? (
+              <span>{item.attemptsUsed} used · <span className="font-semibold text-[#0052FF]">Unlimited</span></span>
+            ) : (
+              <span>
+                {item.attemptsUsed}
+                {item.maxAttempts != null ? ` / ${item.maxAttempts}` : ""} used ·{" "}
+                <span className="font-semibold">{item.remainingAttempts} left</span>
+              </span>
+            )}
           </dd>
         </div>
         <div>
