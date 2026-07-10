@@ -53,3 +53,24 @@ export const updateSubjectSchema = z.object({
 });
 
 export type UpdateSubjectValues = z.infer<typeof updateSubjectSchema>;
+
+// ============================================================
+// User management (FE-ADMIN-3, SYSTEM_ADMIN)
+// ============================================================
+
+export const createUserSchema = z.object({
+  username: z.string().min(1, "Username is required.").max(50, "Username must be 50 characters or fewer."),
+  email: z.string().min(1, "Email is required.").email("Enter a valid email.").max(254, "Email must be 254 characters or fewer."),
+  password: z.string().min(8, "Password must be at least 8 characters.").max(128, "Password must be 128 characters or fewer."),
+  displayName: z.string().min(1, "Display name is required.").max(150, "Display name must be 150 characters or fewer."),
+  accountType: z.enum(["STUDENT", "TEACHER"]),
+  phone: z.string().max(20, "Phone must be 20 characters or fewer.").optional(),
+  nationalId: z.string().max(50, "National ID must be 50 characters or fewer.").optional(),
+});
+export type CreateUserValues = z.infer<typeof createUserSchema>;
+
+export const updateUserSchema = z.object({
+  displayName: z.string().max(150, "Display name must be 150 characters or fewer.").optional(),
+  email: z.string().email("Enter a valid email.").max(254, "Email must be 254 characters or fewer.").optional(),
+});
+export type UpdateUserValues = z.infer<typeof updateUserSchema>;
