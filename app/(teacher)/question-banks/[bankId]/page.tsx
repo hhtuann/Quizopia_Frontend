@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { QuestionEditor } from "@/components/teacher/QuestionEditor";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useBankQuestionsQuery } from "@/hooks/queries/use-question-banks";
 import { QuestionImport } from "@/components/teacher/QuestionImport";
-import { Badge, Input, cardVariants } from "@/components/ui";
+import { Badge, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type {
   Difficulty,
@@ -59,6 +60,7 @@ export default function BankQuestionsPage() {
   const [type, setType] = useState<QuestionType | "">("");
   const [status, setStatus] = useState<QuestionStatus | "">("");
   const [page, setPage] = useState(0);
+  const [editTarget, setEditTarget] = useState<number | null>(null);
 
   // Debounce search; any filter change resets to page 0.
   useEffect(() => {
@@ -194,7 +196,7 @@ export default function BankQuestionsPage() {
         ) : items.length === 0 ? (
           <EmptyState hasFilters={!!search || !!type || !!status} />
         ) : (
-          <QuestionsTable items={items} />
+          <QuestionsTable items={items} onEdit={setEditTarget} />
         )}
 
         {validId && !isPending && !isError && items.length > 0 && (
@@ -206,6 +208,14 @@ export default function BankQuestionsPage() {
           />
         )}
       </div>
+
+      {editTarget !== null && (
+        <QuestionEditor
+          questionId={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={() => setEditTarget(null)}
+        />
+      )}
     </div>
   );
 }
@@ -218,8 +228,10 @@ function statusVariant(status: QuestionStatus): "default" | "success" | "warn" {
 
 function QuestionsTable({
   items,
+  onEdit,
 }: {
   items: QuestionSummary[];
+  onEdit: (id: number) => void;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -233,6 +245,7 @@ function QuestionsTable({
             <th scope="col" className="px-3 pb-3 text-right font-semibold">Points</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Status</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Created</th>
+            <th scope="col" className="px-3 pb-3 text-right font-semibold">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -261,6 +274,9 @@ function QuestionsTable({
                 <Badge variant={statusVariant(q.status)}>{q.status}</Badge>
               </td>
               <td className="px-3 py-3 text-[#64748B]">{formatDate(q.createdAt)}</td>
+              <td className="px-3 py-3 text-right">
+                <button type="button" onClick={() => onEdit(q.id)} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8")}>Edit</button>
+              </td>
             </tr>
           ))}
         </tbody>
