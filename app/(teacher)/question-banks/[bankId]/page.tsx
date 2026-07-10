@@ -196,7 +196,7 @@ export default function BankQuestionsPage() {
         ) : items.length === 0 ? (
           <EmptyState hasFilters={!!search || !!type || !!status} />
         ) : (
-          <QuestionsTable items={items} onEdit={setEditTarget} />
+          <QuestionList items={items} onEdit={setEditTarget} />
         )}
 
         {validId && !isPending && !isError && items.length > 0 && (
@@ -226,7 +226,7 @@ function statusVariant(status: QuestionStatus): "default" | "success" | "warn" {
   return "default";
 }
 
-function QuestionsTable({
+function QuestionList({
   items,
   onEdit,
 }: {
@@ -234,53 +234,25 @@ function QuestionsTable({
   onEdit: (id: number) => void;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
-            <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Type</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Content</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Difficulty</th>
-            <th scope="col" className="px-3 pb-3 text-right font-semibold">Points</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Status</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Created</th>
-            <th scope="col" className="px-3 pb-3 text-right font-semibold">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((q) => (
-            <tr key={q.id} className="border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 group hover:bg-[#F1F5F9]">
-              <td className="px-3 py-3">
-                <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B] whitespace-nowrap transition-colors group-hover:text-[#0052FF]">
-                  {q.code}
-                </span>
-              </td>
-              <td className="px-3 py-3">
-                <Badge variant="accent">{TYPE_LABEL[q.questionType]}</Badge>
-              </td>
-              <td className="px-3 py-3">
-                <span className="block max-w-sm text-[#0F172A] line-clamp-2">
-                  {q.content}
-                </span>
-              </td>
-              <td className="px-3 py-3 capitalize text-[#64748B]">
-                {(q.difficulty as Difficulty).toLowerCase()}
-              </td>
-              <td className="px-3 py-3 text-right font-semibold tabular-nums">
-                {q.defaultPoints}
-              </td>
-              <td className="px-3 py-3">
-                <Badge variant={statusVariant(q.status)}>{q.status}</Badge>
-              </td>
-              <td className="px-3 py-3 text-[#64748B]">{formatDate(q.createdAt)}</td>
-              <td className="px-3 py-3 text-right">
-                <button type="button" onClick={() => onEdit(q.id)} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8")}>Edit</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="space-y-3">
+      {items.map((q) => (
+        <div key={q.id} className="rounded-lg border border-[#E2E8F0] bg-white p-4 transition-shadow hover:shadow-md">
+          {/* Header: type + code + status + edit */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="accent">{TYPE_LABEL[q.questionType]}</Badge>
+            <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs text-[#64748B]">{q.code}</span>
+            <Badge variant={statusVariant(q.status)}>{q.status}</Badge>
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-xs capitalize text-[#64748B]">{(q.difficulty as Difficulty).toLowerCase()}</span>
+              <span className="text-xs text-[#64748B]">·</span>
+              <span className="text-xs font-semibold tabular-nums text-[#64748B]">{q.defaultPoints} pt</span>
+              <button type="button" onClick={() => onEdit(q.id)} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8")}>Edit</button>
+            </div>
+          </div>
+          {/* Content */}
+          <p className="mt-2 text-sm text-[#0F172A]">{q.content}</p>
+        </div>
+      ))}
     </div>
   );
 }
