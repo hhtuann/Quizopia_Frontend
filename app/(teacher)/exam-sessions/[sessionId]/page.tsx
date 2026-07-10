@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -125,6 +125,12 @@ function DetailView({ data }: { data: ExamSessionDetailResponse }) {
   const actionMut = useSessionActionMutation(data.id);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const [confirmAction, setConfirmAction] = useState<Extract<SessionLifecycleAction, "close" | "cancel"> | null>(null);
+
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 4000);
+    return () => clearTimeout(t);
+  }, [notice]);
 
   const editable = EDITABLE_STATES.includes(data.status);
 
@@ -339,7 +345,7 @@ function ConfigForm({ session }: { session: ExamSessionDetailResponse }) {
   return (
     <form noValidate onSubmit={handleSubmit(onSubmit)} className={cn(cardVariants(), "mb-6 p-6")}>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">Configuration</h2>
+        <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">Configuration</h2>
         <Button type="submit" size="sm" disabled={isSubmitting}>{isSubmitting ? "Saving…" : "Save configuration"}</Button>
       </div>
 
