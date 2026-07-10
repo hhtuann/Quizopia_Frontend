@@ -48,9 +48,6 @@ export default function StudentHistoryPage() {
             Your exam attempt history.
           </p>
         </div>
-        <Link href="/sessions" className={buttonVariants({ variant: "outline" })}>
-          Available sessions
-        </Link>
       </div>
 
       <div className={cn(cardVariants(), "p-4 sm:p-6")}>

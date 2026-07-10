@@ -76,18 +76,6 @@ export default function StudentSessionsPage() {
         </p>
       </div>
 
-      {data?.serverTime && (
-        <p className="mb-6 pl-1 text-xs font-medium text-[#64748B]" aria-live="polite">
-          Server time: {formatDateTime(data.serverTime)}
-        </p>
-      )}
-
-      <div className="mb-6 flex justify-end">
-        <Link href="/history" className={buttonVariants({ variant: "outline" })}>
-          My attempts
-        </Link>
-      </div>
-
       {isPending ? (
         <Skeleton />
       ) : isError ? (
