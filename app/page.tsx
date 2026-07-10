@@ -44,7 +44,9 @@ export default function Home() {
   const sessionsQuery = useAvailableSessionsQuery();
   const sessionsError = sessionsQuery.error as unknown as NormalizedApiError | undefined;
   const isPendingStudent =
-    isStudent && sessionsQuery.isError && sessionsError?.kind === "api";
+    isStudent && sessionsQuery.isError
+    && sessionsError?.kind === "api"
+    && sessionsError?.code === "ATTEMPT_STUDENT_PROFILE_NOT_FOUND";
 
   const subtitle = isPendingStudent
     ? "Your account is awaiting school assignment."
