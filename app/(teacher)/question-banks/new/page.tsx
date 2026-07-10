@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createBank, type CreateQuestionBankRequest } from "@/lib/api/question-banks";
-import { useSubjectsQuery } from "@/hooks/queries/use-subjects";
+import { useGradeLevelsQuery, useSubjectsQuery } from "@/hooks/queries/use-subjects";
 import { createBankSchema, type CreateBankValues } from "@/lib/validation/question-bank-schemas";
 import { Button, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
@@ -22,12 +22,12 @@ const selectClass =
   "h-12 w-full rounded-lg border border-[#E2E8F0] bg-transparent px-4 pr-9 text-sm text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
 
 /** Map a create-bank error (NormalizedApiError) to a field or form-level message. */
-function describeCreateError(err: unknown): { field?: "code" | "subjectId"; message: string } {
+function describeCreateError(err: unknown): { field?: "subjectId"; message: string } {
   const norm = err as NormalizedApiError | undefined;
   if (norm?.kind === "api") {
     switch (norm.code) {
       case "QUESTION_BANK_CODE_CONFLICT":
-        return { field: "code", message: "This code is already in use." };
+        return { message: "This code is already in use. Please retry — codes are auto-generated." };
       case "QUESTION_SUBJECT_NOT_FOUND":
         return { field: "subjectId", message: "Subject not found." };
       case "QUESTION_SUBJECT_SCHOOL_MISMATCH":
@@ -53,17 +53,23 @@ export default function NewQuestionBankPage() {
   const queryClient = useQueryClient();
   const { data: subjectsData, isPending: subjectsPending, isError: subjectsError } =
     useSubjectsQuery();
-  const subjects = subjectsData?.items ?? [];
+  const allSubjects = subjectsData?.items ?? [];
+  const { data: gradesData, isPending: gradesPending } = useGradeLevelsQuery();
+  const grades = gradesData?.items ?? [];
+  const [gradeId, setGradeId] = useState<number | "">("");
+  const gradeSelected = typeof gradeId === "number";
+  const subjects = gradeSelected ? allSubjects.filter((s) => s.gradeLevelId === gradeId) : [];
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     setError,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<CreateBankValues>({
     resolver: zodResolver(createBankSchema),
-    defaultValues: { code: "", name: "", description: "", subjectId: NaN },
+    defaultValues: { name: "", description: "", subjectId: NaN },
   });
 
   const mutation = useMutation({
@@ -73,7 +79,6 @@ export default function NewQuestionBankPage() {
   const onSubmit = async (values: CreateBankValues) => {
     setFormError(null);
     const req: CreateQuestionBankRequest = {
-      code: values.code.trim(),
       name: values.name.trim(),
       description: values.description?.trim() ? values.description.trim() : null,
       subjectId: values.subjectId,
@@ -145,22 +150,6 @@ export default function NewQuestionBankPage() {
 
         <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           <div>
-            <label htmlFor="bank-code" className={labelClass}>
-              Code
-            </label>
-            <Input
-              id="bank-code"
-              type="text"
-              placeholder="e.g. MIDTERM-SETS"
-              aria-invalid={!!errors.code}
-              aria-describedby={errors.code ? "bank-code-error" : undefined}
-              className={cn(errors.code && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")}
-              {...register("code")}
-            />
-            <FieldError id="bank-code-error" message={errors.code?.message} />
-          </div>
-
-          <div>
             <label htmlFor="bank-name" className={labelClass}>
               Name
             </label>
@@ -192,6 +181,30 @@ export default function NewQuestionBankPage() {
           </div>
 
           <div>
+            <label htmlFor="bank-grade" className={labelClass}>
+              Grade level
+            </label>
+            <select
+              id="bank-grade"
+              disabled={gradesPending}
+              className={cn(selectClass, "disabled:opacity-70")}
+              value={gradeId}
+              onChange={(e) => {
+                const v = e.target.value;
+                setGradeId(v === "" ? "" : Number(v));
+                setValue("subjectId", NaN);
+              }}
+            >
+              <option value="">{gradesPending ? "Loading grades…" : "Select a grade…"}</option>
+              {grades.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
             <label htmlFor="bank-subject" className={labelClass}>
               Subject
             </label>
@@ -208,18 +221,18 @@ export default function NewQuestionBankPage() {
             ) : (
               <select
                 id="bank-subject"
-                disabled={subjectsPending}
+                disabled={!gradeSelected || subjectsPending}
                 aria-invalid={!!errors.subjectId}
                 aria-describedby={errors.subjectId ? "bank-subject-error" : undefined}
                 className={cn(selectClass, errors.subjectId && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]", "disabled:opacity-70")}
                 {...register("subjectId", { valueAsNumber: true })}
               >
                 <option value="">
-                  {subjectsPending ? "Loading subjects…" : "Select a subject…"}
+                  {!gradeSelected ? "Select a grade first" : subjectsPending ? "Loading subjects…" : "Select a subject…"}
                 </option>
                 {subjects.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.code} — {s.name}
+                    {s.name}
                   </option>
                 ))}
               </select>

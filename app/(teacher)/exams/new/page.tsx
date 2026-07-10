@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createExam, type CreateExamRequest } from "@/lib/api/exams";
-import { useSubjectsQuery } from "@/hooks/queries/use-subjects";
+import { useGradeLevelsQuery, useSubjectsQuery } from "@/hooks/queries/use-subjects";
 import { useExamPurposesQuery } from "@/hooks/queries/use-exams";
 import { createExamSchema, type CreateExamValues } from "@/lib/validation/exam-schemas";
 import { Button, Input, buttonVariants, cardVariants } from "@/components/ui";
@@ -24,12 +24,12 @@ const selectClass =
 
 function describeCreateError(
   err: unknown
-): { field?: "code" | "subjectId" | "purposeId"; message: string } {
+): { field?: "subjectId" | "purposeId"; message: string } {
   const norm = err as NormalizedApiError | undefined;
   if (norm?.kind === "api") {
     switch (norm.code) {
       case "EXAM_CODE_CONFLICT":
-        return { field: "code", message: "This code is already in use." };
+        return { message: "This code is already in use. Please retry — codes are auto-generated." };
       case "EXAM_SUBJECT_NOT_FOUND":
         return { field: "subjectId", message: "Subject not found." };
       case "EXAM_SUBJECT_SCHOOL_MISMATCH":
@@ -60,22 +60,28 @@ export default function NewExamPage() {
 
   const { data: subjectsData, isPending: subjectsPending, isError: subjectsError } =
     useSubjectsQuery();
-  const subjects = subjectsData?.items ?? [];
+  const allSubjects = subjectsData?.items ?? [];
+  const { data: gradesData, isPending: gradesPending } = useGradeLevelsQuery();
+  const grades = gradesData?.items ?? [];
 
   const { data: purposesData, isPending: purposesPending, isError: purposesError } =
     useExamPurposesQuery();
   const purposes = purposesData?.items ?? [];
 
+  const [gradeId, setGradeId] = useState<number | "">("");
+  const gradeSelected = typeof gradeId === "number";
+  const subjects = gradeSelected ? allSubjects.filter((s) => s.gradeLevelId === gradeId) : [];
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     setError,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<CreateExamValues>({
     resolver: zodResolver(createExamSchema),
-    defaultValues: { subjectId: NaN, purposeId: "", code: "", title: "", description: "" },
+    defaultValues: { subjectId: NaN, purposeId: "", title: "", description: "" },
   });
 
   const mutation = useMutation({
@@ -87,7 +93,6 @@ export default function NewExamPage() {
     const req: CreateExamRequest = {
       subjectId: values.subjectId,
       purposeId: values.purposeId && values.purposeId !== "" ? Number(values.purposeId) : null,
-      code: values.code.trim(),
       title: values.title.trim(),
       description: values.description?.trim() ? values.description.trim() : null,
     };
@@ -158,32 +163,27 @@ export default function NewExamPage() {
         <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
-              <label htmlFor="exam-subject" className={labelClass}>
-                Subject
+              <label htmlFor="exam-grade" className={labelClass}>
+                Grade level
               </label>
               <select
-                id="exam-subject"
-                disabled={subjectsPending}
-                aria-invalid={!!errors.subjectId}
-                aria-describedby={errors.subjectId ? "exam-subject-error" : undefined}
-                className={cn(selectClass, errors.subjectId && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]", "disabled:opacity-70")}
-                {...register("subjectId", { valueAsNumber: true })}
+                id="exam-grade"
+                disabled={gradesPending}
+                className={cn(selectClass, "disabled:opacity-70")}
+                value={gradeId}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setGradeId(v === "" ? "" : Number(v));
+                  setValue("subjectId", NaN);
+                }}
               >
-                <option value="">
-                  {subjectsPending ? "Loading subjects…" : "Select a subject…"}
-                </option>
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.code} — {s.name}
+                <option value="">{gradesPending ? "Loading grades…" : "Select a grade…"}</option>
+                {grades.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
                   </option>
                 ))}
               </select>
-              {subjectsError && (
-                <p className="mt-1.5 pl-1 text-xs font-medium text-[#EF4444]">
-                  Couldn&apos;t load subjects.
-                </p>
-              )}
-              <FieldError id="exam-subject-error" message={errors.subjectId?.message} />
             </div>
 
             <div>
@@ -217,19 +217,32 @@ export default function NewExamPage() {
           </div>
 
           <div>
-            <label htmlFor="exam-code" className={labelClass}>
-              Code
+            <label htmlFor="exam-subject" className={labelClass}>
+              Subject
             </label>
-            <Input
-              id="exam-code"
-              type="text"
-              placeholder="e.g. MIDTERM-MATH"
-              aria-invalid={!!errors.code}
-              aria-describedby={errors.code ? "exam-code-error" : undefined}
-              className={cn(errors.code && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")}
-              {...register("code")}
-            />
-            <FieldError id="exam-code-error" message={errors.code?.message} />
+            <select
+              id="exam-subject"
+              disabled={!gradeSelected || subjectsPending}
+              aria-invalid={!!errors.subjectId}
+              aria-describedby={errors.subjectId ? "exam-subject-error" : undefined}
+              className={cn(selectClass, errors.subjectId && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]", "disabled:opacity-70")}
+              {...register("subjectId", { valueAsNumber: true })}
+            >
+              <option value="">
+                {!gradeSelected ? "Select a grade first" : subjectsPending ? "Loading subjects…" : "Select a subject…"}
+              </option>
+              {subjects.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            {subjectsError && (
+              <p className="mt-1.5 pl-1 text-xs font-medium text-[#EF4444]">
+                Couldn&apos;t load subjects.
+              </p>
+            )}
+            <FieldError id="exam-subject-error" message={errors.subjectId?.message} />
           </div>
 
           <div>

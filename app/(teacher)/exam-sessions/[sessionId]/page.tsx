@@ -170,7 +170,6 @@ function DetailView({ data }: { data: ExamSessionDetailResponse }) {
           <Badge variant={data.visibility === "PUBLIC" ? "accent" : "default"}>
             {data.visibility === "PUBLIC" ? "Public" : "Class-restricted"}
           </Badge>
-          <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs text-[#64748B]">{data.code}</span>
         </div>
       </div>
 

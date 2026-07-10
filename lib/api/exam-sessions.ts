@@ -77,7 +77,6 @@ export interface ExamSessionListParams {
 export interface CreateExamSessionRequest {
   examId: number;
   examVersionNumber: number;
-  code: string;
   title: string;
   startsAt: string;
   endsAt: string;

@@ -183,7 +183,6 @@ function ExamsTable({ items }: { items: ExamListItem[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
-            <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Title</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Subject</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Purpose</th>
@@ -196,11 +195,6 @@ function ExamsTable({ items }: { items: ExamListItem[] }) {
         <tbody>
           {items.map((exam) => (
             <tr key={exam.id} className="relative border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 group hover:bg-[#F1F5F9]">
-              <td className="px-3 py-3">
-                <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B] whitespace-nowrap transition-colors group-hover:text-[#0052FF]">
-                  {exam.code}
-                </span>
-              </td>
               <td className="px-3 py-3 font-semibold transition-colors group-hover:text-[#0052FF]">
                 <Link href={`/exams/${exam.id}`} className="after:absolute after:inset-0 transition-colors group-hover:text-[#0052FF]">
                   {exam.title}

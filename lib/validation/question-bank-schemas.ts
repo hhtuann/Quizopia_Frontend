@@ -3,18 +3,14 @@ import { z } from "zod";
 /**
  * Zod schema mirroring backend `CreateQuestionBankRequest` and its Jakarta
  * Validation constraints:
- *   - code: @NotBlank, @Size(max = 80)
  *   - name: @NotBlank, @Size(max = 255)
  *   - description: @Size(max = 2000), nullable (no @NotBlank)
  *   - subjectId: @NotNull (selected from the school-scoped dropdown)
  *
+ * `code` is no longer client-supplied — the backend auto-generates it.
  * Client-side validation only; the backend remains the source of truth.
  */
 export const createBankSchema = z.object({
-  code: z
-    .string()
-    .min(1, "Code is required.")
-    .max(80, "Code must be 80 characters or fewer."),
   name: z
     .string()
     .min(1, "Name is required.")

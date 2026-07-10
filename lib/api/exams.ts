@@ -61,7 +61,6 @@ export interface ExamListParams {
 export interface CreateExamRequest {
   subjectId: number;
   purposeId: number | null;
-  code: string;
   title: string;
   description: string | null;
 }

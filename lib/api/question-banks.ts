@@ -122,7 +122,6 @@ export function listBankQuestions(
  * authenticated teacher profile.
  */
 export interface CreateQuestionBankRequest {
-  code: string;
   name: string;
   description: string | null;
   subjectId: number;

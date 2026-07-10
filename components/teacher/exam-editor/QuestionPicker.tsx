@@ -101,7 +101,7 @@ export function QuestionPicker({
         <option value="">{banksPending ? "Loading banks…" : "Select a bank…"}</option>
         {banks.map((b) => (
           <option key={b.id} value={b.id}>
-            {b.code} — {b.name}
+            {b.name}
           </option>
         ))}
       </select>

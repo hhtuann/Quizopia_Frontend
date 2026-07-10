@@ -156,7 +156,6 @@ function SessionsTable({ items }: { items: ExamSessionListItem[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
-            <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Title</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Exam</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Status</th>
@@ -168,15 +167,14 @@ function SessionsTable({ items }: { items: ExamSessionListItem[] }) {
         <tbody>
           {items.map((s) => (
             <tr key={s.id} className="relative border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 group hover:bg-[#F1F5F9]">
-              <td className="px-3 py-3">
+              <td className="px-3 py-3 font-semibold transition-colors group-hover:text-[#0052FF]">
                 <Link
                   href={`/exam-sessions/${s.id}`}
-                  className="after:absolute after:inset-0 rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B] whitespace-nowrap transition-colors group-group-hover:text-[#0052FF] outline-none transition-colors group-hover:text-[#0052FF] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
+                  className="after:absolute after:inset-0 rounded outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
                 >
-                  {s.code}
+                  {s.title}
                 </Link>
               </td>
-              <td className="px-3 py-3 font-semibold transition-colors group-hover:text-[#0052FF]">{s.title}</td>
               <td className="px-3 py-3 text-[#64748B]">
                 exam #{s.examId} · v{s.examVersionNumber}
               </td>

@@ -5,7 +5,6 @@ import { z } from "zod";
  * Validation constraints:
  *   - examId: @NotNull @Positive
  *   - examVersionNumber: @NotNull @Positive  (must reference a PUBLISHED version)
- *   - code: @NotBlank, @Size(max = 30)        (shorter than an exam code)
  *   - title: @NotBlank, @Size(max = 255)
  *   - startsAt / endsAt: @NotNull Instant      (datetime-local strings here → ISO on submit)
  *   - maxAttempts: @NotNull @Positive Integer
@@ -24,10 +23,6 @@ export const createSessionSchema = z
       .number({ message: "Choose a published version." })
       .int("Choose a published version.")
       .positive("Choose a published version."),
-    code: z
-      .string()
-      .min(1, "Code is required.")
-      .max(30, "Code must be 30 characters or fewer."),
     title: z
       .string()
       .min(1, "Title is required.")

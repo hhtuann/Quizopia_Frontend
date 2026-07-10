@@ -18,12 +18,12 @@ const labelClass = "mb-2 block pl-1 font-mono text-xs uppercase tracking-[0.1em]
 const selectClass =
   "h-12 w-full rounded-lg border border-[#E2E8F0] bg-transparent px-4 pr-9 text-sm text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
 
-function describeCreateError(err: unknown): { field?: "code" | "endsAt" | "examVersionNumber"; message: string } {
+function describeCreateError(err: unknown): { field?: "endsAt" | "examVersionNumber"; message: string } {
   const norm = err as NormalizedApiError | undefined;
   if (norm?.kind === "api") {
     switch (norm.code) {
       case "EXAM_CODE_CONFLICT":
-        return { field: "code", message: "This code is already in use." };
+        return { message: "This code is already in use. Please retry — codes are auto-generated." };
       case "EXAM_SESSION_TIME_INVALID":
         return { field: "endsAt", message: "End time must be after the start time." };
       case "EXAM_VERSION_NOT_DRAFT":
@@ -62,7 +62,7 @@ export default function NewExamSessionPage() {
     formState: { errors, isSubmitting },
   } = useForm<CreateSessionValues>({
     resolver: zodResolver(createSessionSchema),
-    defaultValues: { examId: NaN, examVersionNumber: NaN, code: "", title: "", startsAt: "", endsAt: "", maxAttempts: 1, visibility: "CLASS_RESTRICTED" as const },
+    defaultValues: { examId: NaN, examVersionNumber: NaN, title: "", startsAt: "", endsAt: "", maxAttempts: 1, visibility: "CLASS_RESTRICTED" as const },
   });
 
   const examId = useWatch({ control, name: "examId" });
@@ -93,7 +93,6 @@ export default function NewExamSessionPage() {
     const req: CreateExamSessionRequest = {
       examId: values.examId,
       examVersionNumber: values.examVersionNumber,
-      code: values.code.trim(),
       title: values.title.trim(),
       // datetime-local (local) → ISO UTC. Runs in the submit handler, not render.
       startsAt: new Date(values.startsAt).toISOString(),
@@ -152,7 +151,7 @@ export default function NewExamSessionPage() {
               <option value="">{examsPending ? "Loading exams…" : "Select an exam…"}</option>
               {exams.map((e) => (
                 <option key={e.id} value={e.id} disabled={!e.hasPublished}>
-                  {e.code} — {e.title}{!e.hasPublished ? " (no published version)" : ""}
+                  {e.title}{!e.hasPublished ? " (no published version)" : ""}
                 </option>
               ))}
             </select>
@@ -181,17 +180,10 @@ export default function NewExamSessionPage() {
             <FieldError id="session-version-error" message={errors.examVersionNumber?.message} />
           </div>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <div>
-              <label htmlFor="session-code" className={labelClass}>Code</label>
-              <Input id="session-code" type="text" placeholder="e.g. S1-MID" aria-invalid={!!errors.code} aria-describedby={errors.code ? "session-code-error" : undefined} className={cn(errors.code && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")} {...register("code")} />
-              <FieldError id="session-code-error" message={errors.code?.message} />
-            </div>
-            <div>
-              <label htmlFor="session-maxAttempts" className={labelClass}>Max attempts</label>
-              <Input id="session-maxAttempts" type="number" min={1} step={1} aria-invalid={!!errors.maxAttempts} aria-describedby={errors.maxAttempts ? "session-maxAttempts-error" : undefined} className={cn(errors.maxAttempts && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")} {...register("maxAttempts", { valueAsNumber: true })} />
-              <FieldError id="session-maxAttempts-error" message={errors.maxAttempts?.message} />
-            </div>
+          <div>
+            <label htmlFor="session-maxAttempts" className={labelClass}>Max attempts</label>
+            <Input id="session-maxAttempts" type="number" min={1} step={1} aria-invalid={!!errors.maxAttempts} aria-describedby={errors.maxAttempts ? "session-maxAttempts-error" : undefined} className={cn(errors.maxAttempts && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")} {...register("maxAttempts", { valueAsNumber: true })} />
+            <FieldError id="session-maxAttempts-error" message={errors.maxAttempts?.message} />
           </div>
 
           <div>

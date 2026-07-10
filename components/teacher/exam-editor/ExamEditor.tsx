@@ -157,9 +157,6 @@ export function ExamEditor({ data }: { data: TeacherExamEditorResponse }) {
           {data.title}
         </h1>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[#64748B]">
-          <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs text-[#64748B]">
-            {data.code}
-          </span>
           <span>{data.subject.code} — {data.subject.name}</span>
           {data.purpose && <span>· {data.purpose.title}</span>}
           <Badge variant={data.status === "READY" ? "success" : "default"}>
