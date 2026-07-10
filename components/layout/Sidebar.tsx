@@ -17,7 +17,7 @@ export default function Sidebar() {
   const items = navItemsForRoles(user?.roles);
 
   return (
-    <aside className="hidden md:flex flex-col w-64 select-none space-y-8 border-r border-[#E2E8F0] p-6">
+    <aside className="sticky top-20 hidden max-h-[calc(100vh-6rem)] self-start overflow-y-auto md:flex md:w-64 md:flex-col md:space-y-8 md:border-r md:border-[#E2E8F0] md:p-6">
       {/* Navigation */}
       <nav className="flex flex-col space-y-2" aria-label="Main navigation">
         {items.map((item) => {
@@ -45,21 +45,6 @@ export default function Sidebar() {
           );
         })}
       </nav>
-
-      {/* Minimalist brand accent (brand accent) */}
-      <div className="flex flex-1 items-end justify-center pb-4">
-        <div className="flex w-full flex-col items-center gap-3 rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-[0_4px_6px_rgba(0,0,0,0.07)]">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] font-display text-xl text-white shadow-[0_4px_14px_rgba(0,82,255,0.25)]">
-            Q
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-[#10B981]" />
-            <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-[#64748B]">
-              Quizopia
-            </span>
-          </div>
-        </div>
-      </div>
     </aside>
   );
 }

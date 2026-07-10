@@ -37,7 +37,9 @@ export default function AppShell({ children }: AppShellProps) {
 
         <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden px-2 py-8 md:px-8">
           <div className="flex-1">{children}</div>
-          <Footer />
+          <div className="mt-16">
+            <Footer />
+          </div>
         </main>
       </div>
 
