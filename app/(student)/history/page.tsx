@@ -22,11 +22,12 @@ function formatDateTime(iso: string | null): string {
 function formatDuration(startIso: string, endIso: string): string {
   const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
   if (ms <= 0) return "—";
-  const totalMin = Math.round(ms / 60000);
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
+  const totalSec = Math.round(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
 function statusVariant(status: AttemptStatus): "accent" | "success" | "default" {
@@ -73,9 +74,9 @@ export default function StudentHistoryPage() {
               <thead>
                 <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
                   <th scope="col" className="px-3 pb-3 font-semibold">Session</th>
-                  <th scope="col" className="px-3 pb-3 font-semibold">Status</th>
-                  <th scope="col" className="px-3 pb-3 font-semibold">Duration</th>
-                  <th scope="col" className="px-3 pb-3 font-semibold">Submitted</th>
+                  <th scope="col" className="px-3 pb-3 text-center font-semibold">Status</th>
+                  <th scope="col" className="px-3 pb-3 text-center font-semibold">Duration</th>
+                  <th scope="col" className="px-3 pb-3 text-center font-semibold">Submitted</th>
                   <th scope="col" className="px-3 pb-3 text-center font-semibold">Attempt</th>
                 </tr>
               </thead>
@@ -93,13 +94,13 @@ export default function StudentHistoryPage() {
                         {a.sessionTitle}
                       </Link>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-3 text-center">
                       <Badge variant={statusVariant(a.status)}>{a.status.replace("_", " ")}</Badge>
                     </td>
-                    <td className="px-3 py-3 text-[#64748B]">
+                    <td className="px-3 py-3 text-center font-mono text-[#64748B] tabular-nums">
                       {a.startedAt && a.submittedAt ? formatDuration(a.startedAt, a.submittedAt) : "—"}
                     </td>
-                    <td className="px-3 py-3 text-[#64748B]">{formatDateTime(a.submittedAt)}</td>
+                    <td className="px-3 py-3 text-center text-[#64748B]">{formatDateTime(a.submittedAt)}</td>
                     <td className="px-3 py-3 text-center font-semibold tabular-nums text-[#64748B]">
                       {a.attemptNumber ?? "—"}
                     </td>
