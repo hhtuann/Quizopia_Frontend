@@ -63,12 +63,10 @@ export default function StudentHistoryPage() {
               <thead>
                 <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
                   <th scope="col" className="px-3 pb-3 font-semibold">Session</th>
-                  <th scope="col" className="px-3 pb-3 text-center font-semibold">#</th>
+                  <th scope="col" className="px-3 pb-3 text-center font-semibold">Lần thi</th>
                   <th scope="col" className="px-3 pb-3 font-semibold">Status</th>
-                  <th scope="col" className="px-3 pb-3 font-semibold">Started</th>
-                  <th scope="col" className="px-3 pb-3 font-semibold">Submitted</th>
-                  <th scope="col" className="px-3 pb-3 font-semibold">Deadline</th>
-                  <th scope="col" className="px-3 pb-3 font-semibold">Created</th>
+                  <th scope="col" className="px-3 pb-3 font-semibold">Bắt đầu</th>
+                  <th scope="col" className="px-3 pb-3 font-semibold">Nộp bài</th>
                 </tr>
               </thead>
               <tbody>
@@ -85,7 +83,7 @@ export default function StudentHistoryPage() {
                         {a.sessionTitle}
                       </Link>
                     </td>
-                    <td className="px-3 py-3 text-center tabular-nums text-[#64748B]">
+                    <td className="px-3 py-3 text-center font-semibold tabular-nums text-[#64748B]">
                       {a.attemptNumber ?? "—"}
                     </td>
                     <td className="px-3 py-3">
@@ -93,8 +91,6 @@ export default function StudentHistoryPage() {
                     </td>
                     <td className="px-3 py-3 text-[#64748B]">{formatDateTime(a.startedAt)}</td>
                     <td className="px-3 py-3 text-[#64748B]">{formatDateTime(a.submittedAt)}</td>
-                    <td className="px-3 py-3 text-[#64748B]">{formatDateTime(a.deadlineAt)}</td>
-                    <td className="px-3 py-3 text-[#64748B]">{formatDateTime(a.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>
