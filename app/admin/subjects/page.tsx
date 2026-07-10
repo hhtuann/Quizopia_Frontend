@@ -15,6 +15,7 @@ import {
   useSubjectsQuery,
   useUpdateSubjectMutation,
 } from "@/hooks/queries/use-subjects";
+import { useSchoolsQuery } from "@/hooks/queries/use-schools";
 import {
   updateSubjectStatus,
   type AcademicStatus,
@@ -35,7 +36,7 @@ import type { NormalizedApiError } from "@/lib/api";
  * to this fixed demo school. Tech debt: revisit once the schools list + a
  * status-bearing subject list DTO exist.
  */
-const DEMO_SCHOOL_ID = 1;
+// DEMO_SCHOOL_ID removed — replaced with useSchoolsQuery() auto-select (FE-SCHOOLS).
 const STATUS_OPTIONS: AcademicStatus[] = ["ACTIVE", "INACTIVE", "ARCHIVED"];
 
 const labelClass = "mb-2 block pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]";
@@ -87,7 +88,15 @@ export default function AdminSubjectsPage() {
 
 function SubjectAdmin() {
   const { data, isPending, isError, error } = useSubjectsQuery();
-  const { data: glData } = useGradeLevelsQuery(DEMO_SCHOOL_ID);
+  // Resolve schoolId from the real schools API (replaces hardcoded DEMO_SCHOOL_ID).
+  const { data: schoolsData } = useSchoolsQuery();
+  const [schoolId, setSchoolId] = useState<number | null>(null);
+  // Auto-select the first school (ACADEMIC_ADMIN sees exactly 1). Render-phase resync
+  // (avoids react-hooks/set-state-in-effect). No infinite loop: schoolId !== null after.
+  if (schoolId === null && schoolsData?.items && schoolsData.items.length > 0) {
+    setSchoolId(schoolsData.items[0].id);
+  }
+  const { data: glData } = useGradeLevelsQuery(schoolId ?? 0);
   const items = data?.items ?? [];
   const gradeLevels = glData?.items ?? [];
   const glMap = useMemo(
@@ -194,6 +203,7 @@ function SubjectAdmin() {
 
       {createOpen && (
         <CreateSubjectModal
+          schoolId={schoolId ?? 0}
           gradeLevels={gradeLevels}
           onClose={() => setCreateOpen(false)}
           onCreated={(msg) => {
@@ -353,10 +363,12 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
 
 function CreateSubjectModal({
   gradeLevels,
+  schoolId,
   onClose,
   onCreated,
 }: {
   gradeLevels: GradeLevelView[];
+  schoolId: number;
   onClose: () => void;
   onCreated: (message: string) => void;
 }) {
@@ -370,7 +382,7 @@ function CreateSubjectModal({
     formState: { errors, isSubmitting },
   } = useForm<CreateSubjectValues>({
     resolver: zodResolver(createSubjectSchema),
-    defaultValues: { code: "", name: "", description: "", schoolId: DEMO_SCHOOL_ID, gradeLevelId: NaN },
+    defaultValues: { code: "", name: "", description: "", schoolId, gradeLevelId: NaN },
   });
 
   const onSubmit = async (values: CreateSubjectValues) => {
@@ -380,7 +392,7 @@ function CreateSubjectModal({
         code: values.code.trim(),
         name: values.name.trim(),
         description: values.description?.trim() ? values.description.trim() : null,
-        schoolId: DEMO_SCHOOL_ID,
+        schoolId,
         gradeLevelId: values.gradeLevelId,
       });
       onCreated(`Subject "${res.code}" created.`);
