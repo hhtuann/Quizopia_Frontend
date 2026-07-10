@@ -66,6 +66,8 @@ export interface MyAttemptListItem {
   submittedAt: string | null;
   deadlineAt: string | null;
   createdAt: string;
+  score: number | null;
+  maxScore: number | null;
 }
 
 /** Backend record `MyAttemptsResponse` (paged shape, fixed sort `createdAt: DESC`). */

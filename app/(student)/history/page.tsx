@@ -78,6 +78,7 @@ export default function StudentHistoryPage() {
                   <th scope="col" className="px-3 pb-3 text-center font-semibold">Duration</th>
                   <th scope="col" className="px-3 pb-3 text-center font-semibold">Submitted</th>
                   <th scope="col" className="px-3 pb-3 text-center font-semibold">Attempt</th>
+                  <th scope="col" className="px-3 pb-3 text-center font-semibold">Score</th>
                 </tr>
               </thead>
               <tbody>
@@ -103,6 +104,9 @@ export default function StudentHistoryPage() {
                     <td className="px-3 py-3 text-center text-[#64748B]">{formatDateTime(a.submittedAt)}</td>
                     <td className="px-3 py-3 text-center font-semibold tabular-nums text-[#64748B]">
                       {a.attemptNumber ?? "—"}
+                    </td>
+                    <td className="px-3 py-3 text-center font-mono font-semibold tabular-nums text-[#0F172A]">
+                      {a.score != null && a.maxScore != null ? `${a.score}/${a.maxScore}` : "—"}
                     </td>
                   </tr>
                 ))}
