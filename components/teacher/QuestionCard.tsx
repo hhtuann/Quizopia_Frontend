@@ -46,8 +46,8 @@ export function QuestionCard({
           defaultPointsServer: detail.defaultPoints,
           hasSnapshot: true,
           answerKey: detail.answerKey,
-          options: detail.options.map((o) => ({
-            id: 0,
+          options: detail.options.map((o, i) => ({
+            id: i + 1,
             optionKey: o.optionKey,
             content: o.content,
             isCorrect: o.isCorrect,
