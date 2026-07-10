@@ -28,6 +28,10 @@
 }
 
 /* ===== Base Styles ===== */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   background-color: var(--color-next-background);
   color: var(--color-next-foreground);
