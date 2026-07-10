@@ -46,6 +46,9 @@ export function unlockUser(id: number): Promise<UserResponse> { return http.post
 export function assignRole(id: number, roleCode: string): Promise<UserResponse> {
   return http.post<UserResponse>(`/api/users/${id}/roles`, { roleCode });
 }
+export function removeRole(id: number, roleCode: string): Promise<UserResponse> {
+  return http.delete<UserResponse>(`/api/users/${id}/roles/${encodeURIComponent(roleCode)}`);
+}
 export function getRoles(): Promise<RoleListResponse> {
   return http.get<RoleListResponse>("/api/roles");
 }

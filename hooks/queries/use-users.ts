@@ -3,7 +3,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   activateUser, assignRole, createUser, disableUser, getRoles, listUsers,
-  lockUser, unlockUser, updateUser,
+  lockUser, removeRole, unlockUser, updateUser,
   type CreateUserRequest, type UpdateUserRequest, type UsersListParams,
 } from "@/lib/api/users";
 
@@ -51,6 +51,13 @@ export function useAssignRoleMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, roleCode }: { id: number; roleCode: string }) => assignRole(id, roleCode),
+    onSuccess: () => invalidate(qc),
+  });
+}
+export function useRemoveRoleMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, roleCode }: { id: number; roleCode: string }) => removeRole(id, roleCode),
     onSuccess: () => invalidate(qc),
   });
 }

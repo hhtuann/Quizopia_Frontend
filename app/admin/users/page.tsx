@@ -6,10 +6,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
+import { RoleCell } from "@/components/admin/RoleCell";
 import { Badge, Button, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import {
-  useActivateUserMutation, useAssignRoleMutation, useCreateUserMutation,
+  useActivateUserMutation, useCreateUserMutation,
   useDisableUserMutation, useLockUserMutation, useRolesQuery, useUnlockUserMutation,
   useUpdateUserMutation, useUsersQuery,
 } from "@/hooks/queries/use-users";
@@ -69,7 +70,6 @@ function UsersAdmin() {
   const disableMut = useDisableUserMutation();
   const lockMut = useLockUserMutation();
   const unlockMut = useUnlockUserMutation();
-  const assignRoleMut = useAssignRoleMutation();
   const { data: rolesData } = useRolesQuery();
   const roles = rolesData?.items ?? [];
 
@@ -99,12 +99,6 @@ function UsersAdmin() {
     const { action, userId } = confirmTarget;
     setConfirmTarget(null);
     void runStatus(action, userId);
-  };
-
-  const onAssignRole = async (userId: number, roleCode: string) => {
-    setNotice(null);
-    try { await assignRoleMut.mutateAsync({ id: userId, roleCode }); setNotice({ kind: "success", message: `Role ${roleCode} assigned.` }); }
-    catch { setNotice({ kind: "error", message: "Could not assign role." }); }
   };
 
   return (
@@ -162,13 +156,11 @@ function UsersAdmin() {
                     </td>
                     <td className="px-3 py-3 align-top">
                       <span className="font-medium">{u.displayName}</span>
-                      <span className="mt-0.5 block max-w-xs truncate text-xs text-[#64748B]">{u.email}</span>
+                      <span className="mt-0.5 block max-w-[180px] truncate text-xs text-[#64748B]">{u.email}</span>
                     </td>
                     <td className="px-3 py-3 align-top"><Badge variant={statusVariant(u.status)}>{u.status}</Badge></td>
                     <td className="px-3 py-3 align-top">
-                      <div className="flex flex-wrap gap-1">
-                        {u.roles.map((r) => <Badge key={r} variant="default">{r}</Badge>)}
-                      </div>
+                      <RoleCell userId={u.id} roles={u.roles} allRoles={roles.map((r) => r.code)} />
                     </td>
                     <td className="px-3 py-3 align-top text-[#64748B]">{formatDate(u.createdAt)}</td>
                     <td className="px-3 py-3 align-top">
@@ -190,12 +182,6 @@ function UsersAdmin() {
                           <button type="button" disabled={statusBusy} onClick={() => runStatus("activate", u.id)}
                             className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8")}>Activate</button>
                         )}
-                        {/* Role assign */}
-                        <select value="" disabled={assignRoleMut.isPending} onChange={(e) => { if (e.target.value) onAssignRole(u.id, e.target.value); }}
-                          className="h-8 rounded-lg border border-[#E2E8F0] bg-transparent px-1.5 text-xs text-[#64748B] outline-none focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2" aria-label={`Assign role to ${u.displayName}`}>
-                          <option value="">+ Role</option>
-                          {roles.filter((r) => !u.roles.includes(r.code)).map((r) => <option key={r.code} value={r.code}>{r.code}</option>)}
-                        </select>
                         {/* Edit */}
                         <button type="button" onClick={() => setEditTarget(u)} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8")}>Edit</button>
                       </div>
