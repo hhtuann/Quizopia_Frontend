@@ -123,7 +123,7 @@ function InProgressShell({
     try {
       const res = await submitMut.mutateAsync({ key });
       setSubmitResult(res);
-      setTimeout(() => router.replace("/history"), 5000);
+      setTimeout(() => router.replace(`/attempts/${attemptId}/result`), 3000);
     } catch (err) {
       const norm = err as NormalizedApiError | undefined;
       if (norm?.kind === "api") {

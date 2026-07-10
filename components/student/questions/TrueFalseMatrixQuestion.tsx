@@ -48,9 +48,7 @@ export function TrueFalseMatrixQuestion({ question }: { question: DetailQuestion
                     className={cn(
                       "inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border text-xs font-bold outline-none transition-all duration-200 focus-within:ring-2 focus-within:ring-[#0052FF] focus-within:ring-offset-2",
                       active
-                        ? btn.val
-                          ? "border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]"
-                          : "border-[#0052FF]/30 bg-[#0052FF]/10 text-[#0052FF]"
+                        ? "border-[#0052FF]/30 bg-[#0052FF]/10 text-[#0052FF]"
                         : "border-[#E2E8F0] bg-white text-[#94A3B8] hover:text-[#0F172A]"
                     )}
                   >
