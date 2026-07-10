@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { httpClient } from "@/lib/api";
 import { authApi, initAuth, useAuthStore } from "@/lib/auth";
 import type {
@@ -85,15 +86,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return authApi.register(req);
   }, []);
 
+  const qc = useQueryClient();
+
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
     } finally {
       // Clear local state regardless of network result (cookie cleared server-side on 204).
       useAuthStore.getState().clearAuth();
+      qc.clear();
       setStatus("unauthenticated");
     }
-  }, []);
+  }, [qc]);
 
   const value = useMemo<AuthContextValue>(
     () => ({ status, login, register, logout }),
