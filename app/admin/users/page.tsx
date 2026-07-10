@@ -29,7 +29,7 @@ const pageBtnClass = "inline-flex h-9 w-9 items-center justify-center rounded-lg
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 function statusVariant(s: UserStatus): "success" | "warn" | "destructive" | "default" {
   if (s === "ACTIVE") return "success";
@@ -162,7 +162,7 @@ function UsersAdmin() {
                     <td className="px-3 py-3 text-center align-top">
                       <RoleCell userId={u.id} roles={u.roles} allRoles={roles.map((r) => r.code)} />
                     </td>
-                    <td className="px-3 py-3 text-center align-top text-[#64748B]">{formatDate(u.createdAt)}</td>
+                    <td className="px-3 py-3 text-center align-top text-[#64748B] whitespace-nowrap">{formatDate(u.createdAt)}</td>
                     <td className="px-3 py-3 align-top">
                       <div className="flex flex-wrap items-center justify-center gap-1.5">
                         {/* Contextual status buttons */}
