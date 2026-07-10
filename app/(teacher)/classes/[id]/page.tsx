@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  useAddMembersMutation,
   useClassroomQuery,
   useRemoveMemberMutation,
   useUpdateClassroomMutation,
@@ -17,7 +16,6 @@ import { Badge, Button, Input, buttonVariants, cardVariants } from "@/components
 import { cn } from "@/lib/utils/cn";
 import { updateClassroomSchema, type UpdateClassroomValues } from "@/lib/validation/classroom-schemas";
 import type {
-  AddMembersResponse,
   ClassroomDetailView,
   ClassroomMemberView,
   ClassroomStatus,
@@ -27,37 +25,6 @@ import type { NormalizedApiError } from "@/lib/api";
 const labelClass = "mb-2 block pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]";
 const textareaClass =
   "w-full min-h-[80px] rounded-lg border border-[#E2E8F0] bg-transparent px-4 py-3 text-sm text-[#0F172A] placeholder:text-[#64748B]/50 outline-none transition-all duration-200 resize-y focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
-
-function parseIds(text: string): number[] {
-  const seen = new Set<number>();
-  for (const raw of text.split(/[\s,]+/)) {
-    const t = raw.trim();
-    if (!t) continue;
-    const n = Number(t);
-    if (Number.isInteger(n) && n > 0) seen.add(n);
-  }
-  return [...seen];
-}
-
-function describeAddError(err: unknown): string {
-  const norm = err as NormalizedApiError | undefined;
-  if (norm?.kind === "api") {
-    switch (norm.code) {
-      case "CLASSROOM_ACCESS_DENIED":
-        return "You don't have permission to manage this class.";
-      case "CLASSROOM_NOT_FOUND":
-        return "This class could not be found.";
-      case "CLASSROOM_VALIDATION_ERROR":
-        return "Enter at least one valid student profile ID.";
-      case "CLASSROOM_MEMBER_DUPLICATE":
-        return "A duplicate was detected mid-add. Refresh and retry.";
-      default:
-        return norm.message || "Could not add students.";
-    }
-  }
-  if (norm?.kind === "network") return "Network error — check your connection.";
-  return "Something went wrong. Please try again.";
-}
 
 function describeUpdateError(err: unknown): string {
   const norm = err as NormalizedApiError | undefined;
@@ -182,79 +149,6 @@ function DetailView({ classroom }: { classroom: ClassroomDetailView }) {
         />
       )}
     </div>
-  );
-}
-
-function AddStudentsForm({
-  classId,
-  onResult,
-}: {
-  classId: number;
-  onResult: (r: AddMembersResponse) => void;
-}) {
-  const addMut = useAddMembersMutation(classId);
-  const [text, setText] = useState("");
-  const [result, setResult] = useState<AddMembersResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    const ids = parseIds(text);
-    if (ids.length === 0) {
-      setError("Enter at least one student profile ID (comma, space, or newline separated).");
-      setResult(null);
-      return;
-    }
-    setError(null);
-    setResult(null);
-    try {
-      const res = await addMut.mutateAsync({ studentProfileIds: ids });
-      setResult(res);
-      setText("");
-      onResult(res);
-    } catch (err) {
-      setError(describeAddError(err));
-    }
-  };
-
-  return (
-    <form noValidate onSubmit={onSubmit} className={cn(cardVariants(), "p-5")}>
-      <h2 className="mb-3 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">Add students</h2>
-      <label htmlFor="add-student-ids" className="mb-2 block pl-1 text-xs font-semibold text-[#64748B]">
-        Student profile IDs
-      </label>
-      <textarea
-        id="add-student-ids"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder={"201, 202, 203\n(one per line or comma/space separated)"}
-        className={textareaClass}
-      />
-      <p className="mt-1.5 pl-1 text-xs text-[#64748B]">
-        No student search yet — enter profile IDs. Duplicated or cross-school IDs are reported, not added.
-      </p>
-      <Button type="submit" disabled={addMut.isPending} className="mt-3">
-        {addMut.isPending ? "Adding…" : "Add students"}
-      </Button>
-
-      {error && (
-        <p role="alert" className="mt-3 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-3 text-xs font-medium text-[#EF4444]">
-          {error}
-        </p>
-      )}
-
-      {result && (
-        <div role="status" className="mt-3 space-y-1.5 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] p-3 text-xs">
-          <p className="font-semibold text-[#10B981]">Added {result.added} student{result.added === 1 ? "" : "s"}.</p>
-          {result.duplicated.length > 0 && (
-            <p className="text-[#64748B]">Already members: {result.duplicated.join(", ")}</p>
-          )}
-          {result.invalid.length > 0 && (
-            <p className="text-[#64748B]">Not found / not in your school: {result.invalid.join(", ")}</p>
-          )}
-        </div>
-      )}
-    </form>
   );
 }
 
