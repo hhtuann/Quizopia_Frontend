@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -108,6 +108,32 @@ function InProgressShell({
       : null
     : null;
 
+  // Auto-submit when the timer hits 0 (bypasses canSubmit gating — the latest
+  // saved answers are graded; time is up regardless).
+  const [autoSubmitted, setAutoSubmitted] = useState(false);
+  const handleAutoSubmit = useCallback(async () => {
+    if (autoSubmitted) return;
+    setAutoSubmitted(true);
+    let key = submitKey;
+    if (!key) {
+      key = generateSubmitKey();
+      setSubmitKey(key);
+    }
+    try {
+      const res = await submitMut.mutateAsync({ key });
+      setSubmitResult(res);
+      setTimeout(() => router.replace(`/attempts/${attemptId}/result`), 2000);
+    } catch (err) {
+      const norm = err as NormalizedApiError | undefined;
+      if (norm?.kind === "api" && (norm.code === "ATTEMPT_ALREADY_SUBMITTED" || norm.code === "ATTEMPT_INVALID_STATE")) {
+        router.replace(`/attempts/${attemptId}/result`);
+      } else {
+        setSubmitError("Time expired but auto-submit failed. Please click Submit manually.");
+        setAutoSubmitted(false);
+      }
+    }
+  }, [autoSubmitted, submitKey, submitMut, router, attemptId]);
+
   const showRetry =
     submitError !== null && submitError.includes("Network");
 
@@ -203,9 +229,17 @@ function InProgressShell({
       <AttemptShell
         detail={detail}
         autosaveStatus={autosaveStatus}
-        submitSlot={submitSlot}
+        submitSlot={autoSubmitted ? (
+          <div className={cn(cardVariants({ variant: "elevated" }), "p-6 text-center")}>
+            <p className="font-display text-lg font-bold text-[#EF4444]">Time's up!</p>
+            <p className="mt-1 text-sm font-medium text-[#64748B]">
+              {submitMut.isPending ? "Auto-submitting your answers…" : "Submitting…"}
+            </p>
+          </div>
+        ) : submitSlot}
         liveServerTime={liveServerTime}
         wsStatus={wsStatus}
+        onExpire={handleAutoSubmit}
       />
       <ConfirmDialog
         open={confirmOpen}

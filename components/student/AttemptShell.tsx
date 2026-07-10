@@ -57,12 +57,14 @@ export function AttemptShell({
   submitSlot,
   liveServerTime,
   wsStatus,
+  onExpire,
 }: {
   detail: AttemptDetailResponse;
   autosaveStatus?: AutosaveStatus;
   submitSlot?: ReactNode;
   liveServerTime?: string | null;
   wsStatus?: "connecting" | "connected" | "disconnected";
+  onExpire?: () => void;
 }) {
   const hydrate = useAnswerStore((s) => s.hydrate);
   const flagged = useAnswerStore((s) => s.flagged);
@@ -106,6 +108,15 @@ export function AttemptShell({
     (a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)
   );
   const expired = remainingMs <= 0;
+
+  // Fire onExpire exactly once when the timer hits 0.
+  const [wasExpired, setWasExpired] = useState(false);
+  useEffect(() => {
+    if (expired && !wasExpired) {
+      setWasExpired(true);
+      onExpire?.();
+    }
+  }, [expired, wasExpired, onExpire]);
 
   const scrollToQuestion = (index: number) => {
     document.getElementById(`attempt-q-${index}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
