@@ -44,7 +44,7 @@ body {
 /* Firefox */
 html {
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+  scrollbar-color: rgba(0, 82, 255, 0.4) transparent;
 }
 
 /* WebKit (Chrome, Edge, Safari) */
@@ -58,15 +58,20 @@ html {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.4);
+  background: rgba(0, 82, 255, 0.4);
   border-radius: 9999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.7);
+  background: rgba(0, 82, 255, 0.7);
   background-clip: padding-box;
+}
+
+/* Hide the up/down arrow buttons at scrollbar ends */
+::-webkit-scrollbar-button {
+  display: none;
 }
 
 /* ===== DESIGN_NEXT Utilities ===== */
