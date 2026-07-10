@@ -22,12 +22,16 @@ export interface AnswerEntry {
 
 interface AnswerStoreState {
   answers: Record<number, AnswerEntry>;
+  /** Question ids the student flagged for review. */
+  flagged: Record<number, true>;
   /** Initialise from the server detail's savedAnswer data. Called on attempt page load. */
   hydrate: (questions: DetailQuestionView[]) => void;
   /** Set/update an answer payload for one question. Marks dirty. */
   setAnswer: (attemptQuestionId: number, payload: AnswerPayload) => void;
   /** Clear an answer (payload → null). Marks dirty. */
   clearAnswer: (attemptQuestionId: number) => void;
+  /** Toggle the flag on a question (mark for review). */
+  toggleFlag: (attemptQuestionId: number) => void;
   /** Reset the entire store (used on unmount or when switching attempts). */
   reset: () => void;
   /** Sync sequence from a save response; clear dirty ONLY if payload hasn't changed since send (edit-during-flight). */
@@ -36,6 +40,7 @@ interface AnswerStoreState {
 
 export const useAnswerStore = create<AnswerStoreState>((set) => ({
   answers: {},
+  flagged: {},
 
   hydrate: (questions) => {
     const next: Record<number, AnswerEntry> = {};
@@ -46,8 +51,16 @@ export const useAnswerStore = create<AnswerStoreState>((set) => ({
         dirty: false,
       };
     }
-    set({ answers: next });
+    set({ answers: next, flagged: {} });
   },
+
+  toggleFlag: (qid) =>
+    set((state) => {
+      const next = { ...state.flagged };
+      if (next[qid]) delete next[qid];
+      else next[qid] = true;
+      return { flagged: next };
+    }),
 
   setAnswer: (id, payload) =>
     set((state) => ({
