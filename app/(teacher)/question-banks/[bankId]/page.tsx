@@ -233,27 +233,47 @@ function QuestionList({
   items: QuestionSummary[];
   onEdit: (id: number) => void;
 }) {
+  const iconBtn =
+    "inline-flex items-center justify-center rounded-md text-[#64748B] outline-none transition-colors hover:bg-[#E2E8F0] focus-visible:ring-2 focus-visible:ring-[#0052FF]";
   return (
-    <div className="space-y-3">
+    <ul className="space-y-3">
       {items.map((q) => (
-        <div key={q.id} className="rounded-lg border border-[#E2E8F0] bg-white p-4 transition-shadow hover:shadow-md">
-          {/* Header: type + code + status + edit */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="accent">{TYPE_LABEL[q.questionType]}</Badge>
-            <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs text-[#64748B]">{q.code}</span>
-            <Badge variant={statusVariant(q.status)}>{q.status}</Badge>
-            <div className="ml-auto flex items-center gap-2">
-              <span className="text-xs capitalize text-[#64748B]">{(q.difficulty as Difficulty).toLowerCase()}</span>
-              <span className="text-xs text-[#64748B]">·</span>
-              <span className="text-xs font-semibold tabular-nums text-[#64748B]">{q.defaultPoints} pt</span>
-              <button type="button" onClick={() => onEdit(q.id)} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8")}>Edit</button>
+        <li key={q.id} className="rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] p-4">
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-md border border-[#E2E8F0] bg-white px-1.5 py-0.5 font-mono text-[10px] text-[#64748B]">
+                  {q.code}
+                </span>
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">
+                  {TYPE_LABEL[q.questionType] ?? q.questionType}
+                </span>
+                {q.difficulty && (
+                  <span className="text-[10px] capitalize text-[#64748B]">
+                    {q.difficulty.toLowerCase()}
+                  </span>
+                )}
+                <Badge variant={statusVariant(q.status)}>{q.status}</Badge>
+              </div>
+              <p className="mt-1.5 text-sm text-[#0F172A]">{q.content}</p>
+            </div>
+
+            <div className="flex flex-col items-end gap-2">
+              <button
+                type="button"
+                onClick={() => onEdit(q.id)}
+                aria-label={`Edit ${q.code}`}
+                className={cn(iconBtn, "h-7 w-7 hover:text-[#0052FF]")}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                </svg>
+              </button>
             </div>
           </div>
-          {/* Content */}
-          <p className="mt-2 text-sm text-[#0F172A]">{q.content}</p>
-        </div>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
