@@ -54,8 +54,8 @@ function StudentAnswerDisplay({
   }
 }
 
-/** Outcome badge: correct (success) / wrong (muted) / not answered (grey). */
-function OutcomeBadge({ correct, answered }: { correct: boolean; answered: boolean }) {
+/** Outcome badge: correct (success) / partial (warn) / wrong (muted) / not answered (grey). */
+function OutcomeBadge({ correct, answered, awardedScore }: { correct: boolean; answered: boolean; awardedScore?: number | null }) {
   if (!answered) {
     return (
       <Badge variant="default" className="gap-1">
@@ -69,6 +69,14 @@ function OutcomeBadge({ correct, answered }: { correct: boolean; answered: boole
       <Badge variant="success" className="gap-1">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
         Correct
+      </Badge>
+    );
+  }
+  if (awardedScore != null && awardedScore > 0) {
+    return (
+      <Badge variant="warn" className="gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
+        Partial Correct
       </Badge>
     );
   }
@@ -172,7 +180,7 @@ export function AttemptResultView({
                         {TYPE_LABEL[qr.questionType] ?? qr.questionType}
                       </span>
                     </div>
-                    <OutcomeBadge correct={qr.correct} answered={qr.answered} />
+                    <OutcomeBadge correct={qr.correct} answered={qr.answered} awardedScore={qr.awardedScore} />
                   </div>
                   {detailQ && (
                     <h3 className="mb-3 text-sm font-semibold text-[#0F172A]">{detailQ.content}</h3>
