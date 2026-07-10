@@ -41,13 +41,9 @@ body {
 }
 
 /* ===== Custom Scrollbar ===== */
-/* Firefox */
-html {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0, 82, 255, 0.4) transparent;
-}
-
-/* WebKit (Chrome, Edge, Safari) */
+/* WebKit (Chrome, Edge, Safari) — full control: blue + no arrows + rounded.
+   Do NOT set scrollbar-color/scrollbar-width on html globally — Chrome/Edge
+   121+ will switch to the standard scrollbar API and ignore these styles. */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -70,8 +66,20 @@ html {
 }
 
 /* Hide the up/down arrow buttons at scrollbar ends */
-::-webkit-scrollbar-button {
+::-webkit-scrollbar-button,
+::-webkit-scrollbar-button:start,
+::-webkit-scrollbar-button:end {
   display: none;
+  height: 0;
+  width: 0;
+}
+
+/* Firefox: limited API (no ::-webkit-scrollbar support) */
+@-moz-document url-prefix() {
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 82, 255, 0.4) transparent;
+  }
 }
 
 /* ===== DESIGN_NEXT Utilities ===== */
