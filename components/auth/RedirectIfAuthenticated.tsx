@@ -9,7 +9,7 @@ import { AuthLoader } from "./RequireAuth";
  * CLIENT-SIDE guard for guest-only pages (/login, /register) — UX only, NOT a
  * security boundary. Sends already-authenticated users to `to` (default "/").
  *
- * - `loading`         → neumorphic loader (no redirect → no flicker; same SSR + first paint).
+ * - `loading`         → loading spinner (no redirect → no flicker; same SSR + first paint).
  * - `authenticated`   → redirect to `to` in an effect; render nothing meanwhile.
  * - `unauthenticated` → render children (the guest form).
  */

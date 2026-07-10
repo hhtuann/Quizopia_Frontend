@@ -81,7 +81,7 @@ export function AuthLoader() {
       aria-label="Loading…"
       className="flex min-h-screen items-center justify-center bg-[#FAFAFA]"
     >
-      {/* Spinning ring with an accent top arc — minimalist, no neumorphic insets. */}
+      {/* Spinning ring with an accent top arc — minimalist, no soft-UI insets. */}
       <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#E2E8F0] border-t-[#0052FF]" />
       <span className="sr-only">Loading…</span>
     </div>
