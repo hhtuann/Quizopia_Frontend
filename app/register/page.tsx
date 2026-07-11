@@ -149,7 +149,7 @@ export default function RegisterPage() {
 
   const accountOptions: { value: "STUDENT" | "TEACHER"; label: string; hint: string }[] = [
     { value: "STUDENT", label: "Student", hint: "Take quizzes" },
-    { value: "TEACHER", label: "Teacher", hint: "Create quizzes (invite required)" },
+    { value: "TEACHER", label: "Teacher", hint: "Create quizzes" },
   ];
 
   return (
@@ -260,17 +260,16 @@ export default function RegisterPage() {
                 error={errors.displayName?.message}
                 register={field}
               />
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <LabeledInput
-                  id="phone"
-                  label="Phone"
-                  name="phone"
-                  autoComplete="tel"
-                  placeholder="0901234567"
-                  error={errors.phone?.message}
-                  register={field}
-                />
-              </div>
+              <LabeledInput
+                id="phone"
+                label="Phone"
+                name="phone"
+                autoComplete="tel"
+                placeholder="0901234567"
+                error={errors.phone?.message}
+                register={field}
+              />
+
 
               {accountType === "TEACHER" && (
                 <LabeledInput
