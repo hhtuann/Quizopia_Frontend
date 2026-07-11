@@ -240,7 +240,7 @@ function DetailView({ data }: { data: ExamSessionDetailResponse }) {
           {data.status === "SCHEDULED" && (
             <div className="flex flex-col gap-3">
               <p className="text-sm text-[#64748B]">This session will open automatically when the start time arrives.</p>
-              <Button type="button" variant="outline" onClick={() => setConfirmAction("cancel")} disabled={actionMut.isPending} className="self-start">
+              <Button type="button" variant="outline" onClick={() => setConfirmAction("cancel")} disabled={actionMut.isPending}>
                 Cancel session
               </Button>
             </div>
