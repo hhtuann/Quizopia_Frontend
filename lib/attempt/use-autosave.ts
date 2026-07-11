@@ -17,8 +17,6 @@ const DEBOUNCE_MS = 1500;
 const URGENT_THRESHOLD_MS = 5000;
 
 function generateClientId(): string {
-
-function generateClientId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
