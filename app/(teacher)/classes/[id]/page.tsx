@@ -124,6 +124,7 @@ function DetailView({ classroom }: { classroom: ClassroomDetailView }) {
               : "border-[#EF4444]/30 bg-[#EF4444]/5 text-[#EF4444]"
           )}
         >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
           <span>{notice.message}</span>
         </div>
       )}

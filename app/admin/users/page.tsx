@@ -246,7 +246,9 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
   };
   return (
     <ModalShell title="Create user" onClose={onClose}>
-      {formError && <div role="alert" className="mb-4 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-3 text-sm font-medium text-[#EF4444]">{formError}</div>}
+      {formError && (
+          <div role="alert" className=" flex items-start gap-2 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5  text-sm font-medium text-[#EF4444]"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg><span>{formError}</span></div>
+        )}
       <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
@@ -312,7 +314,9 @@ function EditUserModal({ user, onClose, onSaved }: { user: UserListItem; onClose
   };
   return (
     <ModalShell title={`Edit ${user.username}`} onClose={onClose}>
-      {formError && <div role="alert" className="mb-4 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-3 text-sm font-medium text-[#EF4444]">{formError}</div>}
+      {formError && (
+          <div role="alert" className=" flex items-start gap-2 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5  text-sm font-medium text-[#EF4444]"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg><span>{formError}</span></div>
+        )}
       <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div>
           <label htmlFor="edit-displayName" className={labelClass}>Display name</label>

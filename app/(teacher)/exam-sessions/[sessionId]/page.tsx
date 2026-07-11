@@ -304,6 +304,13 @@ function ConfigForm({ session }: { session: ExamSessionDetailResponse }) {
   const queryClient = useQueryClient();
   const updateMut = useUpdateSessionMutation(session.id);
   const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!formSuccess) return;
+    const t = setTimeout(() => setFormSuccess(null), 4000);
+    return () => clearTimeout(t);
+  }, [formSuccess]);
 
   const {
     register,
@@ -322,6 +329,7 @@ function ConfigForm({ session }: { session: ExamSessionDetailResponse }) {
 
   const onSubmit = async (values: UpdateSessionValues) => {
     setFormError(null);
+    setFormSuccess(null);
     const req: UpdateExamSessionRequest = {
       expectedVersion: session.version ?? 0, // JPA @Version optimistic token.
       title: values.title.trim(),
@@ -332,6 +340,7 @@ function ConfigForm({ session }: { session: ExamSessionDetailResponse }) {
     };
     try {
       await updateMut.mutateAsync(req);
+      setFormSuccess("Configuration saved.");
       // mutation onSuccess invalidates → detail refetch → DetailView re-renders
       // with the bumped version → ConfigForm remounts (key=version) with fresh defaults.
     } catch (err) {
@@ -355,6 +364,14 @@ function ConfigForm({ session }: { session: ExamSessionDetailResponse }) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
           </svg>
           <span>{formError}</span>
+        </div>
+      )}
+      {formSuccess && (
+        <div role="status" className="mb-4 flex items-start gap-2 rounded-lg border border-[#10B981]/30 bg-[#10B981]/5 p-4 text-sm font-medium text-[#10B981]">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+          </svg>
+          <span>{formSuccess}</span>
         </div>
       )}
 
