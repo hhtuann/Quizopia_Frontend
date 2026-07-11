@@ -188,7 +188,7 @@ export default function NewExamSessionPage() {
               <FieldError id="session-maxAttempts-error" message={errors.maxAttempts?.message} />
             </div>
             <div>
-              <label htmlFor="session-durationMinutes" className={labelClass}>Duration (minutes) <span className="font-normal normal-case text-[#64748B]/60">(0 = unlimited)</span></label>
+              <label htmlFor="session-durationMinutes" className={labelClass}>Duration <span className="font-normal normal-case text-[#64748B]/60">(0 = unlimited)</span></label>
               <Input
                 id="session-durationMinutes"
                 type="number"

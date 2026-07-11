@@ -106,3 +106,27 @@ tbody tr:hover td.font-semibold {
   color: var(--color-next-accent);
   transition: color 0.2s ease-out;
 }
+
+/* ===== Custom select chevron (DESIGN_NEXT) =====
+   The native <select> arrow hugs the right edge of the box. Hide it and render
+   a single consistent chevron inset 0.75rem from the right, so it sits balanced
+   instead of pinned to the edge. The selectClass pr-9 / pr-8 already reserves
+   the room; this only repositions the arrow. Applies to every dropdown in the
+   app (no select uses multiple/size, so all are single dropdowns). */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748B' stroke-width='2'><path stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.125rem;
+}
+/* Print + high-contrast safety: keep the native arrow if background images are
+   suppressed. */
+@media print {
+  select {
+    appearance: auto;
+    background-image: none;
+  }
+}
