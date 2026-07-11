@@ -65,7 +65,7 @@ function InProgressShell({
   detail: AttemptDetailResponse;
   attemptId: number;
 }) {
-  const autosaveStatus = useAutosaveAnswers(attemptId);
+  const autosaveStatus = useAutosaveAnswers(attemptId, new Date(detail.deadlineAt).getTime());
   const submitMut = useSubmitAttemptMutation(attemptId);
   const router = useRouter();
   const queryClient = useQueryClient();

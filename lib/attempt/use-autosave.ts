@@ -13,6 +13,10 @@ import type { NormalizedApiError } from "@/lib/api";
 export type AutosaveStatus = "idle" | "saving" | "saved" | "error" | "blocked";
 
 const DEBOUNCE_MS = 1500;
+/** When this many ms or fewer remain, saves are instant (0 debounce). */
+const URGENT_THRESHOLD_MS = 5000;
+
+function generateClientId(): string {
 
 function generateClientId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -40,12 +44,25 @@ function generateClientId(): string {
  *
  * Call this hook ONLY when the attempt status is IN_PROGRESS.
  */
-export function useAutosaveAnswers(attemptId: number): AutosaveStatus {
+export function useAutosaveAnswers(attemptId: number, deadlineMs?: number): AutosaveStatus {
   const [status, setStatus] = useState<AutosaveStatus>("idle");
 
   const clientId = useRef<string>("");
   const inFlight = useRef<Set<number>>(new Set());
   const timers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const urgentRef = useRef(false);
+
+  // When the deadline is near, switch to instant saves (no debounce).
+  useEffect(() => {
+    if (!deadlineMs) return;
+    const check = () => {
+      const remaining = deadlineMs - Date.now();
+      urgentRef.current = remaining <= URGENT_THRESHOLD_MS;
+    };
+    check();
+    const interval = setInterval(check, 1000);
+    return () => clearInterval(interval);
+  }, [deadlineMs]);
   const blocked = useRef(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -124,12 +141,14 @@ export function useAutosaveAnswers(attemptId: number): AutosaveStatus {
 
     function startDebounce(qid: number) {
       if (blocked.current) return;
+      // When urgent (deadline near), save instantly — no debounce delay.
+      const delay = urgentRef.current ? 0 : DEBOUNCE_MS;
       const existing = timers.current.get(qid);
       if (existing) clearTimeout(existing);
       const timer = setTimeout(() => {
         timers.current.delete(qid);
         void fireSave(qid);
-      }, DEBOUNCE_MS);
+      }, delay);
       timers.current.set(qid, timer);
     }
 
