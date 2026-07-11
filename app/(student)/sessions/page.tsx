@@ -176,14 +176,8 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
         </div>
       </dl>
 
-      {item.canResume && item.activeAttemptDeadlineAt && (
-        <p className="mt-4 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-4 py-2 text-xs font-medium text-[#64748B]">
-          Active attempt deadline: {formatDateTime(item.activeAttemptDeadlineAt)}
-        </p>
-      )}
-
       {/* Start / Resume / Countdown / Expired */}
-      <div className="mt-4 flex flex-wrap gap-3">
+      <div className="mt-4 flex flex-wrap items-center gap-3">
         {item.canStartNow && (
           <Button
             type="button"
@@ -202,13 +196,18 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
           </Button>
         )}
         {item.canResume && item.activeAttemptId !== null && (
-          <button
-            type="button"
-            onClick={() => router.push(`/attempts/${item.activeAttemptId}`)}
-            className={buttonVariants({ variant: "outline" })}
-          >
-            Resume attempt
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => router.push(`/attempts/${item.activeAttemptId}`)}
+              className={buttonVariants({ variant: "outline" })}
+            >
+              Resume attempt
+            </button>
+            {item.activeAttemptDeadlineAt && (
+              <AttemptTimeRemaining deadlineAt={item.activeAttemptDeadlineAt} />
+            )}
+          </>
         )}
         {/* Countdown: session not yet open */}
         {!item.canStartNow && !item.canResume && new Date(item.startsAt).getTime() > Date.now() && (
@@ -282,13 +281,57 @@ function CountdownButton({ startsAt, onZero }: { startsAt: string; onZero?: () =
       type="button"
       disabled
       aria-disabled="true"
-      className="inline-flex h-11 cursor-default items-center justify-center gap-2 rounded-xl border border-[#0052FF]/30 bg-[#0052FF]/5 px-5 font-mono text-sm font-semibold text-[#0052FF]"
+      className="inline-flex h-11 cursor-default items-center justify-center gap-2 rounded-xl border border-[#0052FF]/30 bg-[#0052FF]/5 px-5 text-sm font-semibold tabular-nums text-[#0052FF]"
     >
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
       </svg>
       Opens in {text}
     </button>
+  );
+}
+
+/** Live "time remaining" pill for an active attempt, shown to the right of the
+ *  Resume button. Ticks every second; turns red in the final 5 minutes so the
+ *  student knows to hurry. Uses the body font (matching the buttons) with
+ *  tabular-nums so the digits don't jitter as they tick. */
+function AttemptTimeRemaining({ deadlineAt }: { deadlineAt: string }) {
+  const [remaining, setRemaining] = useState(() =>
+    Math.max(0, new Date(deadlineAt).getTime() - Date.now())
+  );
+  useEffect(() => {
+    const id = setInterval(() => {
+      setRemaining(Math.max(0, new Date(deadlineAt).getTime() - Date.now()));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [deadlineAt]);
+
+  const totalSec = Math.floor(remaining / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const text = h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+  const urgent = totalSec > 0 && totalSec <= 300; // ≤ 5 min left
+  const expired = totalSec === 0;
+
+  return (
+    <span
+      className={cn(
+        "inline-flex h-11 items-center gap-1.5 rounded-xl border px-3 text-sm font-semibold tabular-nums",
+        expired
+          ? "border-[#94A3B8]/30 bg-[#94A3B8]/5 text-[#94A3B8]"
+          : urgent
+          ? "border-[#EF4444]/30 bg-[#EF4444]/5 text-[#EF4444]"
+          : "border-[#E2E8F0] bg-[#F1F5F9] text-[#0F172A]"
+      )}
+      title={`Attempt deadline: ${formatDateTime(deadlineAt)}`}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+      </svg>
+      {expired ? "Time over" : `${text} left`}
+    </span>
   );
 }
 
