@@ -22,6 +22,9 @@ export interface NavItem {
   exact?: boolean;
   /** Short descriptive copy shown on the Dashboard's functional action cards. */
   description?: string;
+  /** Additional path prefixes that should mark this nav item as active
+   * (e.g. "/attempts" for the "My attempts" item whose href is "/history"). */
+  alsoActive?: string[];
 }
 
 const ICON = "w-5 h-5";
@@ -73,7 +76,7 @@ const UserPlusIcon = (
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: DashboardIcon, roles: ["STUDENT", "TEACHER", "ACADEMIC_ADMIN", "SYSTEM_ADMIN"], exact: true },
   { href: "/sessions", label: "Available sessions", icon: ExamIcon, roles: ["STUDENT"], description: "Browse open exam sessions and join one when you’re ready." },
-  { href: "/history", label: "My attempts", icon: ClockIcon, roles: ["STUDENT"], description: "Review your past attempts and their detailed results." },
+  { href: "/history", label: "My attempts", icon: ClockIcon, roles: ["STUDENT"], description: "Review your past attempts and their detailed results.", alsoActive: ["/attempts"] },
   { href: "/question-banks", label: "Question banks", icon: BankIcon, roles: ["TEACHER"], description: "Build and organize reusable collections of questions." },
   { href: "/exams", label: "Exams", icon: ExamIcon, roles: ["TEACHER"], description: "Assemble exams from your question banks." },
   { href: "/exam-sessions", label: "Exam sessions", icon: ClockIcon, roles: ["TEACHER"], description: "Schedule live sessions and monitor participants." },
@@ -94,5 +97,9 @@ export function navItemsForRoles(roles?: string[] | null): NavItem[] {
 /** Shared active-link predicate so Sidebar and the mobile drawer agree. */
 export function isActive(pathname: string, item: NavItem): boolean {
   if (item.exact) return pathname === item.href;
-  return pathname === item.href || pathname.startsWith(item.href + "/");
+  if (pathname === item.href || pathname.startsWith(item.href + "/")) return true;
+  if (item.alsoActive) {
+    return item.alsoActive.some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/"));
+  }
+  return false;
 }

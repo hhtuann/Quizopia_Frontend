@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAvailableSessionsQuery } from "@/hooks/queries/use-student-attempts";
@@ -155,37 +155,49 @@ function SessionCard({ item }: { item: AvailableSessionItem }) {
         </p>
       )}
 
-      {/* Start / Resume — FE10 owns the attempt entry point */}
-      {(item.canStartNow || (item.canResume && item.activeAttemptId !== null)) && (
-        <div className="mt-4 flex flex-wrap gap-3">
-          {item.canStartNow && (
-            <Button
-              type="button"
-              disabled={startMut.isPending}
-              onClick={async () => {
-                setStartError(null);
-                try {
-                  const res = await startMut.mutateAsync({ sessionId: item.sessionId });
-                  router.push(`/attempts/${res.attemptId}`);
-                } catch (err) {
-                  setStartError(describeStartError(err));
-                }
-              }}
-            >
-              {startMut.isPending ? "Starting…" : "Start attempt"}
-            </Button>
-          )}
-          {item.canResume && item.activeAttemptId !== null && (
-            <button
-              type="button"
-              onClick={() => router.push(`/attempts/${item.activeAttemptId}`)}
-              className={buttonVariants({ variant: "outline" })}
-            >
-              Resume attempt
-            </button>
-          )}
-        </div>
-      )}
+      {/* Start / Resume / Countdown / Expired */}
+      <div className="mt-4 flex flex-wrap gap-3">
+        {item.canStartNow && (
+          <Button
+            type="button"
+            disabled={startMut.isPending}
+            onClick={async () => {
+              setStartError(null);
+              try {
+                const res = await startMut.mutateAsync({ sessionId: item.sessionId });
+                router.push(`/attempts/${res.attemptId}`);
+              } catch (err) {
+                setStartError(describeStartError(err));
+              }
+            }}
+          >
+            {startMut.isPending ? "Starting…" : "Start attempt"}
+          </Button>
+        )}
+        {item.canResume && item.activeAttemptId !== null && (
+          <button
+            type="button"
+            onClick={() => router.push(`/attempts/${item.activeAttemptId}`)}
+            className={buttonVariants({ variant: "outline" })}
+          >
+            Resume attempt
+          </button>
+        )}
+        {/* Countdown: session not yet open */}
+        {!item.canStartNow && !item.canResume && new Date(item.startsAt).getTime() > Date.now() && (
+          <CountdownButton startsAt={item.startsAt} />
+        )}
+        {/* Expired: session window has passed */}
+        {!item.canStartNow && !item.canResume && new Date(item.endsAt).getTime() <= Date.now() && (
+          <button
+            type="button"
+            disabled
+            className={cn(buttonVariants({ variant: "outline" }), "cursor-not-allowed opacity-50")}
+          >
+            Session ended
+          </button>
+        )}
+      </div>
       {startError && (
         <p role="alert" className="mt-3 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 px-4 py-2 text-xs font-medium text-[#EF4444]">
           {startError}
@@ -203,6 +215,35 @@ function Skeleton() {
       ))}
       <span className="sr-only">Loading…</span>
     </div>
+  );
+}
+
+/** Countdown button — shows time remaining until the session opens.
+ *  When it hits 0, the page refetches and the real "Start attempt" button appears. */
+function CountdownButton({ startsAt }: { startsAt: string }) {
+  const [remaining, setRemaining] = useState(() => Math.max(0, new Date(startsAt).getTime() - Date.now()));
+  useEffect(() => {
+    const id = setInterval(() => {
+      setRemaining(Math.max(0, new Date(startsAt).getTime() - Date.now()));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [startsAt]);
+
+  const totalSec = Math.floor(remaining / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const text = h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+
+  return (
+    <button
+      type="button"
+      disabled
+      className={cn(buttonVariants({ variant: "outline" }), "cursor-default font-mono")}
+    >
+      Opens in {text}
+    </button>
   );
 }
 
