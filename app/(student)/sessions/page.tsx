@@ -125,6 +125,16 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
   const router = useRouter();
   const startMut = useStartAttemptMutation();
   const [startError, setStartError] = useState<string | null>(null);
+
+  const startsFuture = new Date(item.startsAt).getTime() > Date.now();
+  const windowEnded = new Date(item.endsAt).getTime() <= Date.now();
+  // Label for the no-action fallback button (cards with no Start/Resume/Countdown/
+  // Ended button) — keeps the action row visually consistent instead of a gap.
+  const fallbackLabel = item.activeAttemptId !== null
+    ? "Finalizing attempt…"
+    : item.remainingAttempts === 0
+      ? "No attempts remaining"
+      : "Unavailable";
   return (
     <div className={cn(cardVariants({ variant: "elevated" }), "p-6")}>
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -176,9 +186,12 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
         </div>
       </dl>
 
-      {/* Start / Resume / Countdown / Expired */}
+      {/* Action row: exactly one of Start / Resume(+timer) / Countdown / Ended /
+          Fallback renders, so every card has a button and no empty gap. The
+          ternary chain orders by precedence (canStartNow, then canResume, then
+          upcoming, then ended, then the no-action fallback). */}
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        {item.canStartNow && (
+        {item.canStartNow ? (
           <Button
             type="button"
             disabled={startMut.isPending}
@@ -194,8 +207,7 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
           >
             {startMut.isPending ? "Starting…" : "Start attempt"}
           </Button>
-        )}
-        {item.canResume && item.activeAttemptId !== null && (
+        ) : item.canResume && item.activeAttemptId !== null ? (
           <>
             <button
               type="button"
@@ -208,13 +220,9 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
               <AttemptTimeRemaining deadlineAt={item.activeAttemptDeadlineAt} onZero={onWindowOpen} />
             )}
           </>
-        )}
-        {/* Countdown: session not yet open */}
-        {!item.canStartNow && !item.canResume && new Date(item.startsAt).getTime() > Date.now() && (
+        ) : startsFuture ? (
           <CountdownButton startsAt={item.startsAt} onZero={onWindowOpen} />
-        )}
-        {/* Expired: session window has passed */}
-        {!item.canStartNow && !item.canResume && new Date(item.endsAt).getTime() <= Date.now() && (
+        ) : windowEnded ? (
           <button
             type="button"
             disabled
@@ -222,6 +230,15 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
             className="inline-flex h-11 cursor-not-allowed items-center justify-center rounded-xl border border-[#94A3B8]/30 bg-[#94A3B8]/5 px-5 text-sm font-semibold text-[#94A3B8]"
           >
             Session ended
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            className="inline-flex h-11 cursor-not-allowed items-center justify-center rounded-xl border border-[#94A3B8]/30 bg-[#94A3B8]/5 px-5 text-sm font-semibold text-[#94A3B8]"
+          >
+            {fallbackLabel}
           </button>
         )}
       </div>
