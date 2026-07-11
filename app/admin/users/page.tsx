@@ -230,12 +230,12 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
   const [formError, setFormError] = useState<string | null>(null);
   const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<CreateUserValues>({
     resolver: zodResolver(createUserSchema),
-    defaultValues: { username: "", email: "", password: "", displayName: "", accountType: "STUDENT", phone: "", nationalId: "" },
+    defaultValues: { username: "", email: "", password: "", displayName: "", accountType: "STUDENT", phone: "" },
   });
   const onSubmit = async (v: CreateUserValues) => {
     setFormError(null);
     try {
-      const res = await createMut.mutateAsync({ username: v.username.trim(), email: v.email.trim(), password: v.password, displayName: v.displayName.trim(), accountType: v.accountType, phone: v.phone?.trim() || undefined, nationalId: v.nationalId?.trim() || undefined });
+      const res = await createMut.mutateAsync({ username: v.username.trim(), email: v.email.trim(), password: v.password, displayName: v.displayName.trim(), accountType: v.accountType, phone: v.phone?.trim() || undefined });
       onCreated(`User "${res.displayName}" created.`);
     } catch (err) {
       const m = describeCreateError(err);
@@ -283,10 +283,6 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
           <div>
             <label htmlFor="user-phone" className={labelClass}>Phone <span className="font-normal normal-case text-[#64748B]/60">(optional)</span></label>
             <Input id="user-phone" type="text" {...register("phone")} />
-          </div>
-          <div>
-            <label htmlFor="user-nationalId" className={labelClass}>National ID <span className="font-normal normal-case text-[#64748B]/60">(optional)</span></label>
-            <Input id="user-nationalId" type="text" {...register("nationalId")} />
           </div>
         </div>
         <div className="flex items-center justify-end gap-3 pt-2">

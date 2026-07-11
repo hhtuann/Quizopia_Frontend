@@ -108,7 +108,6 @@ export default function RegisterPage() {
       password: "",
       displayName: "",
       phone: "",
-      nationalId: "",
       accountType: "STUDENT",
       teacherInviteCode: "",
     },
@@ -269,14 +268,6 @@ export default function RegisterPage() {
                   autoComplete="tel"
                   placeholder="0901234567"
                   error={errors.phone?.message}
-                  register={field}
-                />
-                <LabeledInput
-                  id="nationalId"
-                  label="National ID"
-                  name="nationalId"
-                  placeholder="001200012345"
-                  error={errors.nationalId?.message}
                   register={field}
                 />
               </div>

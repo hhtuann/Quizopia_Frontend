@@ -33,7 +33,6 @@ export interface RegisterRequest {
   password: string;
   displayName: string;
   phone: string;
-  nationalId: string;
   /** `null`/`undefined` defaults to STUDENT server-side. */
   accountType?: AccountType | null;
   /** Required only when `accountType === "TEACHER"`. */
@@ -60,7 +59,6 @@ export interface RegisterResponse {
   email: string;
   displayName: string;
   phone: string;
-  nationalId: string;
   status: UserStatus;
   roles: string[];
 }
@@ -72,7 +70,6 @@ export interface CurrentUserResponse {
   email: string;
   displayName: string;
   phone: string;
-  nationalId: string;
   status: UserStatus;
   roles: string[];
   permissions: string[];

@@ -40,7 +40,6 @@ export const registerSchema = z
       .min(1, "Display name is required.")
       .max(150, "Display name must be 150 characters or fewer."),
     phone: z.string().min(1, "Phone number is required."),
-    nationalId: z.string().min(1, "National ID is required."),
     // Required here; the form seeds "STUDENT" via defaultValues (the backend
     // treats a missing accountType as STUDENT, but the client always sends one).
     accountType: z.enum(["STUDENT", "TEACHER"]),

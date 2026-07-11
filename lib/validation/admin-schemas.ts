@@ -65,7 +65,6 @@ export const createUserSchema = z.object({
   displayName: z.string().min(1, "Display name is required.").max(150, "Display name must be 150 characters or fewer."),
   accountType: z.enum(["STUDENT", "TEACHER"]),
   phone: z.string().max(20, "Phone must be 20 characters or fewer.").optional(),
-  nationalId: z.string().max(50, "National ID must be 50 characters or fewer.").optional(),
 });
 export type CreateUserValues = z.infer<typeof createUserSchema>;
 

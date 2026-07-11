@@ -19,7 +19,7 @@ export interface UsersListParams {
 
 export interface CreateUserRequest {
   username: string; email: string; password: string; displayName: string;
-  accountType: AccountType; phone?: string; nationalId?: string;
+  accountType: AccountType; phone?: string;
 }
 
 export interface UpdateUserRequest { displayName?: string; email?: string; }
