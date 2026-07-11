@@ -75,7 +75,7 @@ export default function StudentHistoryPage() {
                 <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
                   <th scope="col" className="px-3 pb-3 font-semibold">Session</th>
                   <th scope="col" className="px-3 pb-3 text-center font-semibold">Status</th>
-                  <th scope="col" className="px-3 pb-3 text-center font-semibold">Duration</th>
+                  <th scope="col" className="px-3 pb-3 text-center font-semibold">Time taken</th>
                   <th scope="col" className="px-3 pb-3 text-center font-semibold">Submitted</th>
                   <th scope="col" className="px-3 pb-3 text-center font-semibold">Attempt</th>
                   <th scope="col" className="px-3 pb-3 text-center font-semibold">Score</th>
