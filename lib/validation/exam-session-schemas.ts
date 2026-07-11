@@ -33,6 +33,13 @@ export const createSessionSchema = z
       .number({ message: "Max attempts is required." })
       .int("Max attempts must be a whole number.")
       .min(0, "Max attempts must be 0 or more (0 = unlimited)."),
+    // Per-attempt time limit. Omitted/empty = inherit the exam version's duration.
+    // 0 = unlimited (deadline = session endsAt). Positive = minutes per attempt.
+    durationMinutes: z
+      .number({ message: "Duration must be a whole number." })
+      .int("Duration must be a whole number.")
+      .min(0, "Duration must be 0 or more (0 = unlimited).")
+      .optional(),
     // PUBLIC = all same-school students; CLASS_RESTRICTED = assigned classes only (default).
     visibility: z.enum(["PUBLIC", "CLASS_RESTRICTED"]),
     // Classrooms assigned when CLASS_RESTRICTED. Required-meaningful only then; the

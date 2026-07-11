@@ -62,7 +62,7 @@ export default function NewExamSessionPage() {
     formState: { errors, isSubmitting },
   } = useForm<CreateSessionValues>({
     resolver: zodResolver(createSessionSchema),
-    defaultValues: { examId: NaN, examVersionNumber: NaN, title: "", startsAt: "", endsAt: "", maxAttempts: 1, visibility: "CLASS_RESTRICTED" as const },
+    defaultValues: { examId: NaN, examVersionNumber: NaN, title: "", startsAt: "", endsAt: "", maxAttempts: 1, durationMinutes: undefined, visibility: "CLASS_RESTRICTED" as const },
   });
 
   const examId = useWatch({ control, name: "examId" });
@@ -98,6 +98,8 @@ export default function NewExamSessionPage() {
       startsAt: new Date(values.startsAt).toISOString(),
       endsAt: new Date(values.endsAt).toISOString(),
       maxAttempts: values.maxAttempts,
+      // undefined (empty input) → null = inherit the exam version's duration.
+      durationMinutes: values.durationMinutes ?? null,
       visibility: values.visibility,
       classroomIds: values.visibility === "CLASS_RESTRICTED" ? selectedClassIds : [],
     };
@@ -184,6 +186,22 @@ export default function NewExamSessionPage() {
             <label htmlFor="session-maxAttempts" className={labelClass}>Max attempts <span className="font-normal normal-case text-[#64748B]/60">(0 = unlimited)</span></label>
             <Input id="session-maxAttempts" type="number" min={0} step={1} aria-invalid={!!errors.maxAttempts} aria-describedby={errors.maxAttempts ? "session-maxAttempts-error" : undefined} className={cn(errors.maxAttempts && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")} {...register("maxAttempts", { valueAsNumber: true })} />
             <FieldError id="session-maxAttempts-error" message={errors.maxAttempts?.message} />
+          </div>
+
+          <div>
+            <label htmlFor="session-durationMinutes" className={labelClass}>Duration (minutes) <span className="font-normal normal-case text-[#64748B]/60">(blank = exam default, 0 = unlimited)</span></label>
+            <Input
+              id="session-durationMinutes"
+              type="number"
+              min={0}
+              step={1}
+              placeholder="Exam default"
+              aria-invalid={!!errors.durationMinutes}
+              aria-describedby={errors.durationMinutes ? "session-durationMinutes-error" : undefined}
+              className={cn(errors.durationMinutes && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")}
+              {...register("durationMinutes", { setValueAs: (v) => (v === "" || v == null ? undefined : Number(v)) })}
+            />
+            <FieldError id="session-durationMinutes-error" message={errors.durationMinutes?.message} />
           </div>
 
           <div>

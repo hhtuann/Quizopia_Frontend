@@ -51,6 +51,8 @@ export interface ExamSessionDetailResponse {
   startsAt: string;
   endsAt: string;
   maxAttempts: number;
+  /** Per-attempt time limit (minutes). NULL = use the exam version's default. 0 = unlimited. */
+  durationMinutes: number | null;
   openedAt: string | null;
   closedAt: string | null;
   participantCount: number;
@@ -82,6 +84,8 @@ export interface CreateExamSessionRequest {
   startsAt: string;
   endsAt: string;
   maxAttempts: number;
+  /** Per-attempt time limit (minutes). NULL/omitted = use the exam version's default. 0 = unlimited. */
+  durationMinutes?: number | null;
   /** PUBLIC = all same-school students; CLASS_RESTRICTED (default) = assigned classes only. */
   visibility?: SessionVisibility;
   /** Classrooms assigned when CLASS_RESTRICTED. Ignored when PUBLIC. */

@@ -27,7 +27,7 @@ export default function AttemptResultPage() {
     <div>
       <div className="mb-6">
         <Link
-          href="/history"
+          href="/attempts"
           className="inline-flex items-center gap-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-[#64748B] outline-none transition-colors hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
@@ -68,7 +68,7 @@ function NotFound() {
       </div>
       <p className="font-display text-lg font-bold text-[#0F172A]">Result not found</p>
       <p className="mt-1 text-sm text-[#64748B]">This result may not be available yet or you don&apos;t have access.</p>
-      <Link href="/history" className="mt-5 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
+      <Link href="/attempts" className="mt-5 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
         Back to history
       </Link>
     </div>
@@ -111,7 +111,7 @@ function LoadError({ error }: { error: NormalizedApiError | undefined }) {
       </svg>
       <div>
         <span>{message}</span>
-        <Link href="/history" className="mt-3 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
+        <Link href="/attempts" className="mt-3 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
           Back to history
         </Link>
       </div>

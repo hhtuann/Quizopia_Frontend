@@ -154,6 +154,9 @@ function DetailView({ data }: { data: ExamSessionDetailResponse }) {
 
   const facts: { label: string; value: string }[] = [
     { label: "Exam", value: `${data.examCode ?? "#" + data.examId} · Version ${data.examVersionNumber}` },
+    { label: "Starts at", value: formatDateTime(data.startsAt) },
+    { label: "Ends at", value: formatDateTime(data.endsAt) },
+    { label: "Duration", value: data.durationMinutes == null ? "Exam default" : data.durationMinutes === 0 ? "Unlimited" : `${data.durationMinutes} min` },
     { label: "Opened at", value: formatDateTime(data.openedAt) },
     { label: "Closed at", value: formatDateTime(data.closedAt) },
     { label: "Participants", value: String(data.participantCount) },

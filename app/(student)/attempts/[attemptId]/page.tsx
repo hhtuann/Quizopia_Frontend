@@ -183,7 +183,7 @@ function InProgressShell({
         switch (norm.code) {
           case "ATTEMPT_ALREADY_SUBMITTED":
             setSubmitError("This attempt was already submitted.");
-            setTimeout(() => router.replace("/history"), 3000);
+            setTimeout(() => router.replace("/attempts"), 3000);
             break;
           case "ATTEMPT_DEADLINE_EXCEEDED":
             setSubmitError("Time is over — could not submit.");
@@ -195,7 +195,7 @@ function InProgressShell({
             break;
           case "ATTEMPT_INVALID_STATE":
             setSubmitError("This attempt is already submitted or graded.");
-            setTimeout(() => router.replace("/history"), 3000);
+            setTimeout(() => router.replace("/attempts"), 3000);
             break;
           default:
             setSubmitError(norm.message || "Submit failed. Please try again.");

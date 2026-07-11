@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAvailableSessionsQuery } from "@/hooks/queries/use-student-attempts";
@@ -36,6 +36,31 @@ function flagVariant(tone: Tone): "accent" | "success" | "default" {
   return "default";
 }
 
+/**
+ * Effective deadline used for sorting/priority: an in-progress attempt's
+ * deadline if one is active, else the session's window end. Lower = sooner.
+ */
+function effectiveDeadline(item: AvailableSessionItem): number {
+  if (item.canResume && item.activeAttemptDeadlineAt) {
+    return new Date(item.activeAttemptDeadlineAt).getTime();
+  }
+  return new Date(item.endsAt).getTime();
+}
+
+/**
+ * Sort sessions by action priority then by deadline.
+ *   1. Actionable now (canStartNow OR canResume) — soonest deadline first.
+ *   2. Everything else (upcoming / ended) — soonest deadline first.
+ */
+function sortByPriority(items: AvailableSessionItem[]): AvailableSessionItem[] {
+  return [...items].sort((a, b) => {
+    const aAction = a.canStartNow || a.canResume ? 0 : 1;
+    const bAction = b.canStartNow || b.canResume ? 0 : 1;
+    if (aAction !== bAction) return aAction - bAction;
+    return effectiveDeadline(a) - effectiveDeadline(b);
+  });
+}
+
 /** Map a start-attempt error to a short message. */
 function describeStartError(err: unknown): string {
   const norm = err as NormalizedApiError | undefined;
@@ -62,8 +87,10 @@ function describeStartError(err: unknown): string {
 }
 
 export default function StudentSessionsPage() {
-  const { data, isPending, isError, error } = useAvailableSessionsQuery();
+  const { data, isPending, isError, error, refetch } = useAvailableSessionsQuery();
   const items = data?.items ?? [];
+  // Actionable sessions first, then by soonest deadline.
+  const sorted = sortByPriority(items);
 
   return (
     <div>
@@ -80,12 +107,12 @@ export default function StudentSessionsPage() {
         <Skeleton />
       ) : isError ? (
         <ErrorState error={error as unknown as NormalizedApiError | undefined} />
-      ) : items.length === 0 ? (
+      ) : sorted.length === 0 ? (
         <EmptyState />
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {items.map((s) => (
-            <SessionCard key={s.sessionId} item={s} />
+          {sorted.map((s) => (
+            <SessionCard key={s.sessionId} item={s} onWindowOpen={() => void refetch()} />
           ))}
         </div>
       )}
@@ -93,7 +120,7 @@ export default function StudentSessionsPage() {
   );
 }
 
-function SessionCard({ item }: { item: AvailableSessionItem }) {
+function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWindowOpen?: () => void }) {
   const flag = sessionFlag(item);
   const router = useRouter();
   const startMut = useStartAttemptMutation();
@@ -185,14 +212,15 @@ function SessionCard({ item }: { item: AvailableSessionItem }) {
         )}
         {/* Countdown: session not yet open */}
         {!item.canStartNow && !item.canResume && new Date(item.startsAt).getTime() > Date.now() && (
-          <CountdownButton startsAt={item.startsAt} />
+          <CountdownButton startsAt={item.startsAt} onZero={onWindowOpen} />
         )}
         {/* Expired: session window has passed */}
         {!item.canStartNow && !item.canResume && new Date(item.endsAt).getTime() <= Date.now() && (
           <button
             type="button"
             disabled
-            className={cn(buttonVariants({ variant: "outline" }), "cursor-not-allowed opacity-50")}
+            aria-disabled="true"
+            className="inline-flex h-11 cursor-not-allowed items-center justify-center rounded-xl border border-[#94A3B8]/30 bg-[#94A3B8]/5 px-5 text-sm font-semibold text-[#94A3B8]"
           >
             Session ended
           </button>
@@ -219,12 +247,25 @@ function Skeleton() {
 }
 
 /** Countdown button — shows time remaining until the session opens.
- *  When it hits 0, the page refetches and the real "Start attempt" button appears. */
-function CountdownButton({ startsAt }: { startsAt: string }) {
+ *  Blue-tinted (not a plain outline) so it reads as an active state. When the
+ *  countdown reaches 0, fires `onZero` once so the page can refetch and the
+ *  real "Start attempt" button appears in place of the countdown. */
+function CountdownButton({ startsAt, onZero }: { startsAt: string; onZero?: () => void }) {
+  // Keep the callback in a ref so the 1s interval isn't torn down/recreated
+  // whenever the parent re-renders with a new function identity.
+  const onZeroRef = useRef(onZero);
+  onZeroRef.current = onZero;
+  const firedRef = useRef(false);
+
   const [remaining, setRemaining] = useState(() => Math.max(0, new Date(startsAt).getTime() - Date.now()));
   useEffect(() => {
     const id = setInterval(() => {
-      setRemaining(Math.max(0, new Date(startsAt).getTime() - Date.now()));
+      const r = Math.max(0, new Date(startsAt).getTime() - Date.now());
+      setRemaining(r);
+      if (r === 0 && !firedRef.current) {
+        firedRef.current = true;
+        onZeroRef.current?.();
+      }
     }, 1000);
     return () => clearInterval(id);
   }, [startsAt]);
@@ -240,8 +281,12 @@ function CountdownButton({ startsAt }: { startsAt: string }) {
     <button
       type="button"
       disabled
-      className={cn(buttonVariants({ variant: "outline" }), "cursor-default font-mono")}
+      aria-disabled="true"
+      className="inline-flex h-11 cursor-default items-center justify-center gap-2 rounded-xl border border-[#0052FF]/30 bg-[#0052FF]/5 px-5 font-mono text-sm font-semibold text-[#0052FF]"
     >
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+      </svg>
       Opens in {text}
     </button>
   );

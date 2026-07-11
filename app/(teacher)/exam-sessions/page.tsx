@@ -160,8 +160,8 @@ function SessionsTable({ items }: { items: ExamSessionListItem[] }) {
             <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Title</th>
             <th scope="col" className="px-3 pb-3 text-center font-semibold">Status</th>
-            <th scope="col" className="px-3 pb-3 text-center font-semibold">Opened at</th>
-            <th scope="col" className="px-3 pb-3 text-center font-semibold">Closed at</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Starts at</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Ends at</th>
             <th scope="col" className="px-3 pb-3 text-center font-semibold">Max</th>
             <th scope="col" className="px-3 pb-3 text-center font-semibold">Part.</th>
           </tr>

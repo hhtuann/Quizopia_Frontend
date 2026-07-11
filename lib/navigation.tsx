@@ -23,7 +23,7 @@ export interface NavItem {
   /** Short descriptive copy shown on the Dashboard's functional action cards. */
   description?: string;
   /** Additional path prefixes that should mark this nav item as active
-   * (e.g. "/attempts" for the "My attempts" item whose href is "/history"). */
+   * (e.g. "/attempts" for the "My attempts" item whose href is "/attempts"). */
   alsoActive?: string[];
 }
 
@@ -76,7 +76,7 @@ const UserPlusIcon = (
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: DashboardIcon, roles: ["STUDENT", "TEACHER", "ACADEMIC_ADMIN", "SYSTEM_ADMIN"], exact: true },
   { href: "/sessions", label: "Available sessions", icon: ExamIcon, roles: ["STUDENT"], description: "Browse open exam sessions and join one when you’re ready." },
-  { href: "/history", label: "My attempts", icon: ClockIcon, roles: ["STUDENT"], description: "Review your past attempts and their detailed results.", alsoActive: ["/attempts"] },
+  { href: "/attempts", label: "My attempts", icon: ClockIcon, roles: ["STUDENT"], description: "Review your past attempts and their detailed results." },
   { href: "/question-banks", label: "Question banks", icon: BankIcon, roles: ["TEACHER"], description: "Build and organize reusable collections of questions." },
   { href: "/exams", label: "Exams", icon: ExamIcon, roles: ["TEACHER"], description: "Assemble exams from your question banks." },
   { href: "/exam-sessions", label: "Exam sessions", icon: ClockIcon, roles: ["TEACHER"], description: "Schedule live sessions and monitor participants." },
