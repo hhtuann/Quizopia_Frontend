@@ -14,6 +14,7 @@ import { Button, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { useAutosaveAnswers } from "@/lib/attempt/use-autosave";
 import { useAnswerStore } from "@/lib/attempt/answer-store";
+import { saveAnswer, type SaveAnswerRequest } from "@/lib/api/student-attempt";
 import { useStompConnection } from "@/lib/realtime/use-stomp-connection";
 import { useServerTimeSync } from "@/lib/realtime/use-server-time-sync";
 import type {
@@ -114,6 +115,32 @@ function InProgressShell({
   const handleAutoSubmit = useCallback(async () => {
     if (autoSubmitted) return;
     setAutoSubmitted(true);
+
+    // Flush any dirty (unsaved) answers immediately before submitting —
+    // the student may have selected an answer in the last second before
+    // the timer hit 0, and the autosave debounce (1.5s) hadn't fired yet.
+    const store = useAnswerStore.getState();
+    const dirtyEntries = Object.entries(store.answers).filter(([, e]) => e?.dirty);
+    if (dirtyEntries.length > 0) {
+      const flushClientId = `flush-${Date.now()}`;
+      await Promise.allSettled(
+        dirtyEntries.map(([qidStr, entry]) => {
+          const req: SaveAnswerRequest = {
+            attemptQuestionId: Number(qidStr),
+            answerPayload: entry!.payload,
+            sequenceNumber: entry!.sequence + 1,
+            clientInstanceId: flushClientId,
+          };
+          return saveAnswer(attemptId, req).then((res) => {
+            store.markSaved(Number(qidStr), res.currentSequenceNumber, entry!.payload);
+          }).catch(() => {
+            // Best-effort flush: even if save fails, proceed to submit with
+            // whatever was last persisted. The backend submit will grade that.
+          });
+        })
+      );
+    }
+
     let key = submitKey;
     if (!key) {
       key = generateSubmitKey();
