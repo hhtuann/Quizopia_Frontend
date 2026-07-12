@@ -28,6 +28,29 @@ function formatRemaining(ms: number): string {
   return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
+/** A group of questions that share the same section title (null = ungrouped). */
+interface SectionGroup {
+  title: string | null;
+  instructions: string | null;
+  items: { q: DetailQuestionView; flatIndex: number }[];
+}
+
+/** Groups a flat sorted question array into sections by `sectionTitle`. */
+function groupBySection(sorted: DetailQuestionView[]): SectionGroup[] {
+  const groups: SectionGroup[] = [];
+  let current: SectionGroup | null = null;
+  for (let i = 0; i < sorted.length; i++) {
+    const q = sorted[i];
+    const key = q.sectionTitle ?? null;
+    if (!current || current.title !== key) {
+      current = { title: key, instructions: q.sectionInstructions ?? null, items: [] };
+      groups.push(current);
+    }
+    current.items.push({ q, flatIndex: i });
+  }
+  return groups;
+}
+
 function QuestionRenderer({ question }: { question: DetailQuestionView }) {
   switch (question.questionType) {
     case "SINGLE_CHOICE":
@@ -58,6 +81,7 @@ export function AttemptShell({
   liveServerTime,
   wsStatus,
   onExpire,
+  studentName,
 }: {
   detail: AttemptDetailResponse;
   autosaveStatus?: AutosaveStatus;
@@ -65,6 +89,7 @@ export function AttemptShell({
   liveServerTime?: string | null;
   wsStatus?: "connecting" | "connected" | "disconnected";
   onExpire?: () => void;
+  studentName?: string;
 }) {
   const hydrate = useAnswerStore((s) => s.hydrate);
   const flagged = useAnswerStore((s) => s.flagged);
@@ -107,6 +132,8 @@ export function AttemptShell({
   const sorted = [...detail.questions].sort(
     (a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)
   );
+  const sections = groupBySection(sorted);
+  const hasSections = sections.length > 1 || (sections.length === 1 && sections[0].title !== null);
   const expired = remainingMs <= 0;
 
   // Fire onExpire exactly once when the timer hits 0.
@@ -128,77 +155,28 @@ export function AttemptShell({
       className="fixed inset-0 z-50 overflow-y-auto bg-[#FAFAFA]"
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div className="mx-auto flex max-w-6xl gap-6 p-6">
-        {/* Main column: questions only */}
-        <div className="min-w-0 flex-1">
-          {expired && (
-            <div role="alert" className="mb-6 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-4 text-sm font-medium text-[#0F172A]">
-              Time has expired.
-            </div>
-          )}
-
-          {/* Questions */}
-          <div className="space-y-6">
-            {sorted.map((q, i) => {
-              const isFlagged = !!flagged[q.attemptQuestionId];
-              return (
-                <div key={q.attemptQuestionId} id={`attempt-q-${i}`} className={cn(cardVariants(), "scroll-mt-6 p-6")}>
-                  <div className="mb-4 flex items-center gap-2">
-                    <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-wider text-[#64748B]">
-                      Q{i + 1}
-                    </span>
-                    <span className="font-mono text-xs font-medium text-[#64748B]">
-                      {TYPE_LABEL[q.questionType] ?? q.questionType} · {q.defaultPoints} pts
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => toggleFlag(q.attemptQuestionId)}
-                      aria-label={isFlagged ? `Unflag question ${i + 1}` : `Flag question ${i + 1}`}
-                      aria-pressed={isFlagged}
-                      className={cn(
-                        "ml-auto inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2",
-                        isFlagged
-                          ? "border-[#F59E0B]/40 bg-[#F59E0B]/10 text-[#F59E0B]"
-                          : "border-[#E2E8F0] text-[#94A3B8] hover:bg-[#F1F5F9]"
-                      )}
-                    >
-                      <FlagIcon filled={isFlagged} />
-                      {isFlagged ? "Flagged" : "Flag"}
-                    </button>
-                  </div>
-                  <h3 className="mb-4 text-sm font-semibold text-[#0F172A]">{q.content}</h3>
-                  <QuestionRenderer question={q} />
-                </div>
-              );
-            })}
+      {/* ===== Sticky top navbar ===== */}
+      <div className="sticky top-0 z-10 border-b border-[#E2E8F0] bg-white/95 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-3">
+          {/* Left: exam title + student name */}
+          <div className="min-w-0">
+            <h1 className="truncate font-display text-base font-bold tracking-tight text-[#0F172A] sm:text-lg">
+              {detail.examTitle || "Exam"}
+            </h1>
+            {studentName && (
+              <p className="truncate text-xs font-medium text-[#64748B]">{studentName}</p>
+            )}
           </div>
-
-          {/* Mobile submit */}
-          {submitSlot && <div className="mt-6 lg:hidden">{submitSlot}</div>}
-
-          <p className="mt-6 text-center text-xs text-[#94A3B8]">
-            Answers are saved automatically.
-          </p>
-        </div>
-
-        {/* Sidebar: timer + navigator + submit */}
-        <aside className="hidden w-72 shrink-0 lg:block">
-          <div className="sticky top-6 space-y-4">
+          {/* Right: timer + indicators + submit */}
+          <div className="flex items-center gap-4">
             {/* Timer */}
-            <div
-              className={cn(
-                "rounded-xl border p-4 text-center",
-                expired
-                  ? "border-[#E2E8F0] bg-[#F1F5F9]"
-                  : remainingMs < 300000
-                  ? "border-[#0052FF]/30 bg-[#0052FF]/5"
-                  : "border-[#10B981]/30 bg-[#10B981]/5"
-              )}
-            >
-              <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#64748B]">Time remaining</p>
+            <div className="text-right">
+              <p className="font-mono text-[9px] font-bold uppercase tracking-wider text-[#64748B]">
+                Time remaining
+              </p>
               <p
                 className={cn(
-                  "mt-1 font-mono text-2xl font-bold tabular-nums",
+                  "font-mono text-lg font-bold tabular-nums leading-tight sm:text-xl",
                   expired
                     ? "text-[#94A3B8]"
                     : remainingMs < 300000
@@ -208,16 +186,102 @@ export function AttemptShell({
               >
                 {formatRemaining(remainingMs)}
               </p>
-              <div className="mt-2 flex items-center justify-center gap-3">
+              <div className="flex items-center justify-end gap-2">
                 {autosaveStatus && <AutosaveIndicator status={autosaveStatus} />}
                 {wsStatus && <WsIndicator status={wsStatus} />}
               </div>
             </div>
+            {/* Submit */}
+            {submitSlot}
+          </div>
+        </div>
+      </div>
 
+      {/* ===== Main content area ===== */}
+      <div className="mx-auto flex max-w-6xl gap-6 p-6">
+        {/* Main column: section-grouped questions */}
+        <div className="min-w-0 flex-1">
+          {expired && (
+            <div role="alert" className="mb-6 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-4 text-sm font-medium text-[#0F172A]">
+              Time has expired.
+            </div>
+          )}
+
+          {/* Questions — grouped by section if section data exists */}
+          <div className="space-y-6">
+            {sections.map((section, sIndex) => (
+              <div key={sIndex}>
+                {/* Section header (only when section titles exist) */}
+                {hasSections && section.title && (
+                  <div className="mb-3 rounded-lg border border-[#0052FF]/20 bg-[#0052FF]/5 px-4 py-3">
+                    <h2 className="font-display text-sm font-bold tracking-tight text-[#0052FF]">
+                      {section.title}
+                    </h2>
+                    {section.instructions && (
+                      <p className="mt-1 text-xs font-medium text-[#64748B]">
+                        {section.instructions}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Questions in this section */}
+                <div className="space-y-6">
+                  {section.items.map(({ q, flatIndex }) => {
+                    const isFlagged = !!flagged[q.attemptQuestionId];
+                    return (
+                      <div
+                        key={q.attemptQuestionId}
+                        id={`attempt-q-${flatIndex}`}
+                        className={cn(cardVariants(), "scroll-mt-24 p-6")}
+                      >
+                        <div className="mb-4 flex items-center gap-2">
+                          <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-wider text-[#64748B]">
+                            Q{flatIndex + 1}
+                          </span>
+                          <span className="font-mono text-xs font-medium text-[#64748B]">
+                            {TYPE_LABEL[q.questionType] ?? q.questionType} · {q.defaultPoints} pts
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggleFlag(q.attemptQuestionId)}
+                            aria-label={isFlagged ? `Unflag question ${flatIndex + 1}` : `Flag question ${flatIndex + 1}`}
+                            aria-pressed={isFlagged}
+                            className={cn(
+                              "ml-auto inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2",
+                              isFlagged
+                                ? "border-[#F59E0B]/40 bg-[#F59E0B]/10 text-[#F59E0B]"
+                                : "border-[#E2E8F0] text-[#94A3B8] hover:bg-[#F1F5F9]"
+                            )}
+                          >
+                            <FlagIcon filled={isFlagged} />
+                            {isFlagged ? "Flagged" : "Flag"}
+                          </button>
+                        </div>
+                        <h3 className="mb-4 text-sm font-semibold text-[#0F172A]">{q.content}</h3>
+                        <QuestionRenderer question={q} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="mt-6 text-center text-xs text-[#94A3B8]">
+            Answers are saved automatically.
+          </p>
+        </div>
+
+        {/* Sidebar: question navigator only */}
+        <aside className="hidden w-72 shrink-0 lg:block">
+          <div className="sticky top-24 space-y-4">
             {/* Question navigator */}
             <div className={cn(cardVariants(), "p-4")}>
               <div className="mb-3 flex items-center justify-between">
-                <p className="font-mono text-xs font-semibold uppercase tracking-wider text-[#64748B]">Questions</p>
+                <p className="font-mono text-xs font-semibold uppercase tracking-wider text-[#64748B]">
+                  Questions
+                </p>
                 <div className="flex items-center gap-3 text-[10px] text-[#64748B]">
                   <span className="flex items-center gap-1">
                     <span className="inline-block h-3 w-3 rounded border border-[#0052FF]/30 bg-[#0052FF]/5" />
@@ -254,9 +318,6 @@ export function AttemptShell({
                 })}
               </div>
             </div>
-
-            {/* Submit button */}
-            {submitSlot}
           </div>
         </aside>
       </div>

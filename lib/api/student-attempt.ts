@@ -65,6 +65,9 @@ export interface DetailQuestionView {
   displayOrder: number | null;
   content: string;
   defaultPoints: number;
+  sectionTitle: string | null;
+  sectionInstructions: string | null;
+  sectionPosition: number | null;
   options: AttemptOptionView[];
   savedAnswer: SavedAnswerView | null;
 }
@@ -81,6 +84,7 @@ export interface AttemptDetailResponse {
   serverTime: string;
   answeredCount: number;
   totalQuestions: number;
+  examTitle: string;
   questions: DetailQuestionView[];
 }
 

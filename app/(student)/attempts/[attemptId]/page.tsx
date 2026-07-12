@@ -10,6 +10,7 @@ import {
 } from "@/hooks/queries/use-student-attempt";
 import { AttemptShell } from "@/components/student/AttemptShell";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
+import { useAuth } from "@/hooks/useAuth";
 import { Button, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { useAutosaveAnswers } from "@/lib/attempt/use-autosave";
@@ -29,6 +30,7 @@ export default function AttemptPage() {
   const valid = Number.isFinite(id);
 
   const { data, isPending, isError, error } = useAttemptDetailQuery(id, valid);
+  const { user } = useAuth();
 
   if (!valid) return <NotFound />;
   if (isPending) return <Skeleton />;
@@ -49,9 +51,9 @@ export default function AttemptPage() {
         </Link>
       </div>
       {data.status === "IN_PROGRESS" ? (
-        <InProgressShell detail={data} attemptId={id} />
+        <InProgressShell detail={data} attemptId={id} studentName={user?.displayName} />
       ) : (
-        <AttemptShell detail={data} />
+        <AttemptShell detail={data} studentName={user?.displayName} />
       )}
     </div>
   );
@@ -61,9 +63,11 @@ export default function AttemptPage() {
 function InProgressShell({
   detail,
   attemptId,
+  studentName,
 }: {
   detail: AttemptDetailResponse;
   attemptId: number;
+  studentName?: string;
 }) {
   const autosaveStatus = useAutosaveAnswers(attemptId, new Date(detail.deadlineAt).getTime());
   const submitMut = useSubmitAttemptMutation(attemptId);
@@ -255,6 +259,7 @@ function InProgressShell({
     <>
       <AttemptShell
         detail={detail}
+        studentName={studentName}
         autosaveStatus={autosaveStatus}
         submitSlot={autoSubmitted ? (
           <div className={cn(cardVariants({ variant: "elevated" }), "p-6 text-center")}>
