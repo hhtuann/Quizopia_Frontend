@@ -8,6 +8,7 @@ import {
   getSessionClasses,
   getSessionDetail,
   listMySessions,
+  listSessionParticipants,
   openSession,
   scheduleSession,
   updateSession,
@@ -33,6 +34,19 @@ export function useExamSessionDetailQuery(sessionId: number, enabled: boolean) {
   return useQuery({
     queryKey: ["exam-sessions", sessionId, "detail"],
     queryFn: () => getSessionDetail(sessionId),
+    enabled,
+  });
+}
+
+/**
+ * Session participants (paginated). Used to resolve `studentProfileId` →
+ * `{studentCode, displayName}` in the live monitor's event feed. Fetches a
+ * large page so the lookup covers the whole roster for typical sessions.
+ */
+export function useSessionParticipantsQuery(sessionId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ["exam-sessions", sessionId, "participants"],
+    queryFn: () => listSessionParticipants(sessionId, { page: 0, size: 200 }),
     enabled,
   });
 }

@@ -1,14 +1,19 @@
 "use client";
 
+import { useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useSessionEvents,
   type SessionMetrics,
   type WsStatus,
 } from "@/lib/realtime/use-session-events";
+import { useSessionParticipantsQuery } from "@/hooks/queries/use-exam-sessions";
 import type { RealtimeEventEnvelope } from "@/lib/realtime/types";
 import { cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
+
+/** profileId → {studentCode, displayName} for resolving event-feed rows. */
+type ParticipantMap = Map<number, { studentCode: string; displayName: string }>;
 
 const EVENT_LABEL: Record<string, string> = {
   SESSION_OPENED: "Session opened",
@@ -59,6 +64,16 @@ export function LiveMonitor({
     }
   );
 
+  // Resolve studentProfileId → {studentCode, displayName} for the event feed.
+  const { data: participantsData } = useSessionParticipantsQuery(sessionId, true);
+  const participants = useMemo<ParticipantMap>(() => {
+    const map: ParticipantMap = new Map();
+    for (const p of participantsData?.items ?? []) {
+      map.set(p.studentProfileId, { studentCode: p.studentCode, displayName: p.displayName });
+    }
+    return map;
+  }, [participantsData]);
+
   return (
     <div className={cn(cardVariants(), "mt-6 p-6")}>
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -84,7 +99,7 @@ export function LiveMonitor({
         </p>
         <span className="text-xs text-[#94A3B8]">{metrics.sessionStatus}</span>
       </div>
-      <EventFeed events={recentEvents} />
+      <EventFeed events={recentEvents} participants={participants} />
     </div>
   );
 }
@@ -135,7 +150,13 @@ function MetricCard({
   );
 }
 
-function EventFeed({ events }: { events: RealtimeEventEnvelope[] }) {
+function EventFeed({
+  events,
+  participants,
+}: {
+  events: RealtimeEventEnvelope[];
+  participants: ParticipantMap;
+}) {
   if (events.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-[#E2E8F0] bg-[#F1F5F9]/50 px-4 py-6 text-center text-xs text-[#64748B]">
@@ -165,13 +186,21 @@ function EventFeed({ events }: { events: RealtimeEventEnvelope[] }) {
             {EVENT_LABEL[ev.eventType] ?? ev.eventType}
           </span>
           {ev.studentProfileId != null && (
-            <span className="text-[#64748B]">· profile #{ev.studentProfileId}</span>
+            <span className="truncate text-[#64748B]">
+              · {formatStudent(ev.studentProfileId, participants)}
+            </span>
           )}
-          <span className="ml-auto tabular-nums text-[#94A3B8]">
+          <span className="ml-auto shrink-0 tabular-nums text-[#94A3B8]">
             {formatTime(ev.occurredAt)}
           </span>
         </li>
       ))}
     </ul>
   );
+}
+
+/** "STU00000001 · Nguyen Van A" when known; falls back to "profile #N". */
+function formatStudent(profileId: number, participants: ParticipantMap): string {
+  const p = participants.get(profileId);
+  return p ? `${p.studentCode} · ${p.displayName}` : `profile #${profileId}`;
 }

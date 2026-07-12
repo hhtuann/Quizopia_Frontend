@@ -218,3 +218,29 @@ export function cancelSession(
     `/api/exam-sessions/${sessionId}/cancel`
   );
 }
+
+// ============================================================
+// Participants (GET /api/exam-sessions/{sessionId}/participants)
+// ============================================================
+
+/** Backend record `ExamSessionParticipantResponse`. */
+export interface SessionParticipant {
+  id: number;
+  studentProfileId: number;
+  studentCode: string;
+  displayName: string;
+  status: string;
+  addedAt: string;
+  blockedAt: string | null;
+}
+
+/** `GET /api/exam-sessions/{sessionId}/participants` — paginated participant list. */
+export function listSessionParticipants(
+  sessionId: number,
+  params: { page?: number; size?: number } = {}
+): Promise<PageResponse<SessionParticipant>> {
+  return http.get<PageResponse<SessionParticipant>>(
+    `/api/exam-sessions/${sessionId}/participants`,
+    { params }
+  );
+}
