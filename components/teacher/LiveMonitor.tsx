@@ -7,7 +7,7 @@ import {
   type SessionMetrics,
   type WsStatus,
 } from "@/lib/realtime/use-session-events";
-import { useSessionParticipantsQuery } from "@/hooks/queries/use-exam-sessions";
+import { useSessionRosterQuery } from "@/hooks/queries/use-exam-sessions";
 import type { RealtimeEventEnvelope } from "@/lib/realtime/types";
 import { cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
@@ -65,14 +65,14 @@ export function LiveMonitor({
   );
 
   // Resolve studentProfileId → {studentCode, displayName} for the event feed.
-  const { data: participantsData } = useSessionParticipantsQuery(sessionId, true);
+  const { data: rosterData } = useSessionRosterQuery(sessionId, true);
   const participants = useMemo<ParticipantMap>(() => {
     const map: ParticipantMap = new Map();
-    for (const p of participantsData?.items ?? []) {
+    for (const p of rosterData ?? []) {
       map.set(p.studentProfileId, { studentCode: p.studentCode, displayName: p.displayName });
     }
     return map;
-  }, [participantsData]);
+  }, [rosterData]);
 
   return (
     <div className={cn(cardVariants(), "mt-6 p-6")}>

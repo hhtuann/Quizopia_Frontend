@@ -220,27 +220,17 @@ export function cancelSession(
 }
 
 // ============================================================
-// Participants (GET /api/exam-sessions/{sessionId}/participants)
+// Roster (GET /api/exam-sessions/{sessionId}/roster)
 // ============================================================
 
-/** Backend record `ExamSessionParticipantResponse`. */
-export interface SessionParticipant {
-  id: number;
+/** Backend record `SessionRosterItem` — effective student roster (class members ∪ participants). */
+export interface SessionRosterItem {
   studentProfileId: number;
   studentCode: string;
   displayName: string;
-  status: string;
-  addedAt: string;
-  blockedAt: string | null;
 }
 
-/** `GET /api/exam-sessions/{sessionId}/participants` — paginated participant list. */
-export function listSessionParticipants(
-  sessionId: number,
-  params: { page?: number; size?: number } = {}
-): Promise<PageResponse<SessionParticipant>> {
-  return http.get<PageResponse<SessionParticipant>>(
-    `/api/exam-sessions/${sessionId}/participants`,
-    { params }
-  );
+/** `GET /api/exam-sessions/{sessionId}/roster` — flat roster for resolving studentProfileId → code + name. */
+export function getSessionRoster(sessionId: number): Promise<SessionRosterItem[]> {
+  return http.get<SessionRosterItem[]>(`/api/exam-sessions/${sessionId}/roster`);
 }
