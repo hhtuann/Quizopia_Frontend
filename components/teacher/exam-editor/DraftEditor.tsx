@@ -31,9 +31,11 @@ const TYPE_LABEL: Record<string, string> = {
 export function DraftEditor({
   examId,
   draft,
+  subjectId,
 }: {
   examId: number;
   draft: ExamDraftVersionResponse;
+  subjectId: number;
 }) {
   const mutation = useUpdateDraftCompositionMutation(examId);
 
@@ -278,6 +280,7 @@ export function DraftEditor({
             <div className="mb-4">
               <QuestionPicker
                 excludeSourceIds={allSourceIds}
+                subjectId={subjectId}
                 onAdd={(qs) => addQuestions(section.uid, qs)}
                 onClose={() => setPickerFor(null)}
               />

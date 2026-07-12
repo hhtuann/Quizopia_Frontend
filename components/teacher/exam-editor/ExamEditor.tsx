@@ -249,7 +249,7 @@ export function ExamEditor({ data }: { data: TeacherExamEditorResponse }) {
 
       {/* Draft editor — or no-draft block (with optional create-draft action). */}
       {draft ? (
-        <DraftEditor examId={data.id} draft={draft} />
+        <DraftEditor examId={data.id} draft={draft} subjectId={data.subject.id} />
       ) : (
         <div className={cn(cardVariants(), "p-8 text-center")}>
           <p className="font-display text-lg font-bold text-[#0F172A]">No active draft</p>

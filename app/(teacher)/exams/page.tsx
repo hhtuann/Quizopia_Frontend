@@ -207,7 +207,7 @@ function ExamsTable({ items }: { items: ExamListItem[] }) {
                 </Link>
               </td>
               <td className="px-3 py-3 text-center text-[#64748B]">
-                {exam.subject.code} — {exam.subject.name}
+                {exam.subject.name}
               </td>
               <td className="px-3 py-3 text-center text-[#64748B]">
                 {exam.purpose ? exam.purpose.title : "—"}

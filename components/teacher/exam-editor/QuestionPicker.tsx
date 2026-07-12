@@ -26,10 +26,13 @@ const TYPE_LABEL: Record<string, string> = {
 export function QuestionPicker({
   onAdd,
   excludeSourceIds,
+  subjectId,
   onClose,
 }: {
   onAdd: (questions: LocalQuestion[]) => void;
   excludeSourceIds: number[];
+  /** Only banks whose subject matches the exam's subject are selectable. */
+  subjectId: number;
   onClose: () => void;
 }) {
   const [bankId, setBankId] = useState<number | "">("");
@@ -37,7 +40,9 @@ export function QuestionPicker({
   const excluded = useMemo(() => new Set(excludeSourceIds), [excludeSourceIds]);
 
   const { data: banksData, isPending: banksPending } = useQuestionBanksQuery({ size: 100 });
-  const banks = banksData?.items ?? [];
+  // Only show banks whose subject matches the exam's subject, so every
+  // selectable bank passes the backend's strict subject-match on save.
+  const banks = (banksData?.items ?? []).filter((b) => b.subject.id === subjectId);
 
   const enabled = bankId !== "";
   const { data: questionsData, isPending: questionsPending } = useBankQuestionsQuery(
@@ -106,7 +111,11 @@ export function QuestionPicker({
         ))}
       </select>
 
-      {!enabled ? (
+      {banks.length === 0 ? (
+        <p className="pl-1 text-xs text-[#64748B]">
+          No question banks for this subject yet — create one with the same subject first.
+        </p>
+      ) : !enabled ? (
         <p className="pl-1 text-xs text-[#64748B]">Pick a bank to see its questions.</p>
       ) : questionsPending ? (
         <p role="status" className="pl-1 text-xs text-[#64748B]">
