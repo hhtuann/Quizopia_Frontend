@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { cn } from "@/lib/utils/cn";
-import { Badge, buttonVariants } from "@/components/ui";
+import { Badge } from "@/components/ui";
 import { useQuestionDetailQuery } from "@/hooks/queries/use-questions";
 import type { QuestionSummary } from "@/lib/api/question-banks";
 import type { Difficulty, QuestionStatus } from "@/lib/api/question-banks";

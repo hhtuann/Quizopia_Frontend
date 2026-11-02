@@ -2,12 +2,13 @@ import { z } from "zod";
 
 /**
  * Zod schema mirroring backend `CreateQuestionBankRequest` and its Jakarta
- * Validation constraints:
+ * Validation constraints (Phase 1, Task A):
  *   - name: @NotBlank, @Size(max = 255)
  *   - description: @Size(max = 2000), nullable (no @NotBlank)
- *   - subjectId: @NotNull (selected from the school-scoped dropdown)
+ *   - subjectId: @Positive, nullable — optional for PERSONAL workspaces,
+ *     required and school-matched for ORGANIZATION ones (enforced by the
+ *     page + backend, not the schema)
  *
- * `code` is no longer client-supplied — the backend auto-generates it.
  * Client-side validation only; the backend remains the source of truth.
  */
 export const createBankSchema = z.object({
@@ -22,7 +23,8 @@ export const createBankSchema = z.object({
   subjectId: z
     .number({ message: "Subject is required." })
     .int("Subject is required.")
-    .positive("Subject is required."),
+    .positive("Subject is required.")
+    .optional(),
 });
 
 export type CreateBankValues = z.infer<typeof createBankSchema>;

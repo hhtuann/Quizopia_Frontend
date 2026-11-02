@@ -16,17 +16,18 @@ import { http } from "./http-client";
  * AvailableSessionsResponse.
  */
 
-/** Backend nested record `ExamInfo(Long examId, String title, String subjectName)`. */
+/** Backend nested record `ExamInfo(Long examId, String title, String subjectName)`. `subjectName` may be null (personal-workspace exams carry no subject). */
 export interface ExamInfo {
   examId: number;
   title: string;
-  subjectName: string;
+  subjectName: string | null;
 }
 
 /**
  * Backend nested record `AvailableSessionItem`. `sessionStatus` is the session
  * lifecycle status (OPEN / SCHEDULED / …). Nullable: `activeAttemptId`,
- * `activeAttemptDeadlineAt`, `durationMinutes`, `maxAttempts` (Integer in Java).
+ * `activeAttemptDeadlineAt`, `maxAttempts` (Integer in Java). Since Phase 1
+ * Task B, `durationMinutes` is always present (NOT NULL).
  */
 export interface AvailableSessionItem {
   sessionId: number;
@@ -36,7 +37,7 @@ export interface AvailableSessionItem {
   exam: ExamInfo;
   startsAt: string;
   endsAt: string;
-  durationMinutes: number | null;
+  durationMinutes: number;
   maxAttempts: number | null;
   attemptsUsed: number;
   remainingAttempts: number;

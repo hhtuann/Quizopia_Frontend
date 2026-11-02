@@ -18,39 +18,33 @@ export const loginSchema = z.object({
 export type LoginValues = z.infer<typeof loginSchema>;
 
 /** `RegisterRequest(...)` with the same length/presence constraints. */
-export const registerSchema = z
-  .object({
-    username: z
-      .string()
-      .min(1, "Username is required.")
-      .max(50, "Username must be 50 characters or fewer.")
-      // Backend treats identifier with '@' as an email; a username must not contain it.
-      .refine((v) => !v.includes("@"), "Username cannot contain '@'."),
-    email: z
-      .string()
-      .min(1, "Email is required.")
-      .email("Enter a valid email address.")
-      .max(254, "Email must be 254 characters or fewer."),
-    password: z
-      .string()
-      .min(8, "Password must be at least 8 characters.")
-      .max(128, "Password must be 128 characters or fewer."),
-    displayName: z
-      .string()
-      .min(1, "Display name is required.")
-      .max(150, "Display name must be 150 characters or fewer."),
-    phone: z.string().min(1, "Phone number is required."),
-    // Required here; the form seeds "STUDENT" via defaultValues (the backend
-    // treats a missing accountType as STUDENT, but the client always sends one).
-    accountType: z.enum(["STUDENT", "TEACHER"]),
-    teacherInviteCode: z.string().optional(),
-  })
-  .refine(
-    (data) => data.accountType !== "TEACHER" || !!data.teacherInviteCode?.trim(),
-    {
-      message: "Teacher invite code is required for teacher accounts.",
-      path: ["teacherInviteCode"],
-    }
-  );
+export const registerSchema = z.object({
+  username: z
+    .string()
+    .min(1, "Username is required.")
+    .max(50, "Username must be 50 characters or fewer.")
+    // Backend treats identifier with '@' as an email; a username must not contain it.
+    .refine((v) => !v.includes("@"), "Username cannot contain '@'."),
+  email: z
+    .string()
+    .min(1, "Email is required.")
+    .email("Enter a valid email address.")
+    .max(254, "Email must be 254 characters or fewer."),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters.")
+    .max(128, "Password must be 128 characters or fewer."),
+  displayName: z
+    .string()
+    .min(1, "Display name is required.")
+    .max(150, "Display name must be 150 characters or fewer."),
+  phone: z.string().min(1, "Phone number is required."),
+  // Required here; the form seeds "STUDENT" via defaultValues (the backend
+  // treats a missing accountType as STUDENT, but the client always sends one).
+  accountType: z.enum(["STUDENT", "TEACHER"]),
+  // OPTIONAL since Phase 1: teachers no longer need an invite code — without
+  // one they start in their personal workspace and can join a school later.
+  teacherInviteCode: z.string().max(80, "Invite code must be 80 characters or fewer.").optional(),
+});
 
 export type RegisterValues = z.infer<typeof registerSchema>;

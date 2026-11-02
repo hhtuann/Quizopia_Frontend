@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui";
 import { NotificationBell } from "./NotificationBell";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { useAuth } from "@/hooks/useAuth";
 
 interface HeaderProps {
@@ -57,6 +58,7 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
 
   const displayName = user?.displayName || user?.username || "Account";
   const initials = initialsOf(displayName);
+  const isTeacher = user?.roles?.includes("TEACHER") ?? false;
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-[#E2E8F0] bg-white/80 backdrop-blur-md transition-all duration-300">
@@ -116,7 +118,10 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
 
           {/* Header Actions - Profile / Mobile Menu Toggle */}
           <div className="flex items-center gap-4">
-            
+
+            {/* Workspace switcher (TEACHER, Desktop) — UI preference only */}
+            {isTeacher && <WorkspaceSwitcher />}
+
             {/* Notification Bell (Desktop) */}
             <NotificationBell />
 

@@ -272,14 +272,19 @@ export default function RegisterPage() {
 
 
               {accountType === "TEACHER" && (
-                <LabeledInput
-                  id="teacherInviteCode"
-                  label="Teacher invite code"
-                  name="teacherInviteCode"
-                  placeholder="Enter the code from your administrator"
-                  error={errors.teacherInviteCode?.message}
-                  register={field}
-                />
+                <div>
+                  <LabeledInput
+                    id="teacherInviteCode"
+                    label="Teacher invite code (optional)"
+                    name="teacherInviteCode"
+                    placeholder="Have a code from your school? Enter it here"
+                    error={errors.teacherInviteCode?.message}
+                    register={field}
+                  />
+                  <p className="mt-1.5 pl-1 text-xs font-medium text-[#64748B]">
+                    No code? No problem — you&apos;ll start in your personal workspace and can join a school later.
+                  </p>
+                </div>
               )}
 
               <Button type="submit" disabled={isSubmitting} className="w-full">

@@ -65,11 +65,17 @@ export function LiveMonitor({
   );
 
   // Resolve studentProfileId → {studentCode, displayName} for the event feed.
+  // Roster items without a profile id (members who cannot start attempts)
+  // can't correlate with attempt events and are skipped.
   const { data: rosterData } = useSessionRosterQuery(sessionId, true);
   const participants = useMemo<ParticipantMap>(() => {
     const map: ParticipantMap = new Map();
     for (const p of rosterData ?? []) {
-      map.set(p.studentProfileId, { studentCode: p.studentCode, displayName: p.displayName });
+      if (p.studentProfileId == null) continue;
+      map.set(p.studentProfileId, {
+        studentCode: p.studentCode ?? `#${p.userId}`,
+        displayName: p.displayName,
+      });
     }
     return map;
   }, [rosterData]);

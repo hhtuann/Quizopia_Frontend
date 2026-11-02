@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useUpdateDraftCompositionMutation } from "@/hooks/queries/use-exams";
+import { useUpdateCompositionMutation } from "@/hooks/queries/use-exams";
 import { Button, Input, cardVariants, buttonVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
-import type { ExamDraftVersionResponse } from "@/lib/api/exams";
+import type { TeacherExamEditorResponse } from "@/lib/api/exams";
 import {
   nextUid,
   toLocalSections,
@@ -28,34 +28,44 @@ const TYPE_LABEL: Record<string, string> = {
   NUMERIC_FILL: "Numeric",
 };
 
+/**
+ * Composition editor (Questions tab). Bound to the editor response's
+ * `composition`; saves with `expectedExamVersion = exam.examVersion`. After a
+ * successful save the mutation writes the new editor response (with the
+ * bumped `examVersion` + pinned snapshots) into the cache, and this component
+ * resyncs from it.
+ *
+ * `readOnly` (PUBLISHED/ARCHIVED exams) hides every mutation affordance —
+ * published content is an immutable snapshot.
+ */
 export function DraftEditor({
-  examId,
-  draft,
-  subjectId,
+  exam,
+  readOnly = false,
 }: {
-  examId: number;
-  draft: ExamDraftVersionResponse;
-  subjectId: number;
+  exam: TeacherExamEditorResponse;
+  readOnly?: boolean;
 }) {
-  const mutation = useUpdateDraftCompositionMutation(examId);
+  const mutation = useUpdateCompositionMutation(exam.id);
 
-  const [prevDraft, setPrevDraft] = useState(draft);
+  const [prevExam, setPrevExam] = useState(exam);
   const [editTarget, setEditTarget] = useState<number | null>(null);
-  const [sections, setSections] = useState<LocalSection[]>(() => toLocalSections(draft));
+  const [sections, setSections] = useState<LocalSection[]>(() =>
+    toLocalSections(exam.composition)
+  );
   const [dirty, setDirty] = useState(false);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState(false);
 
-  // Resync local state when the server draft changes. Initial load is handled
+  // Resync local state when the server exam changes. Initial load is handled
   // by the lazy initializer; this block fires after a successful save or a 409
   // conflict refetch. Using the "adjust state when a prop changes" pattern
   // (during render) instead of useEffect to avoid cascading renders. Local
-  // edits are preserved between refetches — react-query keeps a stable `draft`
+  // edits are preserved between refetches — react-query keeps a stable `exam`
   // reference until new data arrives.
-  if (draft !== prevDraft) {
-    setPrevDraft(draft);
-    setSections(toLocalSections(draft));
+  if (exam !== prevExam) {
+    setPrevExam(exam);
+    setSections(toLocalSections(exam.composition));
     setDirty(false);
     setSaveError(null);
   }
@@ -140,23 +150,25 @@ export function DraftEditor({
   const handleSave = async () => {
     setSaveError(null);
     try {
+      // The response carries the NEW examVersion + pinned snapshots and is
+      // written into the editor cache by the mutation — the resync above
+      // rebuilds local state from it.
       await mutation.mutateAsync(
         toRequestBody(
-          draft.versionNumber,
-          draft.durationMinutes,
-          draft.instructions,
+          exam.examVersion,
+          exam.durationMinutes,
+          exam.instructions,
           sections
         )
       );
       setSavedNotice(true);
       setDirty(false);
-      // The mutation's onSuccess invalidates → editor refetches → effect resyncs.
     } catch (err) {
       const mapped = describeSaveError(err);
       setSaveError(mapped.message);
       setSavedNotice(false);
-      // On 409 conflict the mutation onError refetches the editor; the effect
-      // will resync local state to the latest server draft (no overwrite-save).
+      // On 409 conflict the mutation onError refetches the editor; the block
+      // above resyncs local state to the latest server data (no overwrite-save).
     }
   };
 
@@ -165,16 +177,21 @@ export function DraftEditor({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
-            Draft composition
+            {readOnly ? "Questions (read-only)" : "Composition"}
           </h2>
           <p className="mt-1 text-xs font-medium text-[#64748B]">
-            Version {draft.versionNumber} · {sections.length} section
-            {sections.length === 1 ? "" : "s"} · positions follow insertion order.
+            {sections.length} section{sections.length === 1 ? "" : "s"} ·{" "}
+            {allSourceIds.length} question{allSourceIds.length === 1 ? "" : "s"} ·{" "}
+            {readOnly
+              ? "published content is immutable — duplicate the exam to change it."
+              : "positions follow insertion order."}
           </p>
         </div>
-        <Button type="button" onClick={handleSave} disabled={!canSave}>
-          {mutation.isPending ? "Saving…" : "Save draft"}
-        </Button>
+        {!readOnly && (
+          <Button type="button" onClick={handleSave} disabled={!canSave}>
+            {mutation.isPending ? "Saving…" : "Save changes"}
+          </Button>
+        )}
       </div>
 
       {savedNotice && (
@@ -182,10 +199,10 @@ export function DraftEditor({
           role="status"
           className="rounded-lg border border-[#10B981]/30 bg-[#10B981]/5 p-4 text-sm font-semibold text-[#10B981]"
         >
-          Draft saved. Answer snapshots for newly added questions are now pinned.
+          Composition saved. Answer snapshots for newly added questions are now pinned.
         </div>
       )}
-      {validationError && dirty && (
+      {validationError && dirty && !readOnly && (
         <div role="status" className="rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-4 text-sm font-medium text-[#0F172A]">
           {validationError}
         </div>
@@ -220,67 +237,77 @@ export function DraftEditor({
             <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs font-bold uppercase tracking-wider text-[#64748B]">
               Section {sIndex + 1}
             </span>
-            <button
-              type="button"
-              onClick={() => removeSection(section.uid)}
-              aria-label={`Remove section ${sIndex + 1}`}
-              className={cn(iconBtn, "hover:text-[#EF4444]")}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-                className="h-4 w-4"
-                aria-hidden="true"
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={() => removeSection(section.uid)}
+                aria-label={`Remove section ${sIndex + 1}`}
+                className={cn(iconBtn, "hover:text-[#EF4444]")}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-              </svg>
-            </button>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  className="h-4 w-4"
+                  aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
 
           <label className="mb-1.5 block pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
             Title
           </label>
-          <Input
-            type="text"
-            value={section.title}
-            onChange={(e) => patchSection(section.uid, { title: e.target.value })}
-            placeholder="Section title"
-            aria-invalid={section.title.trim() === ""}
-            className="mb-4"
-          />
+          {readOnly ? (
+            <p className="mb-4 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-4 py-3 text-sm font-medium text-[#0F172A]">
+              {section.title}
+            </p>
+          ) : (
+            <Input
+              type="text"
+              value={section.title}
+              onChange={(e) => patchSection(section.uid, { title: e.target.value })}
+              placeholder="Section title"
+              aria-invalid={section.title.trim() === ""}
+              className="mb-4"
+            />
+          )}
 
           <div className="mb-3 flex items-center justify-between">
             <p className="font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
               Questions ({section.questions.length})
             </p>
-            <button
-              type="button"
-              onClick={() => setPickerFor(section.uid)}
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2.5}
-                stroke="currentColor"
-                className="h-3.5 w-3.5"
-                aria-hidden="true"
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={() => setPickerFor(section.uid)}
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-              Add from bank
-            </button>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2.5}
+                  stroke="currentColor"
+                  className="h-3.5 w-3.5"
+                  aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Add from bank
+              </button>
+            )}
           </div>
 
-          {pickerFor === section.uid && (
+          {pickerFor === section.uid && !readOnly && (
             <div className="mb-4">
               <QuestionPicker
                 excludeSourceIds={allSourceIds}
-                subjectId={subjectId}
+                subjectId={exam.subject?.id ?? null}
                 onAdd={(qs) => addQuestions(section.uid, qs)}
                 onClose={() => setPickerFor(null)}
               />
@@ -289,37 +316,39 @@ export function DraftEditor({
 
           {section.questions.length === 0 ? (
             <p className="rounded-lg border border-dashed border-[#E2E8F0] bg-[#F1F5F9]/50 px-4 py-6 text-center text-xs text-[#64748B]">
-              No questions yet. Use “Add from bank”.
+              No questions in this section{readOnly ? "." : " — use “Add from bank”."}
             </p>
           ) : (
             <ul className="space-y-3">
               {section.questions.map((q, qIndex) => (
                 <li key={q.uid} className="rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] p-4">
                   <div className="flex items-start gap-3">
-                    <div className="flex flex-col gap-1">
-                      <button
-                        type="button"
-                        onClick={() => moveQuestion(section.uid, qIndex, -1)}
-                        disabled={qIndex === 0}
-                        aria-label="Move up"
-                        className={cn(iconBtn, "h-7 w-7")}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moveQuestion(section.uid, qIndex, 1)}
-                        disabled={qIndex === section.questions.length - 1}
-                        aria-label="Move down"
-                        className={cn(iconBtn, "h-7 w-7")}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                      </button>
-                    </div>
+                    {!readOnly && (
+                      <div className="flex flex-col gap-1">
+                        <button
+                          type="button"
+                          onClick={() => moveQuestion(section.uid, qIndex, -1)}
+                          disabled={qIndex === 0}
+                          aria-label="Move up"
+                          className={cn(iconBtn, "h-7 w-7")}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveQuestion(section.uid, qIndex, 1)}
+                          disabled={qIndex === section.questions.length - 1}
+                          aria-label="Move down"
+                          className={cn(iconBtn, "h-7 w-7")}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
 
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
@@ -344,41 +373,51 @@ export function DraftEditor({
                     <div className="flex flex-col items-end gap-2">
                       <label className="flex items-center gap-2 text-xs font-semibold text-[#64748B]">
                         Points
-                        <Input
-                          type="number"
-                          inputMode="decimal"
-                          min={0}
-                          step="0.25"
-                          value={q.defaultPoints ?? ""}
-                          placeholder={q.defaultPointsServer != null ? String(q.defaultPointsServer) : "default"}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setPoints(section.uid, q.uid, v === "" ? null : Number(v));
-                          }}
-                          aria-label={`Points for ${q.code}`}
-                          className="w-24 h-10 px-3"
-                        />
+                        {readOnly ? (
+                          <span className="rounded-lg border border-[#E2E8F0] bg-white px-3 py-2 tabular-nums text-[#0F172A]">
+                            {q.defaultPointsServer ?? q.defaultPoints ?? "—"}
+                          </span>
+                        ) : (
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            min={0}
+                            step="0.25"
+                            value={q.defaultPoints ?? ""}
+                            placeholder={q.defaultPointsServer != null ? String(q.defaultPointsServer) : "default"}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setPoints(section.uid, q.uid, v === "" ? null : Number(v));
+                            }}
+                            aria-label={`Points for ${q.code}`}
+                            className="w-24 h-10 px-3"
+                          />
+                        )}
                       </label>
-                      <button
-                        type="button"
-                        onClick={() => setEditTarget(q.sourceQuestionId)}
-                        aria-label={`Edit ${q.code}`}
-                        className={cn(iconBtn, "h-7 w-7 hover:text-[#0052FF]")}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeQuestion(section.uid, q.uid)}
-                        aria-label={`Remove ${q.code}`}
-                        className={cn(iconBtn, "h-7 w-7 hover:text-[#EF4444]")}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setEditTarget(q.sourceQuestionId)}
+                          aria-label={`Edit source ${q.code}`}
+                          className={cn(iconBtn, "h-7 w-7 hover:text-[#0052FF]")}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                          </svg>
+                        </button>
+                        {!readOnly && (
+                          <button
+                            type="button"
+                            onClick={() => removeQuestion(section.uid, q.uid)}
+                            aria-label={`Remove ${q.code}`}
+                            className={cn(iconBtn, "h-7 w-7 hover:text-[#EF4444]")}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </li>
@@ -388,16 +427,18 @@ export function DraftEditor({
         </div>
       ))}
 
-      <button
-        type="button"
-        onClick={addSection}
-        className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-4 w-4" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-        </svg>
-        Add section
-      </button>
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={addSection}
+          className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          Add section
+        </button>
+      )}
 
       {editTarget !== null && (
         <QuestionEditor

@@ -39,14 +39,15 @@ export interface SubjectSummary {
  * Backend record `QuestionBankListItem`. Note: the real record carries
  * `description` and `status` (the FE5 task spec omitted them); both are mirrored
  * here. `status` is a backend String — its enum values are not enumerated
- * client-side, so it is typed as `string`.
+ * client-side, so it is typed as `string`. `subject` is null for banks created
+ * in a personal workspace (subject optional there).
  */
 export interface QuestionBankListItem {
   id: number;
   code: string;
   name: string;
   description: string | null;
-  subject: SubjectSummary;
+  subject: SubjectSummary | null;
   questionCount: number;
   status: string;
   createdAt: string;
@@ -117,23 +118,27 @@ export function listBankQuestions(
 // ============================================================
 
 /**
- * Backend record `CreateQuestionBankRequest`. The client NEVER sends
- * `schoolId` or `ownerTeacherId` — the backend resolves them from the
- * authenticated teacher profile.
+ * Backend record `CreateQuestionBankRequest` (Phase 1, Task A). The client
+ * never sends `schoolId`/`ownerTeacherId` — the backend resolves ownership
+ * from the authenticated user and workspace. `workspaceId` is optional
+ * (defaults to the caller's organization workspace when they hold a teacher
+ * profile, else their personal workspace). `subjectId` is OPTIONAL for
+ * PERSONAL workspaces; required and school-matched for ORGANIZATION ones.
  */
 export interface CreateQuestionBankRequest {
   name: string;
   description: string | null;
-  subjectId: number;
+  subjectId?: number | null;
+  workspaceId?: number;
 }
 
-/** Backend record `QuestionBankResponse` (201 Created). */
+/** Backend record `QuestionBankResponse` (201 Created). `subject` may be null (personal workspace). */
 export interface QuestionBankResponse {
   id: number;
   code: string;
   name: string;
   description: string | null;
-  subject: SubjectSummary;
+  subject: SubjectSummary | null;
   questionCount: number;
   createdAt: string;
 }

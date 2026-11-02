@@ -2,15 +2,17 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  createNextDraft,
+  archiveExam,
+  createExam,
+  duplicateExam,
   getExamDetail,
   listMyExams,
   publishExam,
-  updateDraftComposition,
-  type CreateExamVersionRequest,
+  updateComposition,
+  type CreateExamRequest,
   type ExamListParams,
   type PublishExamRequest,
-  type UpdateDraftCompositionRequest,
+  type UpdateCompositionRequest,
 } from "@/lib/api/exams";
 import { listPurposes } from "@/lib/api/exam-purposes";
 import type { NormalizedApiError } from "@/lib/api";
@@ -36,8 +38,8 @@ export function useExamPurposesQuery() {
   });
 }
 
-/** Teacher editor view for one exam. `enabled` guards against an invalid id. */
-export function useExamEditorQuery(examId: number, enabled: boolean) {
+/** Teacher editor/management view for one exam. `enabled` guards against an invalid id. */
+export function useExamQuery(examId: number, enabled: boolean) {
   return useQuery({
     queryKey: ["exams", examId, "editor"],
     queryFn: () => getExamDetail(examId),
@@ -46,18 +48,23 @@ export function useExamEditorQuery(examId: number, enabled: boolean) {
 }
 
 /**
- * PUT draft composition. On success the editor refetches (local state resyncs
- * from the saved server snapshot). On a 409 (concurrent modification / not a
- * draft) the editor also refetches — but does NOT auto-retry/overwrite; the
- * caller surfaces the conflict and the teacher reviews the updated draft.
+ * PUT composition (DRAFT only). On success the response carries the NEW
+ * `examVersion` + pinned snapshots — it is written straight into the editor
+ * cache (no refetch flicker) and the exams list is invalidated. On a 409
+ * (EXAM_CONCURRENT_MODIFICATION / not a draft) the editor refetches — the
+ * caller surfaces the conflict; no auto-retry/overwrite.
  */
-export function useUpdateDraftCompositionMutation(examId: number) {
+export function useUpdateCompositionMutation(examId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (req: UpdateDraftCompositionRequest) =>
-      updateDraftComposition(examId, req),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["exams", examId, "editor"] });
+    mutationFn: (req: UpdateCompositionRequest) =>
+      updateComposition(examId, req),
+    onSuccess: (data) => {
+      queryClient.setQueriesData(
+        { queryKey: ["exams", examId, "editor"] },
+        data
+      );
+      queryClient.invalidateQueries({ queryKey: ["exams"] });
     },
     onError: (error) => {
       const norm = error as unknown as NormalizedApiError;
@@ -73,10 +80,22 @@ export function useUpdateDraftCompositionMutation(examId: number) {
 }
 
 /**
- * Publish the current DRAFT (immutable snapshot). On success, invalidates the
- * editor + the exams list so the editor refetches (draft→PUBLISHED,
- * publishedVersions +1, status READY). Errors are NOT auto-refetched here —
- * the caller decides (e.g., refetch on 409 EXAM_PUBLISH_CONFLICT, no retry).
+ * Create an exam (workspace-aware). On success invalidates the exams list.
+ */
+export function useCreateExamMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (req: CreateExamRequest) => createExam(req),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exams"] });
+    },
+  });
+}
+
+/**
+ * Publish the DRAFT (immutable snapshot — one-way). `expectedExamVersion` is
+ * optional; a mismatch/concurrent publish → 409 EXAM_PUBLISH_CONFLICT (the
+ * caller surfaces the notice; no auto-retry).
  */
 export function usePublishExamMutation(examId: number) {
   const queryClient = useQueryClient();
@@ -89,17 +108,31 @@ export function usePublishExamMutation(examId: number) {
   });
 }
 
-/**
- * Create the next DRAFT (clones the latest PUBLISHED version when no body).
- * On success, invalidates the editor + list so the new draft appears. Errors
- * are surfaced to the caller (e.g., 409 EXAM_VERSION_NOT_FOUND).
- */
-export function useCreateNextDraftMutation(examId: number) {
+/** Duplicate the exam → new DRAFT copy. Invalidates the exams list. */
+export function useDuplicateExamMutation(examId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (req?: CreateExamVersionRequest) => createNextDraft(examId, req),
+    mutationFn: () => duplicateExam(examId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["exams", examId, "editor"] });
+      queryClient.invalidateQueries({ queryKey: ["exams"] });
+    },
+  });
+}
+
+/**
+ * Archive the exam → editor response with status ARCHIVED. 409
+ * EXAM_ARCHIVE_CONFLICT while sessions are SCHEDULED/OPEN (the caller shows
+ * the "close scheduled/open sessions first" notice).
+ */
+export function useArchiveExamMutation(examId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => archiveExam(examId),
+    onSuccess: (data) => {
+      queryClient.setQueriesData(
+        { queryKey: ["exams", examId, "editor"] },
+        data
+      );
       queryClient.invalidateQueries({ queryKey: ["exams"] });
     },
   });

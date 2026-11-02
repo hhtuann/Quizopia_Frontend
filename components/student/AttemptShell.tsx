@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { AttemptDetailResponse, DetailQuestionView } from "@/lib/api/student-attempt";
 import { useAnswerStore } from "@/lib/attempt/answer-store";
 import { cardVariants } from "@/components/ui";
@@ -136,14 +136,15 @@ export function AttemptShell({
   const hasSections = sections.length > 1 || (sections.length === 1 && sections[0].title !== null);
   const expired = remainingMs <= 0;
 
-  // Fire onExpire exactly once when the timer hits 0.
-  const [wasExpired, setWasExpired] = useState(false);
+  // Fire onExpire exactly once when the timer hits 0 (ref-guarded; no state,
+  // nothing renders from it).
+  const firedExpireRef = useRef(false);
   useEffect(() => {
-    if (expired && !wasExpired) {
-      setWasExpired(true);
+    if (expired && !firedExpireRef.current) {
+      firedExpireRef.current = true;
       onExpire?.();
     }
-  }, [expired, wasExpired, onExpire]);
+  }, [expired, onExpire]);
 
   const scrollToQuestion = (index: number) => {
     document.getElementById(`attempt-q-${index}`)?.scrollIntoView({ behavior: "smooth", block: "start" });

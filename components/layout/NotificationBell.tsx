@@ -5,20 +5,6 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 import { useNotificationsQuery, useUnreadCountQuery, useMarkReadMutation, useMarkAllReadMutation } from "@/hooks/queries/use-notifications";
 
-const TYPE_ICON: Record<string, string> = {
-  RESULT_GRADED: "✓",
-  IMPORT_COMPLETED: "↑",
-  SESSION_ENDED: "■",
-  STUDENT_JOINED_CLASS: "+",
-  EXAM_SESSION_AVAILABLE: "📝",
-  ADDED_TO_CLASS: "+",
-  STUDENT_STARTED_EXAM: "▶",
-  NEW_USER_REGISTERED: "★",
-  NEW_ACADEMIC_ACTIVITY: "🏫",
-  USER_STATUS_CHANGED: "⊘",
-  ADDED_TO_SCHOOL: "✓",
-};
-
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const min = Math.floor(diff / 60000);
