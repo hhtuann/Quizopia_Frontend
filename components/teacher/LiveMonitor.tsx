@@ -9,11 +9,13 @@ import {
 } from "@/lib/realtime/use-session-events";
 import { useSessionRosterQuery } from "@/hooks/queries/use-exam-sessions";
 import type { RealtimeEventEnvelope } from "@/lib/realtime/types";
+import {
+  buildParticipantIndex,
+  resolveEventParticipant,
+  type ParticipantDisplay,
+} from "@/lib/realtime/types";
 import { cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
-
-/** profileId → {studentCode, displayName} for resolving event-feed rows. */
-type ParticipantMap = Map<number, { studentCode: string; displayName: string }>;
 
 const EVENT_LABEL: Record<string, string> = {
   SESSION_OPENED: "Session opened",
@@ -38,7 +40,12 @@ function formatTime(iso: string): string {
  * Metrics are seeded from REST (session detail's `participantCount` for the
  * baseline) and updated by events. On reconnect, REST queries are invalidated.
  *
- * No answer/studentCode leak — the envelope only carries `studentProfileId` +
+ * Participant correlation is user-based: ATTEMPT_* events carry `userId`
+ * (primary); `studentProfileId` is optional legacy provenance. Public
+ * profile-less learners resolve via their roster user entry (displayName)
+ * instead of being skipped.
+ *
+ * No answer/studentCode leak — the envelope only carries identity ids +
  * status + counts.
  */
 export function LiveMonitor({
@@ -64,21 +71,14 @@ export function LiveMonitor({
     }
   );
 
-  // Resolve studentProfileId → {studentCode, displayName} for the event feed.
-  // Roster items without a profile id (members who cannot start attempts)
-  // can't correlate with attempt events and are skipped.
+  // User-based identity index (issue #4 P0-R4): primary lookup by userId;
+  // legacy studentProfileId kept as a compatibility fallback for older
+  // events. Public profile-less learners resolve via displayName.
   const { data: rosterData } = useSessionRosterQuery(sessionId, true);
-  const participants = useMemo<ParticipantMap>(() => {
-    const map: ParticipantMap = new Map();
-    for (const p of rosterData ?? []) {
-      if (p.studentProfileId == null) continue;
-      map.set(p.studentProfileId, {
-        studentCode: p.studentCode ?? `#${p.userId}`,
-        displayName: p.displayName,
-      });
-    }
-    return map;
-  }, [rosterData]);
+  const participants = useMemo(
+    () => buildParticipantIndex(rosterData ?? []),
+    [rosterData]
+  );
 
   return (
     <div className={cn(cardVariants(), "mt-6 p-6")}>
@@ -156,12 +156,14 @@ function MetricCard({
   );
 }
 
+type ParticipantIndex = ReturnType<typeof buildParticipantIndex>;
+
 function EventFeed({
   events,
   participants,
 }: {
   events: RealtimeEventEnvelope[];
-  participants: ParticipantMap;
+  participants: ParticipantIndex;
 }) {
   if (events.length === 0) {
     return (
@@ -172,41 +174,46 @@ function EventFeed({
   }
   return (
     <ul className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
-      {events.map((ev, i) => (
-        <li
-          key={`${ev.eventId}-${i}`}
-          className="flex items-center gap-2 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-3 py-2 text-xs"
-        >
-          <span
-            className={cn(
-              "inline-block h-2 w-2 shrink-0 rounded-full",
-              ev.eventType === "ATTEMPT_SUBMITTED"
-                ? "bg-[#10B981]"
-                : ev.eventType === "ATTEMPT_STARTED"
-                ? "bg-[#0052FF]"
-                : "bg-[#64748B]"
-            )}
-            aria-hidden="true"
-          />
-          <span className="font-semibold text-[#0F172A]">
-            {EVENT_LABEL[ev.eventType] ?? ev.eventType}
-          </span>
-          {ev.studentProfileId != null && (
-            <span className="truncate text-[#64748B]">
-              · {formatStudent(ev.studentProfileId, participants)}
+      {events.map((ev, i) => {
+        const participant = resolveEventParticipant(ev, participants);
+        return (
+          <li
+            key={`${ev.eventId}-${i}`}
+            className="flex items-center gap-2 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-3 py-2 text-xs"
+          >
+            <span
+              className={cn(
+                "inline-block h-2 w-2 shrink-0 rounded-full",
+                ev.eventType === "ATTEMPT_SUBMITTED"
+                  ? "bg-[#10B981]"
+                  : ev.eventType === "ATTEMPT_STARTED"
+                  ? "bg-[#0052FF]"
+                  : "bg-[#64748B]"
+              )}
+              aria-hidden="true"
+            />
+            <span className="font-semibold text-[#0F172A]">
+              {EVENT_LABEL[ev.eventType] ?? ev.eventType}
             </span>
-          )}
-          <span className="ml-auto shrink-0 tabular-nums text-[#94A3B8]">
-            {formatTime(ev.occurredAt)}
-          </span>
-        </li>
-      ))}
+            {participant != null && (
+              <span className="truncate text-[#64748B]">
+                · {formatParticipant(participant)}
+              </span>
+            )}
+            <span className="ml-auto shrink-0 tabular-nums text-[#94A3B8]">
+              {formatTime(ev.occurredAt)}
+            </span>
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
-/** "STU00000001 · Nguyen Van A" when known; falls back to "profile #N". */
-function formatStudent(profileId: number, participants: ParticipantMap): string {
-  const p = participants.get(profileId);
-  return p ? `${p.studentCode} · ${p.displayName}` : `profile #${profileId}`;
+/**
+ * "STU00000001 · Nguyen Van A" for school learners; public profile-less
+ * learners render their display name only.
+ */
+function formatParticipant(p: ParticipantDisplay): string {
+  return p.studentCode != null ? `${p.studentCode} · ${p.displayName}` : p.displayName;
 }
