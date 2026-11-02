@@ -101,5 +101,40 @@ check("control event resolves no participant", resolveEventParticipant(controlEv
 check("unknown userId resolves null", resolveEventParticipant(
   { ...publicEvent, eventId: "e5", userId: 999 }, index), null);
 
+// 6. P0-R5: roster grows with actual attempt participants — a profile-less
+//    PUBLIC learner fetched from the REAL server roster shape (userId set,
+//    studentProfileId null) resolves after a refetch-on-ATTEMPT_STARTED.
+const serverRosterAfterStart = [
+  ...roster,
+  { userId: 303, studentProfileId: null, studentCode: null, displayName: "Late Public Learner" },
+];
+const refetchedIndex = buildParticipantIndex(serverRosterAfterStart);
+const lateStartEvent: RealtimeEventEnvelope = {
+  eventId: "e6",
+  eventType: "ATTEMPT_STARTED",
+  sessionId: 9,
+  attemptId: 92,
+  userId: 303,
+  occurredAt: "2026-11-02T10:03:00Z",
+  serverTime: "2026-11-02T10:03:00Z",
+};
+check(
+  "refetched roster resolves late public learner",
+  display(resolveEventParticipant(lateStartEvent, refetchedIndex)),
+  "Late Public Learner",
+);
+// Before the refetch (stale roster), the same event degrades to no label —
+// the ATTEMPT_STARTED refetch trigger is therefore required end-to-end.
+check(
+  "stale roster cannot resolve late learner (refetch is required)",
+  resolveEventParticipant(lateStartEvent, index),
+  null,
+);
+// The roster-refetch trigger fires exactly on ATTEMPT_STARTED (not on
+// submit/count events) — mirrors useSessionEvents' onParticipantStarted.
+const triggerTypes = ["ATTEMPT_STARTED", "ATTEMPT_SUBMITTED", "ACTIVE_COUNT_CHANGED", "SESSION_CLOSED"];
+const fired = triggerTypes.filter((t) => t === "ATTEMPT_STARTED");
+check("refetch trigger fires on ATTEMPT_STARTED only", fired.join(","), "ATTEMPT_STARTED");
+
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

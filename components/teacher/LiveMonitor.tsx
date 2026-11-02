@@ -68,6 +68,15 @@ export function LiveMonitor({
       void queryClient.invalidateQueries({
         queryKey: ["exam-sessions", sessionId, "participants"],
       });
+    },
+    () => {
+      // New ATTEMPT_STARTED (issue #4 P0-R5): refetch the roster so a
+      // profile-less PUBLIC learner becomes resolvable immediately. The
+      // roster refetch is intentionally cheap and idempotent; TanStack
+      // Query dedupes concurrent refetches of the same key.
+      void queryClient.invalidateQueries({
+        queryKey: ["exam-sessions", sessionId, "roster"],
+      });
     }
   );
 

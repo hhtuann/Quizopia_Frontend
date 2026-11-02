@@ -27,11 +27,17 @@ const MAX_FEED = 20;
  *
  * On reconnect, `onReconnect` fires so the caller can invalidate REST queries
  * (session detail + participants) — REST is the source of truth.
+ *
+ * On a new `ATTEMPT_STARTED` event, `onParticipantStarted` fires (issue #4
+ * P0-R5): the roster must be refetched so profile-less PUBLIC learners —
+ * who only appear in the roster once they actually start — become
+ * resolvable in the event feed immediately, not just after a reconnect.
  */
 export function useSessionEvents(
   sessionId: number,
   initial: SessionMetrics,
-  onReconnect?: () => void
+  onReconnect?: () => void,
+  onParticipantStarted?: (ev: RealtimeEventEnvelope) => void
 ): {
   status: WsStatus;
   metrics: SessionMetrics;
@@ -51,8 +57,20 @@ export function useSessionEvents(
     onReconnectRef.current = onReconnect;
   }, [onReconnect]);
 
+  // Stable onParticipantStarted ref (issue #4 P0-R5).
+  const onParticipantStartedRef = useRef(onParticipantStarted);
+  useEffect(() => {
+    onParticipantStartedRef.current = onParticipantStarted;
+  }, [onParticipantStarted]);
+
   const handleEvent = useCallback((envelope: RealtimeEventEnvelope) => {
     setRecentEvents((prev) => [envelope, ...prev].slice(0, MAX_FEED));
+
+    // Roster refresh on first-time participants (P0-R5): the user only
+    // enters the roster when they actually start an attempt.
+    if (envelope.eventType === "ATTEMPT_STARTED") {
+      onParticipantStartedRef.current?.(envelope);
+    }
 
     setMetrics((prev) => {
       const next = { ...prev };
