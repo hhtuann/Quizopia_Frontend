@@ -208,6 +208,14 @@ describe("Quiz Markdown diagnostics coverage", () => {
     expect(nbsp).toMatchObject({ questionNumber: 1, line: 2, column: 8 });
   });
 
+  it("derives the UNKNOWN_QUESTION_TYPE column from the raw digit token (zero padding)", () => {
+    const padded = diagnostic(
+      "Câu 007 [bogus]: x\nA. a\nB. b\nC. c\nD. d\n",
+      "UNKNOWN_QUESTION_TYPE",
+    );
+    expect(padded).toMatchObject({ questionNumber: 7, line: 1, column: 10 });
+  });
+
   it("still exposes partially valid questions for live preview alongside diagnostics", () => {
     const result = analyzeQuizMarkdown(
       "Câu 1 [SINGLE_CHOICE]: good\n*A. a\nB. b\nC. c\nD. d\nCâu 3 [SINGLE_CHOICE]: gap\n*A. a\nB. b\nC. c\nD. d\n",

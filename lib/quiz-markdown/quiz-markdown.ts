@@ -78,6 +78,7 @@ interface MutableQuestion {
   explanationSeen: boolean;
   headerLine: number;
   number: number;
+  numberTokenLength: number;
   options: MutableOption[];
   stem: string[];
   type: string;
@@ -135,9 +136,11 @@ function javaWhitespacePrefixLength(value: string): number {
   return count;
 }
 
-/** Column of the `[TYPE]` token: `Câu `.length + digits + ` [`.length + 1. */
-function questionTypeColumn(questionNumber: number): number {
-  return "Câu ".length + String(questionNumber).length + 3;
+/** Column of the `[TYPE]` token: `Câu `.length + raw digits + ` [`.length + 1. */
+function questionTypeColumn(numberTokenLength: number): number {
+  // Raw digit token length: "Câu 007" must report where the type token
+  // actually starts, not the normalized integer's length (Java parity).
+  return "Câu ".length + numberTokenLength + 3;
 }
 
 /** Column of the numeric token after `Đáp án:` + leading whitespace (Java parity). */
@@ -349,6 +352,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
         explanationSeen: false,
         headerLine: lineNumber,
         number: parsedNumber,
+        numberTokenLength: header[1].length,
         options: [],
         stem: [header[3].startsWith(" ") ? header[3].slice(1) : header[3]],
         type: header[2],
@@ -610,7 +614,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
           "UNKNOWN_QUESTION_TYPE",
           question.number,
           question.headerLine,
-          questionTypeColumn(question.number),
+          questionTypeColumn(question.numberTokenLength),
           `Unknown or incorrectly cased question type: ${question.type}`,
         ),
       );
@@ -713,19 +717,24 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
           );
         }
       });
-      OPTION_LABELS.forEach((label) => {
-        if (!seenLabels.has(label)) {
-          diagnostics.push(
-            diagnostic(
-              "MISSING_OPTION",
-              question.number,
-              question.headerLine,
-              1,
-              `Missing required option ${label}`,
-            ),
-          );
-        }
-      });
+      // Java parity: the header-level "missing label" scan only runs when
+      // fewer than four markers exist; with four-plus markers the per-marker
+      // expected-label checks already flag ordering gaps.
+      if (question.options.length < OPTION_LABELS.length) {
+        OPTION_LABELS.forEach((label) => {
+          if (!seenLabels.has(label)) {
+            diagnostics.push(
+              diagnostic(
+                "MISSING_OPTION",
+                question.number,
+                question.headerLine,
+                1,
+                `Missing required option ${label}`,
+              ),
+            );
+          }
+        });
+      }
       const correctCount = question.options.filter(
         (option) => option.correct,
       ).length;
