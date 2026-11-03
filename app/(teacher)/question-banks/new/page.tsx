@@ -74,7 +74,7 @@ export default function NewQuestionBankPage() {
     formState: { errors, isSubmitting },
   } = useForm<CreateBankValues>({
     resolver: zodResolver(createBankSchema),
-    defaultValues: { name: "", description: "", subjectId: NaN },
+    defaultValues: { name: "", description: "", subjectId: undefined },
   });
 
   const mutation = useMutation({

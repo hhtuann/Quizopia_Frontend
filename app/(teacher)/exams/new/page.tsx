@@ -84,7 +84,7 @@ export default function NewExamPage() {
     formState: { errors, isSubmitting },
   } = useForm<CreateExamValues>({
     resolver: zodResolver(createExamSchema),
-    defaultValues: { subjectId: NaN, purposeId: "", title: "", description: "" },
+    defaultValues: { subjectId: undefined, purposeId: "", title: "", description: "" },
   });
 
   const mutation = useCreateExamMutation();

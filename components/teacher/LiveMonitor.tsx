@@ -16,6 +16,7 @@ import {
 } from "@/lib/realtime/types";
 import { cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
+import { ParticipantModeration } from "./ParticipantModeration";
 
 const EVENT_LABEL: Record<string, string> = {
   SESSION_OPENED: "Session opened",
@@ -115,6 +116,8 @@ export function LiveMonitor({
         <span className="text-xs text-[#94A3B8]">{metrics.sessionStatus}</span>
       </div>
       <EventFeed events={recentEvents} participants={participants} />
+      <ParticipantModeration sessionId={sessionId} roster={rosterData ?? []}
+        editable={["DRAFT", "SCHEDULED", "OPEN"].includes(metrics.sessionStatus)} />
     </div>
   );
 }
