@@ -265,8 +265,9 @@ export function QuizMarkdownPreview({
 }: QuizMarkdownPreviewProps) {
   const analysis = analyzeQuizMarkdown(source);
   const generatedId = useId();
-  const canToggle =
-    !readOnly && onChange !== undefined && onQuestionSelect !== undefined;
+  // Toggling depends only on the source-change callback, never on the
+  // optional question-navigation callback.
+  const canToggle = !readOnly && onChange !== undefined;
 
   return (
     <section aria-labelledby={`${generatedId}-title`}>

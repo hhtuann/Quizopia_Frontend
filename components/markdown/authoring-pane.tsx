@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   QuizMarkdownCodeEditor,
   type QuizMarkdownCodeEditorHandle,
@@ -66,6 +66,38 @@ export function QuizMarkdownAuthoringPane({
 }: QuizMarkdownAuthoringPaneProps) {
   const editorRef = useRef<QuizMarkdownCodeEditorHandle>(null);
   const [activePane, setActivePane] = useState<Pane>("editor");
+  // Navigation requested while the editor pane is CSS-hidden (mobile preview
+  // mode): applied after the pane becomes visible, because focusing a hidden
+  // textarea is a no-op in real browsers.
+  const pendingNavigationRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (activePane !== "editor") {
+      return;
+    }
+    const pending = pendingNavigationRef.current;
+    if (pending !== null) {
+      pendingNavigationRef.current = null;
+      pending();
+    }
+  }, [activePane]);
+
+  const navigateEditor = (focus: (editor: QuizMarkdownCodeEditorHandle) => void) => {
+    if (activePane === "editor") {
+      const editor = editorRef.current;
+      if (editor !== null) {
+        focus(editor);
+      }
+      return;
+    }
+    pendingNavigationRef.current = () => {
+      const editor = editorRef.current;
+      if (editor !== null) {
+        focus(editor);
+      }
+    };
+    setActivePane("editor");
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -73,7 +105,9 @@ export function QuizMarkdownAuthoringPane({
         <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
           {title ?? "Quiz Markdown authoring"}
         </h2>
-        <PaneSwitch active={activePane} onChange={setActivePane} />
+        <div className="lg:hidden">
+          <PaneSwitch active={activePane} onChange={setActivePane} />
+        </div>
       </div>
 
       <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-2">
@@ -97,14 +131,18 @@ export function QuizMarkdownAuthoringPane({
           <QuizMarkdownPreview
             onChange={onChange}
             onDiagnosticSelect={(line, column) =>
-              editorRef.current?.focusLocation(line, column, {
-                suppressAutocomplete: true,
-              })
+              navigateEditor((editor) =>
+                editor.focusLocation(line, column, {
+                  suppressAutocomplete: true,
+                }),
+              )
             }
             onQuestionSelect={(question) =>
-              editorRef.current?.focusOffset(question.source.offset, {
-                suppressAutocomplete: true,
-              })
+              navigateEditor((editor) =>
+                editor.focusOffset(question.source.offset, {
+                  suppressAutocomplete: true,
+                }),
+              )
             }
             readOnly={readOnly}
             source={value}

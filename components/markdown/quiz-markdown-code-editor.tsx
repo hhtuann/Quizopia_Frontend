@@ -5,6 +5,7 @@ import {
   forwardRef,
   useCallback,
   useEffect,
+  useId,
   useImperativeHandle,
   useLayoutEffect,
   useMemo,
@@ -186,12 +187,26 @@ function fenceLength(line: string): number | null {
   return match ? match[1].length : null;
 }
 
-function highlightedLine(line: string, inFence: boolean): ReactNode {
+function highlightedLine(
+  line: string,
+  literal: "code" | "math" | null,
+): ReactNode {
+  if (literal === "math") {
+    // Display-math content is literal: only the delimiting `$$` is styled.
+    return (
+      <span className={line.trim() === "$$" ? "text-[#F59E0B]" : "text-[#64748B]"}>
+        {line}
+      </span>
+    );
+  }
   if (fenceLength(line) !== null) {
     return <span className="text-[#F59E0B]">{line}</span>;
   }
-  if (inFence) {
+  if (literal === "code") {
     return <span className="text-[#64748B]">{line}</span>;
+  }
+  if (line.trim() === "$$") {
+    return <span className="text-[#F59E0B]">{line}</span>;
   }
 
   const header =
@@ -249,21 +264,32 @@ function highlightedLine(line: string, inFence: boolean): ReactNode {
 function HighlightedSource({ value }: { readonly value: string }) {
   const lines = value.split(/\r\n|\r|\n/);
   let openFence: number | null = null;
+  let inMath = false;
 
   return lines.map((line, index) => {
-    const wasInFence = openFence !== null;
+    // Fence content wins over math (parser precedence); math wins over
+    // structural markers.
+    const literal: "code" | "math" | null =
+      openFence !== null ? "code" : inMath ? "math" : null;
+    const content = highlightedLine(line, literal);
     const currentFence = fenceLength(line);
-    const content = highlightedLine(line, wasInFence);
 
-    if (currentFence !== null) {
-      if (openFence === null) {
-        openFence = currentFence;
-      } else if (
+    if (openFence !== null) {
+      if (
+        currentFence !== null &&
         currentFence >= openFence &&
         line.slice(currentFence).trim() === ""
       ) {
         openFence = null;
       }
+    } else if (inMath) {
+      if (line.trim() === "$$") {
+        inMath = false;
+      }
+    } else if (line.trim() === "$$") {
+      inMath = true;
+    } else if (currentFence !== null) {
+      openFence = currentFence;
     }
 
     return (
@@ -279,6 +305,12 @@ export const QuizMarkdownCodeEditor = forwardRef<
   QuizMarkdownCodeEditorHandle,
   QuizMarkdownCodeEditorProps
 >(function QuizMarkdownCodeEditor({ disabled = false, onChange, value }, ref) {
+  // Instance-scoped IDs so multiple editors can coexist without label/ARIA
+  // collisions (label↔textarea, aria-controls, aria-activedescendant).
+  const sourceId = useId();
+  const titleId = useId();
+  const helpId = useId();
+  const suggestionsId = useId();
   const editorFrameRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLUListElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -552,15 +584,15 @@ export const QuizMarkdownCodeEditor = forwardRef<
 
   const activeSuggestionId =
     suggestions.length > 0
-      ? `quiz-markdown-suggestion-${suggestions[activeIndex]?.id}`
+      ? `${suggestionsId}-option-${suggestions[activeIndex]?.id}`
       : undefined;
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
       <label
         className="mb-2 block pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]"
-        htmlFor="quiz-markdown-source"
-        id="quiz-editor-title"
+        htmlFor={sourceId}
+        id={titleId}
       >
         Quiz Markdown source
       </label>
@@ -618,13 +650,16 @@ export const QuizMarkdownCodeEditor = forwardRef<
           <textarea
             aria-activedescendant={activeSuggestionId}
             aria-autocomplete="list"
-            aria-controls="quiz-markdown-suggestions"
-            aria-describedby="quiz-editor-help"
+            aria-controls={suggestionsId}
+            aria-describedby={helpId}
+            aria-expanded={suggestions.length > 0}
+            aria-haspopup="listbox"
+            role="combobox"
             autoCapitalize="off"
             autoCorrect="off"
             className="absolute inset-0 h-full w-full resize-none overflow-auto whitespace-pre bg-transparent px-4 py-3 font-mono font-normal text-transparent outline-none caret-[#0F172A] selection:bg-[#0052FF]/20 disabled:cursor-not-allowed"
             disabled={disabled}
-            id="quiz-markdown-source"
+            id={sourceId}
             onChange={handleChange}
             onClick={(event) => resetCaret(event.currentTarget)}
             onKeyDown={handleKeyDown}
@@ -669,7 +704,7 @@ export const QuizMarkdownCodeEditor = forwardRef<
           <ul
             aria-label="Quiz Markdown suggestions"
             className="absolute z-20 max-h-64 overflow-auto rounded-lg border border-[#E2E8F0] bg-white p-1 shadow-[0_10px_15px_rgba(0,0,0,0.08)]"
-            id="quiz-markdown-suggestions"
+            id={suggestionsId}
             ref={popupRef}
             role="listbox"
             style={{
@@ -687,7 +722,7 @@ export const QuizMarkdownCodeEditor = forwardRef<
                     ? "bg-[#0052FF] text-white"
                     : "text-[#0F172A] hover:bg-[#F1F5F9]"
                 }`}
-                id={`quiz-markdown-suggestion-${suggestion.id}`}
+                id={`${suggestionsId}-option-${suggestion.id}`}
                 key={suggestion.id}
                 onClick={() => acceptSuggestion(index)}
                 onMouseDown={handleSuggestionMouseDown}
@@ -705,7 +740,7 @@ export const QuizMarkdownCodeEditor = forwardRef<
           ? `${suggestions.length} Quiz Markdown suggestions available.`
           : ""}
       </p>
-      <p className="sr-only" id="quiz-editor-help">
+      <p className="sr-only" id={helpId}>
         Start questions with Câu and a type marker. Use arrow keys to browse
         suggestions, Tab or Enter to accept, Escape to dismiss.
       </p>

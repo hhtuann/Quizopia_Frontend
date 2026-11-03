@@ -61,36 +61,57 @@ describe("QuizMarkdownAuthoringPane", () => {
     expect(previewPane?.className).toContain("hidden");
   });
 
-  it("navigates the caret to a diagnostic location when its list item is clicked", () => {
+  it("switches back to the visible Editor pane before focusing a diagnostic (mobile navigation regression)", () => {
     const broken = "Câu 1 [bogus]: stem\n*A. a\nB. b\nC. c\nD. d";
     const { view } = setup(broken);
     fireEvent.click(view.getByRole("button", { name: "Preview" }));
 
+    const editorPane = view
+      .getByLabelText("Quiz Markdown source")
+      .closest("div.grid > div");
+    expect(editorPane?.className).toContain("hidden");
+
     const diagnosticButton = view
       .getAllByRole("button")
       .find((button) => button.textContent?.includes("UNKNOWN_QUESTION_TYPE"));
-    expect(diagnosticButton).toBeDefined();
     fireEvent.click(diagnosticButton!);
 
+    // Editor pane became visible before the caret was positioned.
+    expect(editorPane?.className).not.toContain("hidden");
     const textarea = view.getByLabelText(
       "Quiz Markdown source",
     ) as HTMLTextAreaElement;
     expect(document.activeElement).toBe(textarea);
-    // UNKNOWN_QUESTION_TYPE for Câu 1 points at column 8 → offset 7.
     expect(textarea.selectionStart).toBe(7);
+    // Source value and preview pane state preserved.
+    expect(textarea.value).toBe(broken);
   });
 
-  it("navigates the caret to a question source when its card header is clicked", () => {
+  it("switches back to the visible Editor pane before focusing a question source (mobile navigation regression)", () => {
     const { view } = setup(sample);
     fireEvent.click(view.getByRole("button", { name: "Preview" }));
 
+    const editorPane = view
+      .getByLabelText("Quiz Markdown source")
+      .closest("div.grid > div");
     fireEvent.click(
       view.getByRole("button", { name: /question 2, line 6/ }),
     );
+
+    expect(editorPane?.className).not.toContain("hidden");
     const textarea = view.getByLabelText(
       "Quiz Markdown source",
     ) as HTMLTextAreaElement;
     expect(document.activeElement).toBe(textarea);
     expect(textarea.selectionStart).toBe(sample.indexOf("Câu 2"));
+    expect(textarea.value).toBe(sample);
+  });
+
+  it("hides the Editor/Preview switch on desktop-sized viewports", () => {
+    const { view } = setup(sample);
+    const switchWrap = view
+      .getByRole("button", { name: "Editor" })
+      .closest("div.lg\\:hidden");
+    expect(switchWrap).not.toBeNull();
   });
 });

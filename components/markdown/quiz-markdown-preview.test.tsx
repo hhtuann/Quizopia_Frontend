@@ -202,3 +202,30 @@ describe("QuizMarkdownPreview", () => {
     expect(view.getByText(/Start a question with/)).not.toBeNull();
   });
 });
+
+describe("QuizMarkdownPreview standalone usage", () => {
+  it("toggles options with only an onChange callback (no navigation wiring)", () => {
+    const onChange = vi.fn();
+    function Standalone() {
+      const [source, setSource] = useState(
+        "Câu 1 [SINGLE_CHOICE]: 2+2?\n*A. 3\nB. 4\nC. 5\nD. 6",
+      );
+      return (
+        <QuizMarkdownPreview
+          onChange={(next) => {
+            onChange(next);
+            setSource(next);
+          }}
+          source={source}
+        />
+      );
+    }
+    const view = render(<Standalone />);
+    const target = optionButton(view, "B");
+    expect(target).toBeDefined();
+    fireEvent.click(target!);
+    expect(onChange).toHaveBeenCalledWith(
+      "Câu 1 [SINGLE_CHOICE]: 2+2?\nA. 3\n*B. 4\nC. 5\nD. 6",
+    );
+  });
+});

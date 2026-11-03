@@ -385,3 +385,96 @@ describe("QuizMarkdownCodeEditor NUMERIC_FILL answer marker autocomplete", () =>
     expect(screen.queryAllByRole("option")).toHaveLength(0);
   });
 });
+
+describe("QuizMarkdownCodeEditor display-math highlighting", () => {
+  it("styles structural-looking markers inside $$ blocks as literal content", () => {
+    const source =
+      "Câu 1 [SINGLE_CHOICE]: Compute\n$$\nCâu 99 [NUMERIC_FILL]: x^2\n*A. fake\n$$\n*A. real";
+    render(<EditorHarness initial={source} />);
+    const layer = screen.getByTestId("quiz-markdown-highlight-layer");
+
+    const spans = Array.from(layer.querySelectorAll("span"));
+    const fakeHeader = spans.find((node) =>
+      node.textContent?.startsWith("Câu 99"),
+    );
+    const fakeOption = spans.find((node) => node.textContent === "*A. fake");
+    const starSpans = spans.filter((node) => node.textContent === "*");
+    const realContent = spans.find((node) => node.textContent === " real");
+
+    expect(fakeHeader?.getAttribute("class")).toContain("64748B");
+    // Inside math, "*A. fake" stays ONE muted literal span — no green
+    // structural star exists inside the block.
+    expect(fakeOption?.getAttribute("class")).toContain("64748B");
+    expect(starSpans).toHaveLength(1);
+    // After the block closes, structural highlighting resumes.
+    expect(starSpans[0]?.getAttribute("class")).toContain("10B981");
+    expect(realContent?.getAttribute("class")).not.toContain("64748B");
+  });
+
+  it("styles the $$ delimiters themselves but keeps fence content outside math", () => {
+    const source = "```text\n$$\nCâu 9 [NUMERIC_FILL]: inside fence\n```\n$$";
+    render(<EditorHarness initial={source} />);
+    const layer = screen.getByTestId("quiz-markdown-highlight-layer");
+
+    const spans = Array.from(layer.querySelectorAll("span"));
+    const insideFence = spans.find((node) =>
+      node.textContent?.startsWith("Câu 9"),
+    );
+    const firstDelimiter = spans.find(
+      (node) => node.textContent === "$$" && node.getAttribute("class")?.includes("F59E0B"),
+    );
+    expect(insideFence?.getAttribute("class")).toContain("64748B");
+    expect(firstDelimiter).toBeDefined();
+  });
+});
+
+describe("QuizMarkdownCodeEditor multiple instances", () => {
+  it("scopes labels, suggestion listboxes and option ids per instance", () => {
+    function TwoEditors() {
+      const [left, setLeft] = useState("câu");
+      const [right, setRight] = useState("Câu 1 [NUMERIC_FILL]: v?\nĐ");
+      return (
+        <>
+          <QuizMarkdownCodeEditor onChange={setLeft} value={left} />
+          <QuizMarkdownCodeEditor onChange={setRight} value={right} />
+        </>
+      );
+    }
+    render(<TwoEditors />);
+
+    const editors = screen.getAllByLabelText<HTMLTextAreaElement>(
+      "Quiz Markdown source",
+    );
+    expect(editors).toHaveLength(2);
+    expect(editors[0]?.id).not.toBe(editors[1]?.id);
+
+    // Move each caret to its line end so both instances show suggestions:
+    // left → 4 question snippets, right → the single Đáp án: completion.
+    for (const editor of editors) {
+      fireEvent.select(editor, {
+        target: {
+          selectionStart: editor.value.length,
+          selectionEnd: editor.value.length,
+        },
+      });
+    }
+    const options = screen.getAllByRole("option");
+    expect(options.map((option) => option.textContent)).toEqual([
+      "Câu 1 [SINGLE_CHOICE]:",
+      "Câu 1 [MULTIPLE_CHOICE]:",
+      "Câu 1 [TRUE_FALSE_MATRIX]:",
+      "Câu 1 [NUMERIC_FILL]:",
+      "Đáp án:",
+    ]);
+    const ids = options.map((option) => option.id);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    // aria-controls of each textarea points at an existing listbox.
+    for (const editor of editors) {
+      const listboxId = editor.getAttribute("aria-controls");
+      expect(listboxId).not.toBeNull();
+      expect(document.getElementById(listboxId!)).not.toBeNull();
+      expect(editor.getAttribute("aria-expanded")).toBe("true");
+    }
+  });
+});
