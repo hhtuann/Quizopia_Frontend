@@ -16,6 +16,7 @@ import type { PublishedExamSummary, TeacherExamEditorResponse } from "@/lib/api/
 import type { NormalizedApiError } from "@/lib/api";
 import { DraftEditor } from "./DraftEditor";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { ExamDetailSectionHeader } from "./ExamDetailSectionHeader";
 
 export type ExamTab = "overview" | "questions" | "sessions";
 
@@ -373,8 +374,81 @@ function OverviewTab({
     { label: "Updated", value: formatDate(data.updatedAt) },
   ];
 
+  const statusLabel =
+    data.status === "PUBLISHED" ? "Published" : data.status === "ARCHIVED" ? "Archived" : "Draft";
+  const immutabilityNote =
+    data.status === "DRAFT"
+      ? "content stays editable until published."
+      : data.status === "ARCHIVED"
+        ? "content is immutable — duplicate the exam to reuse it."
+        : "published content is immutable — duplicate the exam to change it.";
+
   return (
     <div className="space-y-6">
+      <ExamDetailSectionHeader
+        title="Overview"
+        subtitle={
+          `${statusLabel} · ${questionCount} ${questionCount === 1 ? "question" : "questions"} · ` +
+          `${data.totalPoints} total point${data.totalPoints === 1 ? "" : "s"} · ${immutabilityNote}`
+        }
+        actions={
+          <>
+            {data.status === "DRAFT" && (
+              <>
+                <Button type="button" onClick={onOpenPublish} disabled={!canPublish || publishPending}>
+                  {publishPending ? "Publishing…" : "Publish exam"}
+                </Button>
+                {!canPublish && (
+                  <span className="text-xs font-medium text-[#64748B]">
+                    Save at least one question before publishing.
+                  </span>
+                )}
+              </>
+            )}
+            {data.status !== "DRAFT" && (
+              <Button type="button" variant="primary" onClick={onDuplicate} disabled={duplicatePending}>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2.5}
+                  stroke="currentColor"
+                  className="h-4 w-4"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M16.5 8.25V6a2.25 2.25 0 0 0-2.25-2.25H6A2.25 2.25 0 0 0 3.75 6v8.25A2.25 2.25 0 0 0 6 16.5h2.25m8.25-8.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-8.25A2.25 2.25 0 0 1 7.5 18v-7.5a2.25 2.25 0 0 1 2.25-2.25h6.75Z"
+                  />
+                </svg>
+                {duplicatePending ? "Duplicating…" : "Duplicate"}
+              </Button>
+            )}
+            {data.status === "PUBLISHED" && (
+              <Button type="button" variant="destructive" onClick={onOpenArchive} disabled={archivePending}>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2.5}
+                  stroke="currentColor"
+                  className="h-4 w-4"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"
+                  />
+                </svg>
+                {archivePending ? "Archiving…" : "Archive"}
+              </Button>
+            )}
+          </>
+        }
+      />
+
       {data.status === "ARCHIVED" && (
         <div
           role="status"
@@ -401,49 +475,8 @@ function OverviewTab({
         </div>
       )}
 
-      {/* Status actions */}
-      <div className={cn(cardVariants(), "flex flex-wrap items-center gap-3 p-4")}>
-        {data.status === "DRAFT" && (
-          <>
-            <Button type="button" onClick={onOpenPublish} disabled={!canPublish || publishPending}>
-              {publishPending ? "Publishing…" : "Publish exam"}
-            </Button>
-            {!canPublish && (
-              <span className="text-xs font-medium text-[#64748B]">
-                Save at least one question before publishing.
-              </span>
-            )}
-          </>
-        )}
-        {data.status === "PUBLISHED" && (
-          <>
-            <Button type="button" variant="outline" onClick={onDuplicate} disabled={duplicatePending}>
-              {duplicatePending ? "Duplicating…" : "Duplicate"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onOpenArchive}
-              disabled={archivePending}
-              className="text-[#EF4444] hover:bg-[#EF4444]/5"
-            >
-              {archivePending ? "Archiving…" : "Archive"}
-            </Button>
-            <span className="text-xs font-medium text-[#64748B]">
-              Published content is immutable — duplicate to change it.
-            </span>
-          </>
-        )}
-        {data.status === "ARCHIVED" && (
-          <Button type="button" variant="outline" onClick={onDuplicate} disabled={duplicatePending}>
-            {duplicatePending ? "Duplicating…" : "Duplicate"}
-          </Button>
-        )}
-      </div>
-
       {/* Metadata */}
       <div className={cn(cardVariants(), "p-6")}>
-        <h2 className="mb-4 font-display text-lg font-bold tracking-tight text-[#0F172A]">Details</h2>
         {data.description && (
           <p className="mb-4 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-4 py-3 text-sm leading-relaxed text-[#0F172A]">
             {data.description}
@@ -497,37 +530,39 @@ function SessionsTab({ examId, published }: { examId: number; published: boolean
     sort: "createdAt,desc",
   });
   const items: ExamSessionListItem[] = data?.items ?? [];
+  const total = data?.totalElements ?? (isPending ? "…" : 0);
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm font-medium text-[#64748B]">
-          Sessions of this exam ({data?.totalElements ?? (isPending ? "…" : 0)})
-        </p>
-        {published ? (
-          <Link
-            href={`/exams/${examId}/sessions/new`}
-            className={cn(buttonVariants({ variant: "primary" }), "gap-1.5")}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2.5}
-              stroke="currentColor"
-              className="h-4 w-4"
-              aria-hidden="true"
+      <ExamDetailSectionHeader
+        title="Sessions"
+        subtitle={`${total} session${total === 1 ? "" : "s"} · manage scheduling, participants, monitoring and results.`}
+        actions={
+          published ? (
+            <Link
+              href={`/exams/${examId}/sessions/new`}
+              className={cn(buttonVariants({ variant: "primary" }), "gap-1.5")}
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            New session
-          </Link>
-        ) : (
-          <span className="text-xs font-medium text-[#64748B]">
-            Publish the exam to create sessions.
-          </span>
-        )}
-      </div>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2.5}
+                stroke="currentColor"
+                className="h-4 w-4"
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              New session
+            </Link>
+          ) : (
+            <span className="text-xs font-medium text-[#64748B]">
+              Publish the exam to create sessions.
+            </span>
+          )
+        }
+      />
 
       <div className={cn(cardVariants(), "p-4 sm:p-6")}>
         {isPending ? (

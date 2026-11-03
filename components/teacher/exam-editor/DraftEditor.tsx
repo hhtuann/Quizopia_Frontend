@@ -17,6 +17,7 @@ import {
 import { QuestionPicker } from "./QuestionPicker";
 import { QuestionAnswerView } from "./QuestionAnswerView";
 import { QuestionEditor } from "@/components/teacher/QuestionEditor";
+import { ExamDetailSectionHeader } from "./ExamDetailSectionHeader";
 
 const iconBtn =
   "inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#64748B] outline-none transition-all duration-200 hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:opacity-40";
@@ -174,25 +175,25 @@ export function DraftEditor({
 
   return (
     <section className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
-            {readOnly ? "Questions (read-only)" : "Composition"}
-          </h2>
-          <p className="mt-1 text-xs font-medium text-[#64748B]">
+      <ExamDetailSectionHeader
+        title={readOnly ? "Questions (read-only)" : "Composition"}
+        subtitle={
+          <>
             {sections.length} section{sections.length === 1 ? "" : "s"} ·{" "}
             {allSourceIds.length} question{allSourceIds.length === 1 ? "" : "s"} ·{" "}
             {readOnly
               ? "published content is immutable — duplicate the exam to change it."
               : "positions follow insertion order."}
-          </p>
-        </div>
-        {!readOnly && (
-          <Button type="button" onClick={handleSave} disabled={!canSave}>
-            {mutation.isPending ? "Saving…" : "Save changes"}
-          </Button>
-        )}
-      </div>
+          </>
+        }
+        actions={
+          !readOnly ? (
+            <Button type="button" onClick={handleSave} disabled={!canSave}>
+              {mutation.isPending ? "Saving…" : "Save changes"}
+            </Button>
+          ) : undefined
+        }
+      />
 
       {savedNotice && (
         <div
