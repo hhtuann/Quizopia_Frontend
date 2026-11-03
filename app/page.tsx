@@ -8,6 +8,7 @@ import { Badge, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/hooks/useAuth";
 import { navItemsForRoles } from "@/lib/navigation";
+import { useActiveView } from "@/lib/view/store";
 import { useAvailableSessionsQuery } from "@/hooks/queries/use-student-attempts";
 import type { NormalizedApiError } from "@/lib/api";
 
@@ -21,21 +22,27 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function Home() {
   const { user } = useAuth();
+  const { canSwitch, effectiveView } = useActiveView();
 
   // Prefer the registered display name, fall back to the username, then a neutral greeting.
   const displayName = user?.displayName?.trim() || user?.username || "there";
 
   const roleLabel = useMemo(() => {
-    const known = user?.roles?.find((r) => ROLE_LABELS[r]);
-    if (known) return ROLE_LABELS[known];
-    const fallback = user?.roles?.[0];
-    return fallback ? (ROLE_LABELS[fallback] ?? fallback) : null;
-  }, [user]);
+    const roles = user?.roles ?? [];
+    if (roles.includes("ACADEMIC_ADMIN")) return ROLE_LABELS.ACADEMIC_ADMIN;
+    if (roles.includes("SYSTEM_ADMIN")) return ROLE_LABELS.SYSTEM_ADMIN;
+    if (roles.includes("TEACHER") && roles.includes("STUDENT")) {
+      return effectiveView === "STUDENT" ? ROLE_LABELS.STUDENT : ROLE_LABELS.TEACHER;
+    }
+    if (roles.includes("TEACHER")) return ROLE_LABELS.TEACHER;
+    if (roles.includes("STUDENT")) return ROLE_LABELS.STUDENT;
+    return null;
+  }, [user, effectiveView]);
 
   // Functional cards = the same role-filtered nav the sidebar uses, minus the Dashboard itself.
   const cards = useMemo(
-    () => navItemsForRoles(user?.roles).filter((item) => item.href !== "/"),
-    [user]
+    () => navItemsForRoles(user?.roles, effectiveView).filter((item) => item.href !== "/"),
+    [user, effectiveView]
   );
 
   // ONBOARD-3: detect a student with no school profile. The available-sessions
@@ -48,9 +55,13 @@ export default function Home() {
     && sessionsError?.kind === "api"
     && sessionsError?.code === "ATTEMPT_STUDENT_PROFILE_NOT_FOUND";
 
+  // Greeting follows the ACTIVE view for dual-capability accounts.
+  const inTeacherView = canSwitch
+    ? effectiveView === "TEACHER"
+    : (user?.roles?.includes("TEACHER") ?? false);
   const subtitle = isPendingStudent
     ? "Your account is awaiting school assignment."
-    : user?.roles?.includes("TEACHER")
+    : inTeacherView
       ? "Manage your question banks, build exams, and run live sessions."
       : user?.roles?.includes("STUDENT")
         ? "Jump into an available session or review your past attempts."

@@ -85,12 +85,30 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/admin/users", label: "Users", icon: UsersIcon, roles: ["SYSTEM_ADMIN"], description: "Manage user accounts and roles." },
 ];
 
-/** Items visible to the given roles. Falls back to the Dashboard-only set. */
-export function navItemsForRoles(roles?: string[] | null): NavItem[] {
-  if (!roles || roles.length === 0) {
-    return NAV_ITEMS.filter((i) => i.exact);
-  }
-  return NAV_ITEMS.filter((i) => i.roles.some((r) => roles.includes(r)));
+/** Route groups that belong to exactly one of the two switchable views. */
+export const TEACHER_VIEW_PREFIXES = ["/question-banks", "/exams", "/classes", "/exam-sessions"];
+export const STUDENT_VIEW_PREFIXES = ["/sessions", "/attempts"];
+
+/**
+ * Items visible to the given roles. Falls back to the Dashboard-only set.
+ *
+ * `activeView` (dual TEACHER+STUDENT accounts only) narrows the menu to one
+ * coherent view: items scoped to the OTHER view are hidden, shared items
+ * (Dashboard) and admin items (neither TEACHER nor STUDENT) always stay.
+ */
+export function navItemsForRoles(
+  roles?: string[] | null,
+  activeView?: "TEACHER" | "STUDENT" | null
+): NavItem[] {
+  const byRole = !roles || roles.length === 0
+    ? NAV_ITEMS.filter((i) => i.exact)
+    : NAV_ITEMS.filter((i) => i.roles.some((r) => roles.includes(r)));
+  if (!activeView) return byRole;
+  return byRole.filter(
+    (i) =>
+      !(i.roles.includes("TEACHER") || i.roles.includes("STUDENT")) ||
+      i.roles.includes(activeView)
+  );
 }
 
 /** Shared active-link predicate so Sidebar and the mobile drawer agree. */
