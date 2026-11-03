@@ -95,7 +95,7 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-12 z-50 w-80 origin-top-right rounded-xl border border-[#E2E8F0] bg-white shadow-lg">
+        <div className="fixed inset-x-4 top-[calc(var(--topbar-height)+0.5rem)] z-50 origin-top-right rounded-xl border border-[#E2E8F0] bg-white shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-80">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-[#E2E8F0] px-4 py-3">
             <span className="font-display text-sm font-bold text-[#0F172A]">Notifications</span>
@@ -112,7 +112,7 @@ export function NotificationBell() {
           </div>
 
           {/* List */}
-          <div className="max-h-96 overflow-y-auto">
+          <div className="max-h-[min(24rem,calc(100dvh-var(--topbar-height)-5rem))] overflow-y-auto overscroll-contain">
             {items.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-[#64748B]">No notifications</div>
             ) : (

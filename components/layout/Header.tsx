@@ -61,20 +61,21 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
   const isTeacher = user?.roles?.includes("TEACHER") ?? false;
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-[#E2E8F0] bg-white/80 backdrop-blur-md transition-all duration-300">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-20 items-center justify-between gap-4">
+    <header className="app-topbar w-full border-b border-[#E2E8F0] bg-white/95">
+      <div className="app-topbar-inner">
+        <div className="flex h-full items-center justify-between gap-2 sm:gap-4">
 
           {/* Logo brand — click returns to the Dashboard */}
           <Link href="/" aria-label="Go to dashboard" className="flex items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFAFA]">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] text-white shadow-[0_4px_14px_rgba(0,82,255,0.25)]">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                fill="none"
                 viewBox="0 0 24 24"
-                strokeWidth={2.5}
+                fill="currentColor"
+                strokeWidth={1.5}
                 stroke="currentColor"
                 className="w-6 h-6"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -83,13 +84,13 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
                 />
               </svg>
             </div>
-            <span className="font-display text-2xl tracking-tight text-[#0F172A]">
+            <span className="hidden font-display text-2xl tracking-tight text-[#0F172A] lg:inline">
               Quiz<span className="gradient-text">opia</span>
             </span>
           </Link>
 
           {/* Search bar - Desktop */}
-          <div className="hidden md:flex flex-1 max-w-md mx-8">
+          <div className="mx-4 hidden min-w-0 max-w-md flex-1 lg:mx-8 lg:flex">
             <div className="relative w-full">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-[#64748B]">
                 <svg
@@ -117,7 +118,7 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
           </div>
 
           {/* Header Actions - Profile / Mobile Menu Toggle */}
-          <div className="flex items-center gap-4">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-4">
 
             {/* Workspace switcher (TEACHER, Desktop) — UI preference only */}
             {isTeacher && <WorkspaceSwitcher />}
@@ -137,12 +138,12 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
                 <div className="h-6 w-6 rounded-full bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] flex items-center justify-center text-white font-bold text-xs">
                   {initials}
                 </div>
-                <span className="hidden sm:inline">{displayName}</span>
+                <span className="hidden max-w-32 truncate sm:inline xl:max-w-48">{displayName}</span>
               </button>
               {menuOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-[#E2E8F0] bg-white p-3 shadow-lg"
+                  className="absolute right-0 z-50 mt-2 max-h-[calc(100dvh-var(--topbar-height)-1rem)] w-64 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-[#E2E8F0] bg-white p-3 shadow-lg"
                 >
                   <div className="px-3 py-2">
                     <p className="truncate text-sm font-semibold text-[#0F172A]">{displayName}</p>
@@ -170,7 +171,7 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
             {/* Mobile Hamburger menu toggle button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="flex md:hidden h-11 w-11 items-center justify-center rounded-lg text-[#64748B] outline-none transition-all duration-200 hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFAFA]"
+              className="flex lg:hidden h-11 w-11 items-center justify-center rounded-lg text-[#64748B] outline-none transition-all duration-200 hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFAFA]"
               aria-label="Toggle navigation menu"
               aria-expanded={isMobileMenuOpen}
               aria-controls="mobile-navigation"

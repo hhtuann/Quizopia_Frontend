@@ -17,7 +17,7 @@ export default function Sidebar() {
   const items = navItemsForRoles(user?.roles);
 
   return (
-    <aside className="sticky top-20 hidden max-h-[calc(100vh-6rem)] self-start overflow-y-auto md:flex md:w-64 md:flex-col md:space-y-8 md:border-r md:border-[#E2E8F0] md:p-6">
+    <aside className="app-sidebar hidden border-r border-[#E2E8F0] bg-[#FAFAFA] p-4 lg:flex lg:flex-col lg:space-y-8">
       {/* Navigation */}
       <nav className="flex flex-col space-y-2" aria-label="Main navigation">
         {items.map((item) => {

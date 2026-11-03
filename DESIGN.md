@@ -251,12 +251,54 @@ This gradient appears on: primary buttons, featured badges, icon backgrounds, pr
 
 ### Spacing & Layout
 
-**Core Principle:** Generous, intentional whitespace is a primary design tool—but it's balanced by density within components.
+**Core Principle:** Quizopia uses an **Adaptive / Fluid Layout**. The application shell, topbar, main content and footer fill the available viewport width. Dashboard, administration, teacher and student workspaces use the space remaining beside navigation, including on ultrawide screens. Do not apply a centered fixed-width or global `max-w-*` container to the application.
 
-- **Section Spacing:** Large vertical padding (`py-28` to `py-44`) creates a calm, paced scrolling experience.
-- **Container Width:** `max-w-6xl` (72rem) for primary content. Centered with `mx-auto`.
-- **Component Density:** Within cards and components, spacing is tighter to create cohesive units that float in the generous section whitespace.
-- **Grid Gaps:** `gap-5` to `gap-8` between grid items. Slightly tighter than standard to maintain visual cohesion.
+- **Application Spacing:** Main content uses `1.5rem` vertical padding below desktop and `2rem` on desktop. Horizontal padding comes from `--page-gutter`; do not add a second container gutter to the footer or page root.
+- **Marketing Section Spacing:** Large vertical padding (`py-28` to `py-44`) is reserved for promotional sections, not application workspaces.
+- **Component Density:** Within cards and components, spacing is tighter to keep related controls together.
+- **Grid Gaps:** `gap-5` to `gap-8`; the shared `.adaptive-grid` uses `1.5rem`.
+
+#### Shared Layout Geometry
+
+`app/globals.css` is the source of truth for layout tokens. Header, Sidebar, AppShell and overlays must consume these tokens instead of duplicating offsets.
+
+| Viewport width | `--topbar-height` | `--page-gutter` | Primary navigation |
+| :------------- | :--------------- | :------------- | :----------------- |
+| Below 640px | `4rem` | `1rem` | Mobile drawer |
+| 640–1023px | `4rem` | `1.5rem` | Mobile drawer |
+| 1024–1919px | `5rem` | `2rem` | Fixed sidebar |
+| 1920px and above | `5rem` | `3rem` | Fixed sidebar |
+
+- `.app-shell`: `min-height: 100dvh`, with top padding equal to `--topbar-height`.
+- `.app-main`: fluid flex child with `min-width: 0`; from 1024px, its left margin equals `--sidebar-width` (`16rem`). No global maximum width.
+- `.app-sidebar`: fixed at the left edge, from `--topbar-height` to the viewport bottom; independently scrollable when navigation exceeds the available height. Visible only from 1024px.
+- Footer stays in normal document flow inside main and follows its available width.
+
+#### Content Width by Purpose
+
+Width limits are local readability or interaction constraints, never an application-wide shell constraint. Existing narrower form cards, authentication panels and dialogs may retain their local limits.
+
+| Primitive | Contract | Typical use |
+| :-------- | :------- | :---------- |
+| `.page-fluid` | `width: 100%; min-width: 0`, no maximum | Dashboard, lists, tables, management and editing workspaces |
+| `.page-form` | Fluid up to `48rem`, start-aligned by default | Focused forms; narrower cards are allowed |
+| `.page-reading` | Fluid up to `70ch`, locally centered | Long-form reading content |
+| `.page-marketing` | Fluid up to `90rem`, locally centered | Explicit promotional sections only |
+
+Use `.adaptive-grid` for collections that should adapt to available content width: `repeat(auto-fit, minmax(min(100%, 18rem), 1fr))`. Use explicit responsive columns where content requires them. Flex/grid children must be able to shrink (`min-w-0`, `minmax(0, 1fr)`), text must wrap or truncate deliberately, and wide tables must scroll inside a local wrapper. Do not hide application-wide horizontal overflow to mask layout defects.
+
+#### Fixed Topbar & Scroll Ownership
+
+- `.app-topbar` is **fixed**, full viewport width, at `inset: 0 0 auto`, with height `--topbar-height`. Its inner row uses the shared gutter, without a centered width cap.
+- The shell reserves the topbar height exactly once. Do not add page-level topbar spacers or hard-coded `top-20` offsets. Document anchors use `scroll-padding-top: calc(var(--topbar-height) + 1rem)`.
+- The document is the normal page scroller; keep shell/main in normal flow without nested page-height scroll containers. `scrollbar-gutter: stable` reserves scrollbar space without forcing a permanent scrollbar.
+- Do not add `transform`, `filter`, `backdrop-filter` or containment to ancestors of viewport-fixed overlays: these can re-anchor them. Do not clip menus with shell/main overflow rules.
+- On widths below 1024px, the drawer occupies the area below the topbar, with its own scroll area and a dismissible backdrop. While open, document scrolling is locked and main content is `inert`. Escape, a navigation link, the toggle or backdrop closes it; crossing into desktop closes it too. Opening moves focus into navigation and closing restores the prior focus.
+- Keep topbar actions within the available width: compact branding/profile labels on small screens, bounded/truncated display names, and desktop search only from 1024px. Popovers need viewport-bounded widths/heights and local scrolling.
+
+**Layer tokens:** sidebar `--z-sidebar: 20`, mobile drawer `--z-drawer: 30`, topbar `--z-topbar: 40`, exam surface `--z-exam: 45`, modal `--z-modal: 50`. These are root-layer priorities; a child popover remains inside its parent's stacking context even with a higher local z-index.
+
+**Exam workspace exception:** `AttemptShell` intentionally covers the application with a viewport-fixed fluid surface above the topbar. It locks document scrolling (restoring the prior setting on unmount), keeps its wrapping exam toolbar outside the dedicated content scroller, and uses a fluid question column plus an `18rem` navigator from 1024px. Question content may be locally limited to `80ch` for readability; the exam shell itself has no centered fixed-width cap. Question anchor offsets are relative to the exam scroller, not the application topbar.
 
 **Asymmetry Patterns:**
 - Hero: `grid-cols-[1.1fr_0.9fr]` — Left-heavy for text dominance
@@ -438,6 +480,10 @@ const stagger = {
 
 **Breakpoint Philosophy:** Mobile layouts simplify structure but maintain the bold aesthetic. Touch targets are 44px+ minimum.
 
+**Application contract:** Apply the Adaptive / Fluid Layout and Fixed Topbar rules above to every role workspace. Navigation switches at 1024px (`lg`), not `md`. Content adapts to its available width; wider monitors increase usable workspace instead of adding empty outer margins. Forms, reading content, dialogs and authentication panels retain purposeful local width limits.
+
+The following patterns describe **marketing sections**, not mandatory structures or spacing for application pages:
+
 - **Hero:** Single column. Hide abstract graphic on small screens. Stack CTAs vertically with full width (`w-full sm:w-auto`).
 - **Stats:** 2 columns on mobile → 4 columns on desktop with vertical dividers hidden on mobile
 - **Features:** 1 column → 2 columns (md) → 3 columns (lg) with first card spanning on larger screens
@@ -448,7 +494,7 @@ const stagger = {
 
 **Key Adaptations:**
 - Reduce headline sizes: `text-[2.75rem]` mobile → `text-6xl` → `text-[5.25rem]` desktop
-- Maintain generous section padding: `py-28` → `py-44` (reduce slightly, not dramatically)
+- Marketing sections maintain generous padding: `py-28` → `py-44`; application pages use the shared main padding and gutter tokens
 - Hide decorative elements on mobile: rotating rings, complex graphics (use `hidden lg:block`)
 - Keep gradient accents and color inversions—these define the style
 - Button heights: `h-12` to `h-14` for primary CTAs (44px-56px touch targets)
@@ -484,7 +530,7 @@ const stagger = {
 All components (Button, Card, Input) are built locally using `cva` and `tailwind-merge`, following Shadcn API patterns but tailored to this design system.
 
 **CSS Custom Properties:**
-The StyleWrapper component injects all design tokens as CSS custom properties, allowing for consistent theming across all components.
+`app/globals.css` defines theme tokens in Tailwind's `@theme` and shared layout geometry/layer tokens in `:root`. The root layout imports this stylesheet; shared layout components consume its classes and variables directly.
 
 **Font Loading:**
 Fonts are loaded via Google Fonts:
