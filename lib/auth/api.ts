@@ -1,10 +1,14 @@
 import { http } from "@/lib/api";
 import type {
+  AuthProvidersResponse,
   CurrentUserResponse,
   LoginRequest,
   RegisterRequest,
   RegisterResponse,
+  ResendOtpResponse,
   TokenResponse,
+  VerifyEmailRequest,
+  VerifyEmailResponse,
 } from "./types";
 
 /**
@@ -32,4 +36,20 @@ export const authApi = {
   /** `GET /api/auth/me` → 200 `CurrentUserResponse`. */
   me: (): Promise<CurrentUserResponse> =>
     http.get<CurrentUserResponse>("/api/auth/me"),
+
+  /** `POST /api/auth/verify-email` → 200 (Identity-M1). Idempotent for verified accounts. */
+  verifyEmail: (req: VerifyEmailRequest): Promise<VerifyEmailResponse> =>
+    http.post<VerifyEmailResponse>("/api/auth/verify-email", req),
+
+  /** `POST /api/auth/verify-email/resend` → 200 with the cooldown window (Identity-M1). */
+  resendVerificationOtp: (email: string): Promise<ResendOtpResponse> =>
+    http.post<ResendOtpResponse>("/api/auth/verify-email/resend", { email }),
+
+  /** `GET /api/auth/providers` → which SSO providers are configured. */
+  providers: (): Promise<AuthProvidersResponse> =>
+    http.get<AuthProvidersResponse>("/api/auth/providers"),
+
+  /** `POST /api/auth/oauth/exchange` → 200 `TokenResponse` (one-time code from the OIDC callback). */
+  exchangeOauthCode: (code: string): Promise<TokenResponse> =>
+    http.post<TokenResponse>("/api/auth/oauth/exchange", { code }),
 };

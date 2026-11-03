@@ -3,12 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  useForm,
-  useWatch,
-  type FieldPath,
-  type UseFormRegister,
-} from "react-hook-form";
+import { useForm, type FieldPath, type UseFormRegister } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, type RegisterValues } from "@/lib/validation/auth-schemas";
 import { Button, Card, Input } from "@/components/ui";
@@ -16,6 +11,9 @@ import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/hooks/useAuth";
 import { RedirectIfAuthenticated } from "@/components/auth/RedirectIfAuthenticated";
 import type { NormalizedApiError } from "@/lib/api";
+
+/** sessionStorage key holding the email pending verification (never the OTP). */
+export const PENDING_VERIFICATION_EMAIL = "quizopia.pendingVerificationEmail";
 
 function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null;
@@ -96,8 +94,6 @@ export default function RegisterPage() {
   const {
     register: field,
     handleSubmit,
-    control,
-    setValue,
     setError,
     formState: { errors, isSubmitting },
   } = useForm<RegisterValues>({
@@ -108,18 +104,23 @@ export default function RegisterPage() {
       password: "",
       displayName: "",
       phone: "",
-      accountType: "STUDENT",
-      teacherInviteCode: "",
     },
   });
-
-  const accountType = useWatch({ control, name: "accountType" });
 
   const onSubmit = async (values: RegisterValues) => {
     setFormError(null);
     try {
-      await registerAction(values);
-      router.replace("/login?registered=1");
+      const created = await registerAction(values);
+      // Identity-M1: every new account is STUDENT and must verify an email
+      // OTP before login. Carry the address in sessionStorage (not the URL)
+      // so the OTP screen can prefill and the browser history stays PII-free.
+      try {
+        sessionStorage.setItem(PENDING_VERIFICATION_EMAIL, created.email);
+      } catch {
+        // sessionStorage unavailable (private mode): the OTP screen falls
+        // back to asking for the email.
+      }
+      router.replace("/verify-email");
     } catch (err) {
       const norm = err as NormalizedApiError;
       if (norm?.kind === "api") {
@@ -129,9 +130,6 @@ export default function RegisterPage() {
             break;
           case "AUTH_EMAIL_ALREADY_EXISTS":
             setError("email", { message: "This email is already registered." });
-            break;
-          case "AUTH_TEACHER_INVITE_INVALID":
-            setError("teacherInviteCode", { message: "Invalid teacher invite code." });
             break;
           case "AUTH_VALIDATION_ERROR":
             setFormError("Please check the highlighted fields and try again.");
@@ -147,11 +145,6 @@ export default function RegisterPage() {
     }
   };
 
-  const accountOptions: { value: "STUDENT" | "TEACHER"; label: string; hint: string }[] = [
-    { value: "STUDENT", label: "Student", hint: "Take quizzes" },
-    { value: "TEACHER", label: "Teacher", hint: "Create quizzes" },
-  ];
-
   return (
     <RedirectIfAuthenticated to="/">
       <main className="flex min-h-screen items-center justify-center bg-[#FAFAFA] px-4 py-12">
@@ -161,7 +154,7 @@ export default function RegisterPage() {
               Create your <span className="gradient-text">account</span>
             </h1>
             <p className="mt-2 text-sm font-medium text-[#64748B]">
-              Join Quizopia in seconds
+              Join Quizopia as a learner in seconds
             </p>
           </div>
 
@@ -191,37 +184,6 @@ export default function RegisterPage() {
             )}
 
             <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-              {/* Account type toggle */}
-              <fieldset>
-                <legend className="mb-2 block pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
-                  Account type
-                </legend>
-                <div className="grid grid-cols-2 gap-3">
-                  {accountOptions.map((opt) => {
-                    const selected = accountType === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        aria-pressed={selected}
-                        onClick={() =>
-                          setValue("accountType", opt.value, { shouldValidate: true })
-                        }
-                        className={cn(
-                          "flex flex-col items-start gap-0.5 rounded-lg border p-4 text-left outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFAFA]",
-                          selected
-                            ? "border-[#0052FF] bg-[#0052FF]/5 text-[#0052FF] shadow-[0_4px_14px_rgba(0,82,255,0.15)]"
-                            : "border-[#E2E8F0] bg-white text-[#64748B] hover:border-[#0052FF]/30 hover:bg-[#F1F5F9] hover:text-[#0F172A]"
-                        )}
-                      >
-                        <span className="text-sm font-bold">{opt.label}</span>
-                        <span className="text-xs font-medium opacity-80">{opt.hint}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </fieldset>
-
               <LabeledInput
                 id="username"
                 label="Username"
@@ -270,22 +232,10 @@ export default function RegisterPage() {
                 register={field}
               />
 
-
-              {accountType === "TEACHER" && (
-                <div>
-                  <LabeledInput
-                    id="teacherInviteCode"
-                    label="Teacher invite code (optional)"
-                    name="teacherInviteCode"
-                    placeholder="Have a code from your school? Enter it here"
-                    error={errors.teacherInviteCode?.message}
-                    register={field}
-                  />
-                  <p className="mt-1.5 pl-1 text-xs font-medium text-[#64748B]">
-                    No code? No problem — you&apos;ll start in your personal workspace and can join a school later.
-                  </p>
-                </div>
-              )}
+              <p className="pl-1 text-xs font-medium text-[#64748B]">
+                Every account starts as a learner. You can register as a teacher
+                from the app menu once you&apos;re signed in.
+              </p>
 
               <Button type="submit" disabled={isSubmitting} className="w-full">
                 {isSubmitting ? "Creating account…" : "Create account"}

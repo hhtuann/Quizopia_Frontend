@@ -26,17 +26,13 @@ export interface LoginRequest {
   password: string;
 }
 
-/** Backend record `RegisterRequest(...)`. */
+/** Backend record `RegisterRequest(...)` (Identity-M1: STUDENT-only, no role choice). */
 export interface RegisterRequest {
   username: string;
   email: string;
   password: string;
   displayName: string;
   phone: string;
-  /** `null`/`undefined` defaults to STUDENT server-side. */
-  accountType?: AccountType | null;
-  /** Required only when `accountType === "TEACHER"`. */
-  teacherInviteCode?: string | null;
 }
 
 /** Backend record `TokenResponse(...)`. Refresh token is HttpOnly-only. */
@@ -52,7 +48,7 @@ export interface TokenResponse {
   roles: string[];
 }
 
-/** Backend record `RegisterResponse(...)`. No ciphertext/hash/token echoed. */
+/** Backend record `RegisterResponse(...)` (Identity-M1 verification fields). */
 export interface RegisterResponse {
   id: number;
   username: string;
@@ -61,6 +57,31 @@ export interface RegisterResponse {
   phone: string;
   status: UserStatus;
   roles: string[];
+  /** Always true for new registrations (Identity-M1). */
+  emailVerificationRequired: boolean;
+  /** Whether the OTP mail was accepted by the transport. */
+  emailSent: boolean;
+}
+
+/** Backend record `VerifyEmailRequest(email, otp)` for `POST /api/auth/verify-email`. */
+export interface VerifyEmailRequest {
+  email: string;
+  otp: string;
+}
+
+/** Response of `POST /api/auth/verify-email`. */
+export interface VerifyEmailResponse {
+  verified: boolean;
+}
+
+/** Response of `POST /api/auth/verify-email/resend`. */
+export interface ResendOtpResponse {
+  resendCooldownSeconds: number;
+}
+
+/** Response of `GET /api/auth/providers` (which SSO buttons to render). */
+export interface AuthProvidersResponse {
+  googleEnabled: boolean;
 }
 
 /** Backend record `CurrentUserResponse(...)` for `GET /api/auth/me`. */
@@ -71,6 +92,8 @@ export interface CurrentUserResponse {
   displayName: string;
   phone: string;
   status: UserStatus;
+  /** Identity-M1: email verified (OTP or trusted OIDC provider). */
+  emailVerified: boolean;
   roles: string[];
   permissions: string[];
 }
