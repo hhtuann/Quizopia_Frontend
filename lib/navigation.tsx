@@ -25,6 +25,12 @@ export interface NavItem {
   /** Additional path prefixes that should mark this nav item as active
    * (e.g. "/attempts" for the "My attempts" item whose href is "/attempts"). */
   alsoActive?: string[];
+  /**
+   * Identity-M2: which active view owns this item. "shared" items (dashboard,
+   * admin) render in every view; student/teacher items render only when the
+   * user's activeView matches AND the roles permit.
+   */
+  view?: "student" | "teacher" | "shared";
 }
 
 const ICON = "w-5 h-5";
@@ -74,15 +80,15 @@ const UserPlusIcon = (
 );
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Dashboard", icon: DashboardIcon, roles: ["STUDENT", "TEACHER", "ACADEMIC_ADMIN", "SYSTEM_ADMIN"], exact: true },
-  { href: "/sessions", label: "Available sessions", icon: ExamIcon, roles: ["STUDENT"], description: "Browse open exam sessions and join one when you’re ready." },
-  { href: "/attempts", label: "My attempts", icon: ClockIcon, roles: ["STUDENT"], description: "Review your past attempts and their detailed results." },
-  { href: "/question-banks", label: "Question banks", icon: BankIcon, roles: ["TEACHER"], description: "Build and organize reusable collections of questions." },
-  { href: "/exams", label: "Exams", icon: ExamIcon, roles: ["TEACHER"], description: "Assemble exams from your question banks and run their sessions." },
-  { href: "/classes", label: "Classes", icon: UsersIcon, roles: ["TEACHER"], description: "Manage your classes and student rosters." },
-  { href: "/admin/subjects", label: "Subjects", icon: ClipboardListIcon, roles: ["ACADEMIC_ADMIN"], description: "Manage subjects across your school." },
-  { href: "/admin/pending-students", label: "Pending Students", icon: UserPlusIcon, roles: ["ACADEMIC_ADMIN"], description: "Assign pending students to a school." },
-  { href: "/admin/users", label: "Users", icon: UsersIcon, roles: ["SYSTEM_ADMIN"], description: "Manage user accounts and roles." },
+  { href: "/", label: "Dashboard", icon: DashboardIcon, roles: ["STUDENT", "TEACHER", "ACADEMIC_ADMIN", "SYSTEM_ADMIN"], exact: true, view: "shared" },
+  { href: "/sessions", label: "Available sessions", icon: ExamIcon, roles: ["STUDENT"], view: "student", description: "Browse open exam sessions and join one when you’re ready." },
+  { href: "/attempts", label: "My attempts", icon: ClockIcon, roles: ["STUDENT"], view: "student", description: "Review your past attempts and their detailed results." },
+  { href: "/question-banks", label: "Question banks", icon: BankIcon, roles: ["TEACHER"], view: "teacher", description: "Build and organize reusable collections of questions." },
+  { href: "/exams", label: "Exams", icon: ExamIcon, roles: ["TEACHER"], view: "teacher", description: "Assemble exams from your question banks and run their sessions." },
+  { href: "/classes", label: "Classes", icon: UsersIcon, roles: ["TEACHER"], view: "teacher", description: "Manage your classes and student rosters." },
+  { href: "/admin/subjects", label: "Subjects", icon: ClipboardListIcon, roles: ["ACADEMIC_ADMIN"], view: "shared", description: "Manage subjects across your school." },
+  { href: "/admin/pending-students", label: "Pending Students", icon: UserPlusIcon, roles: ["ACADEMIC_ADMIN"], view: "shared", description: "Assign pending students to a school." },
+  { href: "/admin/users", label: "Users", icon: UsersIcon, roles: ["SYSTEM_ADMIN"], view: "shared", description: "Manage user accounts and roles." },
 ];
 
 /** Items visible to the given roles. Falls back to the Dashboard-only set. */
@@ -91,6 +97,20 @@ export function navItemsForRoles(roles?: string[] | null): NavItem[] {
     return NAV_ITEMS.filter((i) => i.exact);
   }
   return NAV_ITEMS.filter((i) => i.roles.some((r) => roles.includes(r)));
+}
+
+/**
+ * Identity-M2: items visible in the given active view — "shared" items always,
+ * view-specific items only when the activeView matches AND the roles permit.
+ * Falls back to the Dashboard-only set for anonymous/empty roles.
+ */
+export function navItemsForView(roles: string[] | null | undefined, view: "student" | "teacher"): NavItem[] {
+  if (!roles || roles.length === 0) {
+    return NAV_ITEMS.filter((i) => i.exact);
+  }
+  return NAV_ITEMS.filter(
+    (i) => (i.view ?? "shared") === "shared" || i.view === view,
+  ).filter((i) => i.roles.some((r) => roles.includes(r)));
 }
 
 /** Shared active-link predicate so Sidebar and the mobile drawer agree. */

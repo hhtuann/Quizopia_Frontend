@@ -9,7 +9,9 @@ import Footer from "./Footer";
 import { cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/hooks/useAuth";
-import { navItemsForRoles, isActive } from "@/lib/navigation";
+import { navItemsForView, isActive } from "@/lib/navigation";
+import { useActiveView } from "@/lib/view/store";
+import { ViewTransitionOverlay, TEACHER_TRANSITION_MESSAGE, STUDENT_TRANSITION_MESSAGE } from "./ViewTransitionOverlay";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -17,16 +19,35 @@ interface AppShellProps {
 
 /**
  * Application shell: Header + Sidebar + content + Footer, plus a mobile drawer
- * that mirrors the sidebar's role-filtered items (single source of truth in
- * `lib/navigation`). No fake tab state — navigation is real `<Link>`s and active
- * highlighting comes from `usePathname`.
+ * that mirrors the sidebar's items (single source of truth in
+ * `lib/navigation`, filtered by the active view). No fake tab state —
+ * navigation is real `<Link>`s and active highlighting comes from
+ * `usePathname`. The view-transition overlay lives here so every view switch
+ * (menu-driven) covers the whole shell exactly once.
  */
 export default function AppShell({ children }: AppShellProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const { user } = useAuth();
-  const items = navItemsForRoles(user?.roles);
+  const { view, changeView } = useActiveView();
+  const items = navItemsForView(user?.roles, view);
+  const [transitionMessage, setTransitionMessage] = useState<string | null>(null);
   const drawerRef = useRef<HTMLElement>(null);
+
+  /** Menu-driven view switch with the overlay and no artificial delay. */
+  const switchView = (next: "student" | "teacher") => {
+    if (next === view) return;
+    setTransitionMessage(next === "teacher" ? TEACHER_TRANSITION_MESSAGE : STUDENT_TRANSITION_MESSAGE);
+    try {
+      changeView(next);
+      // Close after the next paint: the new view's nav is rendered in the
+      // same commit, so the overlay hides as soon as the switch lands.
+      requestAnimationFrame(() => requestAnimationFrame(() => setTransitionMessage(null)));
+    } catch {
+      // Error recovery: never leave the user stuck on the overlay.
+      setTransitionMessage(null);
+    }
+  };
 
   useEffect(() => {
     if (!isMobileMenuOpen) return;
@@ -50,7 +71,12 @@ export default function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="app-shell flex flex-col bg-[#FAFAFA] text-[#0F172A]">
-      <Header isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+      <Header
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
+        onViewSwitch={switchView}
+      />
+      <ViewTransitionOverlay open={transitionMessage !== null} message={transitionMessage ?? ""} />
 
       {/* Main layout area */}
       <div className="flex w-full min-w-0 flex-1">

@@ -26,6 +26,8 @@ interface AuthContextValue {
   status: AuthStatus;
   login: (req: LoginRequest) => Promise<CurrentUserResponse>;
   register: (req: RegisterRequest) => Promise<RegisterResponse>;
+  /** Identity-M2: re-fetches /api/auth/me into the store (e.g. after a role upgrade). */
+  refreshUser: () => Promise<CurrentUserResponse>;
   logout: () => Promise<void>;
 }
 
@@ -86,6 +88,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return authApi.register(req);
   }, []);
 
+  /** Identity-M2: pulls the freshest identity (roles) into the store. */
+  const refreshUser = useCallback(async () => {
+    const me = await authApi.me();
+    useAuthStore.getState().setUser(me);
+    return me;
+  }, []);
+
   const qc = useQueryClient();
 
   const logout = useCallback(async () => {
@@ -100,8 +109,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [qc]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ status, login, register, logout }),
-    [status, login, register, logout]
+    () => ({ status, login, register, refreshUser, logout }),
+    [status, login, register, refreshUser, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -52,4 +52,11 @@ export const authApi = {
   /** `POST /api/auth/oauth/exchange` → 200 `TokenResponse` (one-time code from the OIDC callback). */
   exchangeOauthCode: (code: string): Promise<TokenResponse> =>
     http.post<TokenResponse>("/api/auth/oauth/exchange", { code }),
+
+  /**
+   * `POST /api/auth/upgrade-teacher` → 200 with the effective roles
+   * (Identity-M2). Self-service TEACHER grant; idempotent, no body.
+   */
+  upgradeToTeacher: (): Promise<{ roles: string[] }> =>
+    http.post<{ roles: string[] }>("/api/auth/upgrade-teacher"),
 };

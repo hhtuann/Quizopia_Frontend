@@ -5,15 +5,15 @@ import { useAuthContext } from "@/components/providers/AuthProvider";
 
 /**
  * Single auth hook for components. Reads auth DATA (user, accessToken) from the
- * FE3 zustand store and auth STATUS + actions (login/register/logout) from the
- * AuthProvider context.
+ * FE3 zustand store and auth STATUS + actions (login/register/refreshUser/
+ * logout) from the AuthProvider context.
  *
  * Must be used inside <AuthProvider> (which is composed in app/layout.tsx).
  */
 export function useAuth() {
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
-  const { status, login, register, logout } = useAuthContext();
+  const { status, login, register, refreshUser, logout } = useAuthContext();
 
   return {
     user,
@@ -23,6 +23,8 @@ export function useAuth() {
     isLoading: status === "loading",
     login,
     register,
+    /** Identity-M2: re-fetches the identity (roles) after e.g. an upgrade. */
+    refreshUser,
     logout,
   };
 }
