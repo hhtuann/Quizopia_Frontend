@@ -104,6 +104,51 @@ function diagnostic(
   return { code, questionNumber, line, column, message };
 }
 
+/**
+ * Java `Character.isWhitespace`-compatible set, matching the authoritative
+ * backend parser (Quizopia_Backend PR #3). Unlike `String.prototype.trim()`,
+ * this EXCLUDES the non-breaking spaces U+00A0, U+2007, U+202F and the BOM
+ * U+FEFF, which Java `String.strip()` leaves untouched. ASCII behavior is
+ * identical to `trim()`.
+ */
+const JAVA_WHITESPACE =
+  /[\t\n\u000B\f\r\u001C-\u001F\u0020\u1680\u2000-\u2006\u2008-\u200A\u2028\u2029\u205F\u3000]/;
+
+/** Mirrors Java `String.strip()` for the NUMERIC_FILL answer token. */
+function stripLikeJava(token: string): string {
+  let start = 0;
+  let end = token.length;
+  while (start < end && JAVA_WHITESPACE.test(token[start]!)) {
+    start += 1;
+  }
+  while (end > start && JAVA_WHITESPACE.test(token[end - 1]!)) {
+    end -= 1;
+  }
+  return token.slice(start, end);
+}
+
+function javaWhitespacePrefixLength(value: string): number {
+  let count = 0;
+  while (count < value.length && JAVA_WHITESPACE.test(value[count]!)) {
+    count += 1;
+  }
+  return count;
+}
+
+/** Column of the `[TYPE]` token: `Câu `.length + digits + ` [`.length + 1. */
+function questionTypeColumn(questionNumber: number): number {
+  return "Câu ".length + String(questionNumber).length + 3;
+}
+
+/** Column of the numeric token after `Đáp án:` + leading whitespace (Java parity). */
+function numericAnswerColumn(answerRaw: string | null): number {
+  return (
+    "Đáp án:".length +
+    (answerRaw === null ? 0 : javaWhitespacePrefixLength(answerRaw)) +
+    1
+  );
+}
+
 function sourceLines(source: string): string[] {
   return source.split(/\r\n|\r|\n/);
 }
@@ -177,7 +222,7 @@ function isAcceptedType(type: string): type is QuizQuestionType {
 }
 
 export function isValidNumericAnswerToken(raw: string): boolean {
-  const token = raw.trim();
+  const token = stripLikeJava(raw);
   if (token.length !== 4 || !/[0-9]/.test(token)) {
     return false;
   }
@@ -276,6 +321,24 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
 
     const header = QUESTION_HEADER.exec(line);
     if (header) {
+      const parsedNumber = Number.parseInt(header[1], 10);
+      // Java Integer.parseInt rejects anything above Integer.MAX_VALUE with
+      // MALFORMED_QUESTION_HEADER (Backend PR #3); Number.parseInt would keep
+      // an unsafe float instead.
+      if (!Number.isSafeInteger(parsedNumber) || parsedNumber > 0x7fffffff) {
+        diagnostics.push(
+          diagnostic(
+            "MALFORMED_QUESTION_HEADER",
+            null,
+            lineNumber,
+            5,
+            "Question number is outside the supported integer range",
+          ),
+        );
+        current = null;
+        target = "none";
+        return;
+      }
       current = {
         answerCompleteAtExplanation: false,
         answerCount: 0,
@@ -285,7 +348,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
         explanationLine: null,
         explanationSeen: false,
         headerLine: lineNumber,
-        number: Number.parseInt(header[1], 10),
+        number: parsedNumber,
         options: [],
         stem: [header[3].startsWith(" ") ? header[3].slice(1) : header[3]],
         type: header[2],
@@ -418,7 +481,9 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
       current.answerCompleteAtExplanation = isAcceptedType(current.type)
         ? current.type === "NUMERIC_FILL"
           ? current.answerCount === 1 &&
-            (current.answerRaw?.trim().length ?? 0) > 0
+            (current.answerRaw === null
+              ? false
+              : stripLikeJava(current.answerRaw).length > 0)
           : orderedOptionsComplete(current.options)
         : false;
       const suffix = line.slice(EXPLANATION_PREFIX.length);
@@ -545,7 +610,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
           "UNKNOWN_QUESTION_TYPE",
           question.number,
           question.headerLine,
-          1,
+          questionTypeColumn(question.number),
           `Unknown or incorrectly cased question type: ${question.type}`,
         ),
       );
@@ -592,7 +657,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
             "NUMERIC_ANSWER_INVALID",
             question.number,
             question.answerLine ?? question.headerLine,
-            1,
+            numericAnswerColumn(question.answerRaw),
             "Numeric answer must be exactly four ASCII characters and follow the accepted '-' and '.' rules",
           ),
         );
@@ -719,7 +784,8 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
         ? question.explanation.join("\n")
         : null,
       number: question.number,
-      numericAnswer: question.answerRaw?.trim() ?? null,
+      numericAnswer:
+        question.answerRaw === null ? null : stripLikeJava(question.answerRaw),
       options: question.options.map((option) => ({
         content: option.content.join("\n"),
         correct: option.correct,

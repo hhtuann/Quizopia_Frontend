@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   analyzeQuizMarkdown,
   getQuizAutocompleteSuggestions,
+  isValidNumericAnswerToken,
   toggleQuizOptionCorrectness,
 } from "./quiz-markdown";
 import {
@@ -19,10 +20,9 @@ import {
  * - engine edge cases (tab suppression, Vietnamese case folding, lone-CR, clamps,
  *   toggle guards, Unicode preservation)
  *
- * Column semantics intentionally differ from Backend PR #3 in two codes —
- * UNKNOWN_QUESTION_TYPE (TS: 1, Java: computed type column) and
- * NUMERIC_ANSWER_INVALID (TS: 1, Java: computed token column) — matching donor
- * behavior; lines and question numbers agree.
+ * Diagnostic columns follow Backend PR #3 exactly: UNKNOWN_QUESTION_TYPE and
+ * NUMERIC_ANSWER_INVALID report the computed token columns (typeColumn /
+ * answerColumn parity), numbering diagnostics stay at column 5.
  */
 
 function diagnostic(source: string, code: string) {
@@ -172,21 +172,40 @@ describe("Quiz Markdown diagnostics coverage", () => {
     ).toBe(5);
   });
 
-  it("reports UNKNOWN_QUESTION_TYPE and NUMERIC_ANSWER_INVALID at column 1 (donor TS semantics; Java computes token columns)", () => {
-    expect(
-      diagnostic(
-        "Câu 1 [single_choice]: stem\nA. a\nB. b\nC. c\nD. d\n",
-        "UNKNOWN_QUESTION_TYPE",
-      ).column,
-    ).toBe(1);
-    expect(
-      diagnostic("Câu 1 [NUMERIC_FILL]: v?\nĐáp án:   12345\n", "NUMERIC_ANSWER_INVALID")
-        .column,
-    ).toBe(1);
-    expect(
-      diagnostic("Câu 1 [NUMERIC_FILL]: v?\nĐáp án:   12345\n", "NUMERIC_ANSWER_INVALID")
-        .line,
-    ).toBe(2);
+  it("reports UNKNOWN_QUESTION_TYPE and NUMERIC_ANSWER_INVALID at exact Java token columns (Backend PR #3 parity)", () => {
+    const unknown = diagnostic(
+      "Câu 1 [small_choice]: stem\nA. a\nB. b\nC. c\nD. d\n",
+      "UNKNOWN_QUESTION_TYPE",
+    );
+    expect(unknown).toMatchObject({ questionNumber: 1, line: 1, column: 8 });
+
+    // Multi-digit question numbers shift the [TYPE] token accordingly.
+    const wide = diagnostic(
+      "Câu 12 [SINGLE_CHOICE]: stem\n*A. a\nB. b\nC. c\nD. d\nCâu 345 [bogus]: x\n",
+      "UNKNOWN_QUESTION_TYPE",
+    );
+    expect(wide).toMatchObject({ questionNumber: 345, line: 6, column: 10 });
+
+    const invalid = diagnostic(
+      "Câu 1 [NUMERIC_FILL]: v?\nĐáp án:   12345\n",
+      "NUMERIC_ANSWER_INVALID",
+    );
+    // "Đáp án:" (7) + 3 spaces + 1 → token starts at column 11.
+    expect(invalid).toMatchObject({ questionNumber: 1, line: 2, column: 11 });
+
+    // Tab whitespace after the marker counts one column, like Java.
+    const tabbed = diagnostic(
+      "Câu 1 [NUMERIC_FILL]: v?\nĐáp án:\t12345\n",
+      "NUMERIC_ANSWER_INVALID",
+    );
+    expect(tabbed).toMatchObject({ questionNumber: 1, line: 2, column: 9 });
+
+    // Non-breaking space is NOT Java whitespace: column stays at 8.
+    const nbsp = diagnostic(
+      "Câu 1 [NUMERIC_FILL]: v?\nĐáp án:\u00A012345\n",
+      "NUMERIC_ANSWER_INVALID",
+    );
+    expect(nbsp).toMatchObject({ questionNumber: 1, line: 2, column: 8 });
   });
 
   it("still exposes partially valid questions for live preview alongside diagnostics", () => {
@@ -349,5 +368,95 @@ describe("Quiz Markdown engine edge cases", () => {
       contentEnd: 0,
       end: 0,
     });
+  });
+});
+
+describe("Quiz Markdown remediation parity (TL review of PR #2)", () => {
+  it("rejects question numbers above Integer.MAX_VALUE with the Java diagnostic", () => {
+    const overflow = analyzeQuizMarkdown(
+      "Câu 2147483648 [SINGLE_CHOICE]: x\n*A. a\n",
+    );
+    expect(overflow.questions).toHaveLength(0);
+    expect(overflow.diagnostics[0]).toMatchObject({
+      code: "MALFORMED_QUESTION_HEADER",
+      questionNumber: null,
+      line: 1,
+      column: 5,
+      message: "Question number is outside the supported integer range",
+    });
+    expect(
+      overflow.diagnostics
+        .filter((item) => item.code === "MALFORMED_QUESTION_HEADER")
+        .map((item) => item.message),
+    ).toEqual(["Question number is outside the supported integer range"]);
+
+    // Unsafe-int territory (20 nines) is rejected the same way.
+    const unsafe = analyzeQuizMarkdown("Câu 99999999999999999999 [NUMERIC_FILL]: x\n");
+    expect(unsafe.questions).toHaveLength(0);
+    expect(
+      unsafe.diagnostics.some(
+        (item) =>
+          item.code === "MALFORMED_QUESTION_HEADER" &&
+          item.questionNumber === null &&
+          item.line === 1 &&
+          item.column === 5,
+      ),
+    ).toBe(true);
+  });
+
+  it("still accepts Integer.MAX_VALUE itself and applies normal numbering rules", () => {
+    const boundary = analyzeQuizMarkdown(
+      "Câu 2147483647 [NUMERIC_FILL]: v?\nĐáp án: 1234\n",
+    );
+    expect(boundary.questions).toHaveLength(1);
+    expect(boundary.questions[0]?.number).toBe(2147483647);
+    expect(
+      boundary.diagnostics.map((item) => item.code),
+    ).toEqual(["QUESTION_NUMBER_MUST_START_AT_ONE"]);
+  });
+
+  it("preserves expected-numbering autocomplete after an overflow header", () => {
+    const source =
+      "Câu 1 [NUMERIC_FILL]: v?\nĐáp án: 1234\nCâu 99999999999999999999 [SINGLE_CHOICE]: x\nC";
+    expect(
+      getQuizAutocompleteSuggestions(source, source.length).map(
+        (item) => item.label,
+      ),
+    ).toEqual([
+      "Câu 3 [SINGLE_CHOICE]:",
+      "Câu 3 [MULTIPLE_CHOICE]:",
+      "Câu 3 [TRUE_FALSE_MATRIX]:",
+      "Câu 3 [NUMERIC_FILL]:",
+    ]);
+  });
+
+  it("normalizes numeric tokens with Java Character.isWhitespace semantics, not String.trim", () => {
+    // Java String.strip() keeps non-breaking whitespace: these become invalid
+    // (length ≠ 4 after strip, or illegal characters).
+    expect(isValidNumericAnswerToken("\u00A01234\u00A0")).toBe(false);
+    expect(isValidNumericAnswerToken("\uFEFF2.50")).toBe(false);
+    expect(isValidNumericAnswerToken("\u2007-0.5\u2007")).toBe(false);
+    expect(isValidNumericAnswerToken("\u202F1234")).toBe(false);
+
+    // Java-only separators U+001C–U+001F are stripped by Java and by us.
+    expect(isValidNumericAnswerToken("\u001C1234\u001D")).toBe(true);
+
+    // Whitespace both languages strip, plus plain ASCII: unchanged behavior.
+    expect(isValidNumericAnswerToken("\u20051234\u2005")).toBe(true);
+    expect(isValidNumericAnswerToken("  -3.5\t")).toBe(true);
+    expect(isValidNumericAnswerToken("1\u00A02")).toBe(false);
+  });
+
+  it("applies the Java strip to the emitted numericAnswer value end to end", () => {
+    const valid = analyzeQuizMarkdown("Câu 1 [NUMERIC_FILL]: v?\nĐáp án: \t-3.5  \n");
+    expect(valid.questions[0]?.numericAnswer).toBe("-3.5");
+
+    const nbsp = analyzeQuizMarkdown(
+      "Câu 1 [NUMERIC_FILL]: v?\nĐáp án:\u00A01234\n",
+    );
+    expect(
+      nbsp.diagnostics.some((item) => item.code === "NUMERIC_ANSWER_INVALID"),
+    ).toBe(true);
+    expect(nbsp.questions[0]?.numericAnswer).toBe("\u00A01234");
   });
 });
