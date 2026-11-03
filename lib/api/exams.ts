@@ -2,19 +2,29 @@ import { http } from "./http-client";
 import type { PageResponse, QuestionType } from "./question-banks";
 
 /**
- * Exams API + types (Day 6, Teacher-only). Mirrors backend records:
- *   - com.hhtuann.backend.exam.dto.ExamListItem
- *   - com.hhtuann.backend.exam.dto.ExamPurposeSummary (embedded `purpose`)
- *   - com.hhtuann.backend.question.dto.SubjectSummary (embedded `subject`)
- *   - com.hhtuann.backend.exam.dto.CreateExamRequest
+ * Exams API + types (Phase 1, Task B — one exam = one content set).
+ * Mirrors backend records:
+ *   - com.quizopia.backend.exam.dto.ExamListItem
+ *   - com.quizopia.backend.exam.dto.TeacherExamEditorResponse
+ *   - com.quizopia.backend.exam.dto.CreateExamRequest
+ *   - com.quizopia.backend.exam.dto.UpdateDraftCompositionRequest
+ *   - com.quizopia.backend.exam.dto.PublishExamRequest
+ *   - com.quizopia.backend.exam.dto.PublishedExamSummary
  *
  * Endpoints (ExamController, prefix /api/exams):
- *   - GET  /api/exams/my  → PageResponse<ExamListItem>
- *   - POST /api/exams     → 201 ExamListItem
- * (detail / composition / versions / publish are FE7b — not used here.)
+ *   - GET    /api/exams/my                      → PageResponse<ExamListItem>
+ *   - POST   /api/exams                         → 201 ExamListItem
+ *   - GET    /api/exams/{examId}                → TeacherExamEditorResponse
+ *   - PUT    /api/exams/{examId}/composition    → TeacherExamEditorResponse (DRAFT only)
+ *   - POST   /api/exams/{examId}/publish        → PublishedExamSummary
+ *   - POST   /api/exams/{examId}/duplicate      → 201 ExamListItem (new DRAFT copy)
+ *   - POST   /api/exams/{examId}/archive        → TeacherExamEditorResponse
+ *
+ * There are NO exam versions anymore: publish is one-way and immutable; to
+ * change content after publishing, DUPLICATE the exam and edit the copy.
  */
 
-/** Embedded subject — same shape as `SubjectSummary`. */
+/** Embedded subject — same shape as `SubjectSummary`; null for personal-workspace exams. */
 export interface ExamSubjectRef {
   id: number;
   code: string;
@@ -28,19 +38,19 @@ export interface ExamPurposeRef {
   title: string;
 }
 
-export type ExamStatus = "DRAFT" | "READY";
+export type ExamStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
 
-/** Backend record `ExamListItem`. */
+/** Backend record `ExamListItem` (no version fields — one exam, one content set). */
 export interface ExamListItem {
   id: number;
   code: string;
   title: string;
-  subject: ExamSubjectRef;
+  subject: ExamSubjectRef | null;
   purpose: ExamPurposeRef | null;
   status: ExamStatus;
-  currentVersionNumber: number | null;
-  hasDraft: boolean;
-  hasPublished: boolean;
+  questionCount: number;
+  totalPoints: number;
+  publishedAt: string | null;
   createdAt: string;
 }
 
@@ -54,15 +64,17 @@ export interface ExamListParams {
 }
 
 /**
- * Backend record `CreateExamRequest`. Client never sends `schoolId` /
- * `ownerTeacherId` — the backend resolves them from the teacher profile.
- * `purposeId` and `description` are nullable.
+ * Backend record `CreateExamRequest`. `workspaceId` is optional — defaults to
+ * the caller's organization workspace when they hold a teacher profile, else
+ * their personal workspace. `subjectId` is required for ORGANIZATION
+ * workspaces and unsupported for PERSONAL ones.
  */
 export interface CreateExamRequest {
-  subjectId: number;
-  purposeId: number | null;
+  workspaceId?: number;
+  subjectId?: number | null;
+  purposeId?: number | null;
   title: string;
-  description: string | null;
+  description?: string | null;
 }
 
 /** `GET /api/exams/my` — list exams owned by the caller (TEACHER). */
@@ -78,7 +90,7 @@ export function createExam(req: CreateExamRequest): Promise<ExamListItem> {
 }
 
 // ============================================================
-// Editor (GET detail + PUT draft composition) — FE7b
+// Editor (GET detail + PUT composition)
 // ============================================================
 
 /** Backend `ExamQuestionOptionResponse(Long id, String optionKey, String content, Boolean isCorrect, Integer position)`. */
@@ -104,7 +116,7 @@ export interface ExamQuestionResponse {
   questionType: QuestionType;
   content: string;
   defaultPoints: number;
-  difficulty: string;
+  difficulty: string | null;
   explanation: string | null;
   answerKey: unknown;
   metadata: unknown;
@@ -121,45 +133,39 @@ export interface ExamSectionResponse {
   questions: ExamQuestionResponse[];
 }
 
-/** Backend `ExamDraftVersionResponse`. `tfMatrixScoring` is a `JsonNode` → opaque. */
-export interface ExamDraftVersionResponse {
-  versionNumber: number;
-  status: string;
-  durationMinutes: number | null;
-  instructions: string | null;
-  tfMatrixScoring: unknown;
-  sections: ExamSectionResponse[];
-}
-
-/** Backend `PublishedExamVersionSummary(Integer versionNumber, Instant publishedAt, BigDecimal totalPoints)`. */
-export interface PublishedExamVersionSummary {
-  versionNumber: number;
-  publishedAt: string;
-  totalPoints: number;
-}
-
-/** Backend `TeacherExamEditorResponse` (teacher editor view; carries answers). */
+/**
+ * Backend `TeacherExamEditorResponse` — the single management view of an exam
+ * (Task B redesign): identity + settings + composition + publish metadata.
+ * For PUBLISHED exams the composition is the immutable published snapshot.
+ * `examVersion` is the JPA `@Version` optimistic token (starts 0, +1 after
+ * each composition save).
+ */
 export interface TeacherExamEditorResponse {
   id: number;
   code: string;
   title: string;
   description: string | null;
-  subject: ExamSubjectRef;
+  subject: ExamSubjectRef | null;
   purpose: ExamPurposeRef | null;
   status: ExamStatus;
-  currentVersionNumber: number | null;
-  currentDraftVersion: ExamDraftVersionResponse | null;
-  publishedVersions: PublishedExamVersionSummary[];
+  durationMinutes: number | null;
+  instructions: string | null;
+  tfMatrixScoring: unknown;
+  composition: ExamSectionResponse[];
+  totalPoints: number;
+  publishedAt: string | null;
+  sourceExamId: number | null;
+  examVersion: number;
   createdAt: string;
   updatedAt: string | null;
 }
 
 /**
- * `PUT /api/exams/{examId}/draft/composition` request — STRUCTURAL ONLY.
+ * `PUT /api/exams/{examId}/composition` request — STRUCTURAL ONLY (DRAFT only).
  * The client never sends snapshot fields (sourceQuestionVersionId, content,
  * options, answerKey, metadata) — the backend resolves + pins them.
- * `expectedVersionNumber` is the optimistic token (the current DRAFT
- * ExamVersion.versionNumber); a mismatch → 409 EXAM_CONCURRENT_MODIFICATION.
+ * `expectedExamVersion` is the optimistic token (the exam's current
+ * `examVersion`); a mismatch → 409 EXAM_CONCURRENT_MODIFICATION.
  */
 export interface CompositionQuestionRequest {
   sourceQuestionId: number;
@@ -174,8 +180,8 @@ export interface CompositionSectionRequest {
   questions: CompositionQuestionRequest[];
 }
 
-export interface UpdateDraftCompositionRequest {
-  expectedVersionNumber: number;
+export interface UpdateCompositionRequest {
+  expectedExamVersion: number;
   durationMinutes?: number | null;
   instructions?: string | null;
   sections: CompositionSectionRequest[];
@@ -186,28 +192,32 @@ export function getExamDetail(examId: number): Promise<TeacherExamEditorResponse
   return http.get<TeacherExamEditorResponse>(`/api/exams/${examId}`);
 }
 
-/** `PUT /api/exams/{examId}/draft/composition` → updated teacher editor view (with pinned snapshot). */
-export function updateDraftComposition(
+/**
+ * `PUT /api/exams/{examId}/composition` → updated editor view (with the new
+ * `examVersion` and pinned snapshots). DRAFT only. The legacy
+ * `/draft/composition` path is a retained alias — the canonical path is used.
+ */
+export function updateComposition(
   examId: number,
-  req: UpdateDraftCompositionRequest
+  req: UpdateCompositionRequest
 ): Promise<TeacherExamEditorResponse> {
   return http.put<TeacherExamEditorResponse>(
-    `/api/exams/${examId}/draft/composition`,
+    `/api/exams/${examId}/composition`,
     req
   );
 }
 
 // ============================================================
-// Publish + create-next-draft (FE7c)
+// Publish / duplicate / archive
 // ============================================================
 
 /**
- * Backend `PublishExamRequest`. `expectedVersionNumber` is the optimistic
- * token (current DRAFT version); null/absent = "publish the current DRAFT".
- * Mismatch/concurrent → 409 EXAM_PUBLISH_CONFLICT.
+ * Backend `PublishExamRequest`. `expectedExamVersion` is the optimistic token;
+ * absent body or null means "publish the current DRAFT". A mismatch (or a
+ * concurrent publish) → 409 EXAM_PUBLISH_CONFLICT.
  */
 export interface PublishExamRequest {
-  expectedVersionNumber?: number | null;
+  expectedExamVersion?: number | null;
 }
 
 /**
@@ -216,24 +226,11 @@ export interface PublishExamRequest {
  */
 export interface PublishedExamSummary {
   examId: number;
-  versionNumber: number;
   status: string;
   publishedAt: string;
   totalPoints: number;
   questionCount: number | null;
   durationMinutes: number | null;
-}
-
-/** Backend `CreateExamVersionRequest`. `cloneFromVersionNumber` null = clone latest PUBLISHED. */
-export interface CreateExamVersionRequest {
-  cloneFromVersionNumber?: number | null;
-}
-
-/** Backend `CreateExamVersionResponse` (create-next-draft, HTTP 201). NO answer data. */
-export interface CreateExamVersionResponse {
-  versionNumber: number;
-  status: string;
-  clonedFrom: number | null;
 }
 
 /** `POST /api/exams/{examId}/publish` → 200 `PublishedExamSummary`. */
@@ -244,10 +241,15 @@ export function publishExam(
   return http.post<PublishedExamSummary>(`/api/exams/${examId}/publish`, req);
 }
 
-/** `POST /api/exams/{examId}/versions` → 201 `CreateExamVersionResponse` (clone latest PUBLISHED when no body). */
-export function createNextDraft(
-  examId: number,
-  req: CreateExamVersionRequest = {}
-): Promise<CreateExamVersionResponse> {
-  return http.post<CreateExamVersionResponse>(`/api/exams/${examId}/versions`, req);
+/** `POST /api/exams/{examId}/duplicate` → 201 `ExamListItem` (new DRAFT copy). */
+export function duplicateExam(examId: number): Promise<ExamListItem> {
+  return http.post<ExamListItem>(`/api/exams/${examId}/duplicate`);
+}
+
+/**
+ * `POST /api/exams/{examId}/archive` → editor response (status ARCHIVED).
+ * 409 EXAM_ARCHIVE_CONFLICT while sessions are SCHEDULED/OPEN.
+ */
+export function archiveExam(examId: number): Promise<TeacherExamEditorResponse> {
+  return http.post<TeacherExamEditorResponse>(`/api/exams/${examId}/archive`);
 }

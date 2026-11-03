@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createBank, type CreateQuestionBankRequest } from "@/lib/api/question-banks";
 import { useGradeLevelsQuery, useSubjectsQuery } from "@/hooks/queries/use-subjects";
+import { useActiveWorkspace } from "@/hooks/queries/use-workspaces";
 import { createBankSchema, type CreateBankValues } from "@/lib/validation/question-bank-schemas";
 import { Button, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
@@ -51,6 +52,10 @@ function describeCreateError(err: unknown): { field?: "subjectId"; message: stri
 export default function NewQuestionBankPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { activeWorkspace, isPersonal } = useActiveWorkspace();
+  // Subject is required only for ORGANIZATION workspaces (legacy academic
+  // rule) — hidden entirely for the personal workspace.
+  const subjectRequired = !isPersonal;
   const { data: subjectsData, isPending: subjectsPending, isError: subjectsError } =
     useSubjectsQuery();
   const allSubjects = subjectsData?.items ?? [];
@@ -69,7 +74,7 @@ export default function NewQuestionBankPage() {
     formState: { errors, isSubmitting },
   } = useForm<CreateBankValues>({
     resolver: zodResolver(createBankSchema),
-    defaultValues: { name: "", description: "", subjectId: NaN },
+    defaultValues: { name: "", description: "", subjectId: undefined },
   });
 
   const mutation = useMutation({
@@ -78,10 +83,17 @@ export default function NewQuestionBankPage() {
 
   const onSubmit = async (values: CreateBankValues) => {
     setFormError(null);
+    if (subjectRequired && (values.subjectId == null || !Number.isFinite(values.subjectId))) {
+      setError("subjectId", { message: "Subject is required for organization banks." });
+      return;
+    }
     const req: CreateQuestionBankRequest = {
       name: values.name.trim(),
       description: values.description?.trim() ? values.description.trim() : null,
-      subjectId: values.subjectId,
+      ...(values.subjectId != null && Number.isFinite(values.subjectId)
+        ? { subjectId: values.subjectId }
+        : {}),
+      ...(activeWorkspace ? { workspaceId: activeWorkspace.workspaceId } : {}),
     };
     try {
       await mutation.mutateAsync(req);
@@ -121,6 +133,13 @@ export default function NewQuestionBankPage() {
         <h1 className="mt-3 font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
           Create question bank
         </h1>
+        {activeWorkspace && (
+          <p className="mt-2 text-sm font-medium text-[#64748B]">
+            Creating in{" "}
+            <span className="font-semibold text-[#0052FF]">{activeWorkspace.name}</span>
+            {isPersonal ? " — personal bank, no subject needed" : ""}
+          </p>
+        )}
       </div>
 
       <div className={cn(cardVariants({ variant: "elevated" }), "max-w-2xl p-8 sm:p-10")}>
@@ -180,65 +199,69 @@ export default function NewQuestionBankPage() {
             <FieldError id="bank-description-error" message={errors.description?.message} />
           </div>
 
-          <div>
-            <label htmlFor="bank-grade" className={labelClass}>
-              Grade level
-            </label>
-            <select
-              id="bank-grade"
-              disabled={gradesPending}
-              className={cn(selectClass, "disabled:opacity-70")}
-              value={gradeId}
-              onChange={(e) => {
-                const v = e.target.value;
-                setGradeId(v === "" ? "" : Number(v));
-                setValue("subjectId", NaN);
-              }}
-            >
-              <option value="">{gradesPending ? "Loading grades…" : "Select a grade…"}</option>
-              {grades.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="bank-subject" className={labelClass}>
-              Subject
-            </label>
-            {subjectsError ? (
-              <p role="alert" className="pl-1 text-sm font-medium text-[#EF4444]">
-                Couldn&apos;t load subjects.{" "}
-                <Link
-                  href="/question-banks/new"
-                  className="rounded font-semibold text-[#0052FF] outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
+          {!isPersonal && (
+            <>
+              <div>
+                <label htmlFor="bank-grade" className={labelClass}>
+                  Grade level
+                </label>
+                <select
+                  id="bank-grade"
+                  disabled={gradesPending}
+                  className={cn(selectClass, "disabled:opacity-70")}
+                  value={gradeId}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setGradeId(v === "" ? "" : Number(v));
+                    setValue("subjectId", NaN);
+                  }}
                 >
-                  Retry
-                </Link>
-              </p>
-            ) : (
-              <select
-                id="bank-subject"
-                disabled={!gradeSelected || subjectsPending}
-                aria-invalid={!!errors.subjectId}
-                aria-describedby={errors.subjectId ? "bank-subject-error" : undefined}
-                className={cn(selectClass, errors.subjectId && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]", "disabled:opacity-70")}
-                {...register("subjectId", { valueAsNumber: true })}
-              >
-                <option value="">
-                  {!gradeSelected ? "Select a grade first" : subjectsPending ? "Loading subjects…" : "Select a subject…"}
-                </option>
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            )}
-            <FieldError id="bank-subject-error" message={errors.subjectId?.message} />
-          </div>
+                  <option value="">{gradesPending ? "Loading grades…" : "Select a grade…"}</option>
+                  {grades.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="bank-subject" className={labelClass}>
+                  Subject
+                </label>
+                {subjectsError ? (
+                  <p role="alert" className="pl-1 text-sm font-medium text-[#EF4444]">
+                    Couldn&apos;t load subjects.{" "}
+                    <Link
+                      href="/question-banks/new"
+                      className="rounded font-semibold text-[#0052FF] outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
+                    >
+                      Retry
+                    </Link>
+                  </p>
+                ) : (
+                  <select
+                    id="bank-subject"
+                    disabled={!gradeSelected || subjectsPending}
+                    aria-invalid={!!errors.subjectId}
+                    aria-describedby={errors.subjectId ? "bank-subject-error" : undefined}
+                    className={cn(selectClass, errors.subjectId && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]", "disabled:opacity-70")}
+                    {...register("subjectId", { valueAsNumber: true })}
+                  >
+                    <option value="">
+                      {!gradeSelected ? "Select a grade first" : subjectsPending ? "Loading subjects…" : "Select a subject…"}
+                    </option>
+                    {subjects.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <FieldError id="bank-subject-error" message={errors.subjectId?.message} />
+              </div>
+            </>
+          )}
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button type="submit" disabled={isSubmitting}>

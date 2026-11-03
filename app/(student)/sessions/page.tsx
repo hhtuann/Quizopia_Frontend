@@ -1,7 +1,6 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAvailableSessionsQuery } from "@/hooks/queries/use-student-attempts";
 import { useStartAttemptMutation } from "@/hooks/queries/use-student-attempt";
@@ -12,7 +11,7 @@ import type { NormalizedApiError } from "@/lib/api";
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "â€”";
   return d.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
@@ -22,7 +21,7 @@ type Tone = "accent" | "active" | "muted";
 function sessionFlag(item: AvailableSessionItem): { label: string; tone: Tone } {
   if (item.canStartNow) return { label: "Available to start", tone: "accent" };
   if (item.canResume) return { label: "Resume active attempt", tone: "active" };
-  // Active attempt that expired (now > deadline) — Day 7 doesn't finalize; pending.
+  // Active attempt that expired (now > deadline) â€” Day 7 doesn't finalize; pending.
   if (item.activeAttemptId !== null && !item.canResume && !item.canStartNow)
     return { label: "Expired attempt", tone: "muted" };
   if (item.remainingAttempts === 0) return { label: "No attempts remaining", tone: "muted" };
@@ -49,8 +48,8 @@ function effectiveDeadline(item: AvailableSessionItem): number {
 
 /**
  * Sort sessions by action priority then by deadline.
- *   1. Actionable now (canStartNow OR canResume) — soonest deadline first.
- *   2. Everything else (upcoming / ended) — soonest deadline first.
+ *   1. Actionable now (canStartNow OR canResume) â€” soonest deadline first.
+ *   2. Everything else (upcoming / ended) â€” soonest deadline first.
  */
 function sortByPriority(items: AvailableSessionItem[]): AvailableSessionItem[] {
   return [...items].sort((a, b) => {
@@ -67,7 +66,7 @@ function describeStartError(err: unknown): string {
   if (norm?.kind === "api") {
     switch (norm.code) {
       case "ATTEMPT_DEADLINE_EXCEEDED":
-        return "The active attempt has expired — it will be finalized later.";
+        return "The active attempt has expired â€” it will be finalized later.";
       case "ATTEMPT_SESSION_NOT_OPEN":
         return "The session is not open yet.";
       case "ATTEMPT_OUTSIDE_WINDOW":
@@ -82,7 +81,7 @@ function describeStartError(err: unknown): string {
         return norm.message || "Could not start the attempt.";
     }
   }
-  if (norm?.kind === "network") return "Network error — check your connection.";
+  if (norm?.kind === "network") return "Network error â€” check your connection.";
   return "Something went wrong. Please try again.";
 }
 
@@ -126,12 +125,20 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
   const startMut = useStartAttemptMutation();
   const [startError, setStartError] = useState<string | null>(null);
 
-  const startsFuture = new Date(item.startsAt).getTime() > Date.now();
-  const windowEnded = new Date(item.endsAt).getTime() <= Date.now();
+  // Ticking "now" so window buttons flip on their own (interval callback â€”
+  // never a direct impure call during render).
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const startsFuture = new Date(item.startsAt).getTime() > now;
+  const windowEnded = new Date(item.endsAt).getTime() <= now;
   // Label for the no-action fallback button (cards with no Start/Resume/Countdown/
-  // Ended button) — keeps the action row visually consistent instead of a gap.
+  // Ended button) â€” keeps the action row visually consistent instead of a gap.
   const fallbackLabel = item.activeAttemptId !== null
-    ? "Finalizing attempt…"
+    ? "Finalizing attemptâ€¦"
     : item.remainingAttempts === 0
       ? "No attempts remaining"
       : "Unavailable";
@@ -142,7 +149,7 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
           <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
             {item.exam.title}
           </h2>
-          <p className="mt-0.5 text-sm text-[#64748B]">{item.exam.subjectName}</p>
+          <p className="mt-0.5 text-sm text-[#64748B]">{item.exam.subjectName ?? "General"}</p>
         </div>
         <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B]">
           {item.code}
@@ -155,24 +162,24 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
         <div>
           <dt className="font-mono uppercase tracking-[0.1em] text-[#64748B]">Window</dt>
           <dd className="mt-0.5 text-[#0F172A]">
-            {formatDateTime(item.startsAt)} → {formatDateTime(item.endsAt)}
+            {formatDateTime(item.startsAt)} â†’ {formatDateTime(item.endsAt)}
           </dd>
         </div>
         <div>
           <dt className="font-mono uppercase tracking-[0.1em] text-[#64748B]">Duration</dt>
           <dd className="mt-0.5 text-[#0F172A]">
-            {item.durationMinutes != null ? `${item.durationMinutes} min` : "—"}
+            {item.durationMinutes > 0 ? `${item.durationMinutes} min` : "Unlimited"}
           </dd>
         </div>
         <div>
           <dt className="font-mono uppercase tracking-[0.1em] text-[#64748B]">Attempts</dt>
           <dd className="mt-0.5 text-[#0F172A]">
             {item.maxAttempts === 0 ? (
-              <span>{item.attemptsUsed} used · <span className="font-semibold text-[#0052FF]">Unlimited</span></span>
+              <span>{item.attemptsUsed} used Â· <span className="font-semibold text-[#0052FF]">Unlimited</span></span>
             ) : (
               <span>
                 {item.attemptsUsed}
-                {item.maxAttempts != null ? ` / ${item.maxAttempts}` : ""} used ·{" "}
+                {item.maxAttempts != null ? ` / ${item.maxAttempts}` : ""} used Â·{" "}
                 <span className="font-semibold">{item.remainingAttempts} left</span>
               </span>
             )}
@@ -205,7 +212,7 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
               }
             }}
           >
-            {startMut.isPending ? "Starting…" : "Start attempt"}
+            {startMut.isPending ? "Startingâ€¦" : "Start attempt"}
           </Button>
         ) : item.canResume && item.activeAttemptId !== null ? (
           <>
@@ -257,12 +264,12 @@ function Skeleton() {
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="h-44 animate-pulse rounded-xl border border-[#E2E8F0] bg-[#F1F5F9]" />
       ))}
-      <span className="sr-only">Loading…</span>
+      <span className="sr-only">Loadingâ€¦</span>
     </div>
   );
 }
 
-/** Countdown button — shows time remaining until the session opens.
+/** Countdown button â€” shows time remaining until the session opens.
  *  Blue-tinted (not a plain outline) so it reads as an active state. When the
  *  countdown reaches 0, fires `onZero` once so the page can refetch and the
  *  real "Start attempt" button appears in place of the countdown. */
@@ -270,7 +277,9 @@ function CountdownButton({ startsAt, onZero }: { startsAt: string; onZero?: () =
   // Keep the callback in a ref so the 1s interval isn't torn down/recreated
   // whenever the parent re-renders with a new function identity.
   const onZeroRef = useRef(onZero);
-  onZeroRef.current = onZero;
+  useEffect(() => {
+    onZeroRef.current = onZero;
+  }, [onZero]);
   const firedRef = useRef(false);
 
   const [remaining, setRemaining] = useState(() => Math.max(0, new Date(startsAt).getTime() - Date.now()));
@@ -316,11 +325,13 @@ function CountdownButton({ startsAt, onZero }: { startsAt: string; onZero?: () =
  *  When the timer hits 0, fires `onZero` (a refetch) and keeps polling it every
  *  10s. The backend timeout sweeper finalizes the attempt within ~30s of the
  *  deadline; once it does, the parent re-renders without Resume and this pill
- *  unmounts — stopping the poll. So the Resume button disappears on its own
+ *  unmounts â€” stopping the poll. So the Resume button disappears on its own
  *  without a manual reload. */
 function AttemptTimeRemaining({ deadlineAt, onZero }: { deadlineAt: string; onZero?: () => void }) {
   const onZeroRef = useRef(onZero);
-  onZeroRef.current = onZero;
+  useEffect(() => {
+    onZeroRef.current = onZero;
+  }, [onZero]);
   const firedRef = useRef(false);
   const [remaining, setRemaining] = useState(() =>
     Math.max(0, new Date(deadlineAt).getTime() - Date.now())
@@ -352,7 +363,7 @@ function AttemptTimeRemaining({ deadlineAt, onZero }: { deadlineAt: string; onZe
   }, [expired]);
 
   // Once expired, poll onZero every 10s until the backend finalizes the attempt
-  // and the parent drops the Resume button → this pill unmounts (cleanup stops
+  // and the parent drops the Resume button â†’ this pill unmounts (cleanup stops
   // the poll). Bridges the up-to-30s sweeper lag so Resume disappears on its own.
   useEffect(() => {
     if (!expired) return;
@@ -366,7 +377,7 @@ function AttemptTimeRemaining({ deadlineAt, onZero }: { deadlineAt: string; onZe
   const s = totalSec % 60;
   const pad = (n: number) => String(n).padStart(2, "0");
   const text = h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
-  const urgent = totalSec > 0 && totalSec <= 300; // ≤ 5 min left
+  const urgent = totalSec > 0 && totalSec <= 300; // â‰¤ 5 min left
 
   return (
     <span
@@ -399,13 +410,13 @@ function ErrorState({ error }: { error: NormalizedApiError | undefined }) {
         message = "Your student profile wasn't found. Please contact your school.";
         break;
       case "AUTH_ACCESS_TOKEN_INVALID":
-        message = "Your session has expired — please sign in again.";
+        message = "Your session has expired â€” please sign in again.";
         break;
       default:
         message = error.message || "Couldn't load available sessions.";
     }
   } else if (error?.kind === "network") {
-    message = "Network error — check your connection.";
+    message = "Network error â€” check your connection.";
   } else {
     message = "Something went wrong. Please try again.";
   }

@@ -2,16 +2,20 @@ import { http } from "./http-client";
 import type { PageResponse } from "./question-banks";
 
 /**
- * Exam-sessions API + types (Day 6, Teacher-only). Mirrors backend records:
- *   - com.hhtuann.backend.exam.dto.ExamSessionListItem
- *   - com.hhtuann.backend.exam.dto.ExamSessionDetailResponse
- *   - com.hhtuann.backend.exam.dto.CreateExamSessionRequest
+ * Exam-sessions API + types (Phase 1, Task B). Mirrors backend records:
+ *   - com.quizopia.backend.exam.dto.ExamSessionListItem
+ *   - com.quizopia.backend.exam.dto.ExamSessionDetailResponse
+ *   - com.quizopia.backend.exam.dto.CreateExamSessionRequest
  *
- * Endpoints (ExamSessionController, prefix /api/exam-sessions):
- *   - GET  /api/exam-sessions/my        → PageResponse<ExamSessionListItem>
- *   - GET  /api/exam-sessions/{id}      → ExamSessionDetailResponse
- *   - POST /api/exam-sessions           → 201 ExamSessionDetailResponse
- * (update / schedule / open / close / cancel are FE8b.)
+ * Canonical nested routes (ExamSessionNestedController):
+ *   - GET  /api/exams/{examId}/sessions            → PageResponse<ExamSessionListItem>
+ *   - POST /api/exams/{examId}/sessions            → 201 ExamSessionDetailResponse
+ * Legacy flat routes (/api/exam-sessions/*) still work with the same payloads
+ * and are used for session-scoped detail/actions by sessionId — deprecated.
+ *
+ * One exam = one published content set, so there is NO version selection:
+ * session creation requires the exam to be PUBLISHED (409
+ * EXAM_SESSION_NOT_PUBLISHED_EXAM otherwise).
  */
 
 export type ExamSessionStatus =
@@ -21,14 +25,13 @@ export type ExamSessionStatus =
   | "CLOSED"
   | "CANCELLED";
 
-/** Backend `SessionVisibility` (V10). PUBLIC = all same-school students; CLASS_RESTRICTED = assigned classes only. */
+/** Backend `SessionVisibility`. PUBLIC = all same-school students; CLASS_RESTRICTED = assigned classes only. */
 export type SessionVisibility = "PUBLIC" | "CLASS_RESTRICTED";
 
-/** Backend record `ExamSessionListItem`. */
+/** Backend record `ExamSessionListItem` (no examVersionNumber anymore). */
 export interface ExamSessionListItem {
   id: number;
   examId: number;
-  examVersionNumber: number;
   code: string;
   title: string;
   status: ExamSessionStatus;
@@ -39,20 +42,18 @@ export interface ExamSessionListItem {
   createdAt: string;
 }
 
-/** Backend record `ExamSessionDetailResponse`. `version` is the @Version optimistic token (used in FE8b). */
+/** Backend record `ExamSessionDetailResponse`. `version` is the @Version optimistic token. `durationMinutes` is always set now. */
 export interface ExamSessionDetailResponse {
   id: number;
   examId: number;
   examCode: string | null;
-  examVersionNumber: number;
   code: string;
   title: string;
   status: ExamSessionStatus;
   startsAt: string;
   endsAt: string;
   maxAttempts: number;
-  /** Per-attempt time limit (minutes). NULL = use the exam version's default. 0 = unlimited. */
-  durationMinutes: number | null;
+  durationMinutes: number;
   openedAt: string | null;
   closedAt: string | null;
   participantCount: number;
@@ -67,24 +68,21 @@ export interface ExamSessionListParams {
   sort?: string;
   search?: string;
   status?: ExamSessionStatus;
-  examId?: number;
 }
 
 /**
- * Backend record `CreateExamSessionRequest`. Client never sends `schoolId` /
- * `owner` — the backend resolves them. `examVersionNumber` MUST reference a
- * PUBLISHED version (taken from the exam editor's `publishedVersions`, never
- * the current draft). `code` is ≤ 30 (shorter than an exam code). Starts/ends
- * are ISO-8601 UTC instants.
+ * Backend record `CreateExamSessionRequest` (NO examVersionNumber). The exam
+ * must be PUBLISHED. `code` is ≤ 30 (shorter than an exam code). Starts/ends
+ * are ISO-8601 UTC instants. `durationMinutes` NULL = prefill from the exam's
+ * editor-metadata default; 0 = unlimited.
  */
 export interface CreateExamSessionRequest {
   examId: number;
-  examVersionNumber: number;
+  code?: string | null;
   title: string;
   startsAt: string;
   endsAt: string;
   maxAttempts: number;
-  /** Per-attempt time limit (minutes). NULL/omitted = use the exam version's default. 0 = unlimited. */
   durationMinutes?: number | null;
   /** PUBLIC = all same-school students; CLASS_RESTRICTED (default) = assigned classes only. */
   visibility?: SessionVisibility;
@@ -92,7 +90,18 @@ export interface CreateExamSessionRequest {
   classroomIds?: number[];
 }
 
-/** `GET /api/exam-sessions/my` — sessions owned by the caller (TEACHER). */
+/** `GET /api/exams/{examId}/sessions` — sessions of ONE exam (canonical nested route). */
+export function listExamSessions(
+  examId: number,
+  params: ExamSessionListParams = {}
+): Promise<PageResponse<ExamSessionListItem>> {
+  return http.get<PageResponse<ExamSessionListItem>>(
+    `/api/exams/${examId}/sessions`,
+    { params }
+  );
+}
+
+/** `GET /api/exam-sessions/my` — sessions owned by the caller (legacy flat route). */
 export function listMySessions(
   params: ExamSessionListParams = {}
 ): Promise<PageResponse<ExamSessionListItem>> {
@@ -101,18 +110,22 @@ export function listMySessions(
   });
 }
 
-/** `GET /api/exam-sessions/{sessionId}` — teacher detail (read-only in FE8a). */
+/** `GET /api/exam-sessions/{sessionId}` — teacher detail (legacy flat route, by sessionId). */
 export function getSessionDetail(
   sessionId: number
 ): Promise<ExamSessionDetailResponse> {
   return http.get<ExamSessionDetailResponse>(`/api/exam-sessions/${sessionId}`);
 }
 
-/** `POST /api/exam-sessions` → 201 `ExamSessionDetailResponse`. */
-export function createSession(
-  req: CreateExamSessionRequest
+/** `POST /api/exams/{examId}/sessions` → 201 `ExamSessionDetailResponse` (canonical nested route). */
+export function createExamSession(
+  examId: number,
+  req: Omit<CreateExamSessionRequest, "examId">
 ): Promise<ExamSessionDetailResponse> {
-  return http.post<ExamSessionDetailResponse>("/api/exam-sessions", req);
+  return http.post<ExamSessionDetailResponse>(
+    `/api/exams/${examId}/sessions`,
+    req
+  );
 }
 
 // ============================================================
@@ -131,7 +144,7 @@ export interface SessionClassesResponse {
   items: SessionClassSummary[];
 }
 
-/** Body for `PUT /api/exam-sessions/{sessionId}/classes` — REPLACE semantics (clears old, sets new). */
+/** Body for `PUT .../classes` — REPLACE semantics (clears old, sets new). */
 export interface AssignSessionClassesRequest {
   classroomIds: number[];
 }
@@ -157,13 +170,13 @@ export function getSessionClasses(
 }
 
 // ============================================================
-// Update config + lifecycle (FE8b)
+// Update config + lifecycle (legacy flat routes, by sessionId)
 // ============================================================
 
 /**
  * Backend `UpdateExamSessionRequest`. `expectedVersion` is the JPA `@Version`
- * optimistic token. Only `title`/`startsAt`/`endsAt`/`maxAttempts` are editable
- * — `code`/`examId`/`examVersionNumber`/owner never change after create.
+ * optimistic token. Only `title`/`startsAt`/`endsAt`/`maxAttempts` are
+ * editable — `code`/`examId`/owner never change after create.
  */
 export interface UpdateExamSessionRequest {
   expectedVersion: number;
@@ -223,10 +236,16 @@ export function cancelSession(
 // Roster (GET /api/exam-sessions/{sessionId}/roster)
 // ============================================================
 
-/** Backend record `SessionRosterItem` — effective student roster (class members ∪ participants). */
+/**
+ * Backend record `SessionRosterItem` — effective student roster (class members
+ * ∪ participants). User-based; `studentProfileId` is the legacy profile id
+ * kept for realtime-event correlation (may be null for members without a
+ * profile — they cannot start attempts).
+ */
 export interface SessionRosterItem {
-  studentProfileId: number;
-  studentCode: string;
+  userId: number;
+  studentProfileId: number | null;
+  studentCode: string | null;
   displayName: string;
 }
 

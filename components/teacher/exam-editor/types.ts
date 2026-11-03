@@ -1,15 +1,15 @@
 import type { QuestionType } from "@/lib/api/question-banks";
 import type {
-  ExamDraftVersionResponse,
   ExamQuestionOptionResponse,
-  UpdateDraftCompositionRequest,
+  ExamSectionResponse,
+  UpdateCompositionRequest,
 } from "@/lib/api/exams";
 import type { NormalizedApiError } from "@/lib/api";
 
 /**
- * Local editable composition tree (FE7b editor). This is the client-side
- * working copy; it is rebuilt from the server draft whenever the editor query
- * refetches (initial load + after a successful save).
+ * Local editable composition tree (exam editor). This is the client-side
+ * working copy; it is rebuilt from the server composition whenever the editor
+ * query refetches (initial load + after a successful save).
  *
  * `position` is NOT stored — it is implied by array order (insertion order =
  * position), and recomputed when building the PUT body.
@@ -44,9 +44,9 @@ export function nextUid(prefix: string): string {
   return `${prefix}-${uidCounter}`;
 }
 
-/** Build the local editable tree from the server draft (sorted by position). */
-export function toLocalSections(draft: ExamDraftVersionResponse): LocalSection[] {
-  return draft.sections
+/** Build the local editable tree from the server composition (sorted by position). */
+export function toLocalSections(composition: ExamSectionResponse[]): LocalSection[] {
+  return composition
     .slice()
     .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
     .map((s) => ({
@@ -75,16 +75,17 @@ export function toLocalSections(draft: ExamDraftVersionResponse): LocalSection[]
 /**
  * Build the PUT body. STRUCTURAL ONLY — sends `sourceQuestionId`, `position`
  * (array index), `defaultPoints`. NEVER sends snapshot fields. `position` is
- * recomputed from array order.
+ * recomputed from array order. `expectedExamVersion` is the exam's current
+ * optimistic token (from the editor response's `examVersion`).
  */
 export function toRequestBody(
-  expectedVersionNumber: number,
+  expectedExamVersion: number,
   durationMinutes: number | null,
   instructions: string | null,
   sections: LocalSection[]
-): UpdateDraftCompositionRequest {
+): UpdateCompositionRequest {
   return {
-    expectedVersionNumber,
+    expectedExamVersion,
     durationMinutes,
     instructions,
     sections: sections.map((section, sIndex) => ({
@@ -127,10 +128,11 @@ export function describeSaveError(err: unknown): {
         return {
           conflict: true,
           message:
-            "This draft was changed by another session. Your edits were not saved — review the updated draft and retry.",
+            "This exam was changed by another session. Your edits were not saved — review the updated composition and retry.",
         };
+      case "EXAM_NOT_DRAFT":
       case "EXAM_VERSION_NOT_DRAFT":
-        return { conflict: true, message: "This version is no longer a draft." };
+        return { conflict: true, message: "This exam is no longer a draft (published exams are read-only)." };
       case "EXAM_ACCESS_DENIED":
         return { message: "You don't have permission to edit this exam." };
       case "EXAM_NOT_FOUND":
@@ -138,7 +140,7 @@ export function describeSaveError(err: unknown): {
       case "EXAM_VALIDATION_ERROR":
         return { message: norm.message || "Please check the highlighted fields." };
       default:
-        return { message: norm.message || "Could not save the draft." };
+        return { message: norm.message || "Could not save the composition." };
     }
   }
   if (norm?.kind === "network") {

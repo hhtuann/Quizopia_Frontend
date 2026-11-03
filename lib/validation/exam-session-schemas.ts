@@ -2,12 +2,11 @@ import { z } from "zod";
 
 /**
  * Zod schema mirroring backend `CreateExamSessionRequest` and its Jakarta
- * Validation constraints:
- *   - examId: @NotNull @Positive
- *   - examVersionNumber: @NotNull @Positive  (must reference a PUBLISHED version)
+ * Validation constraints (Phase 1, Task B — no version selection):
+ *   - examId: @NotNull @Positive            (from the route, not the form)
  *   - title: @NotBlank, @Size(max = 255)
- *   - startsAt / endsAt: @NotNull Instant      (datetime-local strings here → ISO on submit)
- *   - maxAttempts: @NotNull @Positive Integer
+ *   - startsAt / endsAt: @NotNull Instant    (datetime-local strings here → ISO on submit)
+ *   - maxAttempts: @NotNull @Min(0) Integer
  *
  * `startsAt`/`endsAt` are held as `datetime-local` strings; the submit handler
  * converts them to ISO UTC. The cross-field check (endsAt > startsAt) is also
@@ -15,14 +14,6 @@ import { z } from "zod";
  */
 export const createSessionSchema = z
   .object({
-    examId: z
-      .number({ message: "Choose an exam." })
-      .int("Choose an exam.")
-      .positive("Choose an exam."),
-    examVersionNumber: z
-      .number({ message: "Choose a published version." })
-      .int("Choose a published version.")
-      .positive("Choose a published version."),
     title: z
       .string()
       .min(1, "Title is required.")
