@@ -39,12 +39,21 @@ export const registerSchema = z.object({
     .min(1, "Display name is required.")
     .max(150, "Display name must be 150 characters or fewer."),
   phone: z.string().min(1, "Phone number is required."),
-  // Required here; the form seeds "STUDENT" via defaultValues (the backend
-  // treats a missing accountType as STUDENT, but the client always sends one).
-  accountType: z.enum(["STUDENT", "TEACHER"]),
-  // OPTIONAL since Phase 1: teachers no longer need an invite code — without
-  // one they start in their personal workspace and can join a school later.
-  teacherInviteCode: z.string().max(80, "Invite code must be 80 characters or fewer.").optional(),
 });
 
 export type RegisterValues = z.infer<typeof registerSchema>;
+
+/**
+ * Identity-M1 OTP verification form: 6-digit code (backend `VerifyEmailRequest`).
+ */
+export const verifyEmailSchema = z.object({
+  email: z
+    .string()
+    .min(1, "Email is required.")
+    .email("Enter a valid email address."),
+  otp: z
+    .string()
+    .regex(/^\d{6}$/, "The code is 6 digits."),
+});
+
+export type VerifyEmailValues = z.infer<typeof verifyEmailSchema>;

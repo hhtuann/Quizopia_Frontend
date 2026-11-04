@@ -1,0 +1,42 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Typecheck, Lint & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies (npm ci, lockfile-locked)
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Production build
+        run: npm run build
+        env:
+          # Browser-reachable API base used at build time; CI has no backend.
+          NEXT_PUBLIC_API_URL: http://localhost:8080
+
+      # NOTE (remediation §19): no automated frontend unit/E2E suite exists
+      # yet — vitest/playwright infrastructure is not part of this repo. The
+      # workflow therefore verifies typecheck + lint + production build only;
+      # browser E2E evidence is produced separately on the review branches.
