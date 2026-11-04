@@ -30,7 +30,7 @@
  * The linking flow rides the same endpoints with the link callback redirect.
  */
 import { createServer } from "node:http";
-import { generateKeyPairSync, createSign, randomBytes } from "node:crypto";
+import { generateKeyPairSync, createSign, createPublicKey, randomBytes } from "node:crypto";
 
 const PORT = Number(process.env.PORT || 9700);
 const ISSUER = process.env.ISSUER || `http://localhost:${PORT}`;
@@ -40,10 +40,10 @@ const EMAIL_VERIFIED = process.env.EMAIL_VERIFIED !== "false";
 
 const { publicKey, privateKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
-  publicKeyEncoding: { type: "spki", format: "pem" },
+  publicKeyEncoding: { type: "spki", format: "jwk" },
   privateKeyEncoding: { type: "pkcs8", format: "pem" },
 });
-const publicJwk = createPublicKey(publicKey).export({ format: "jwk" });
+const publicJwk = publicKey;
 const KID = "sim-oidc-key-1";
 
 /** code → { nonce, clientId, sub, email, used } */
