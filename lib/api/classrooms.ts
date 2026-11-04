@@ -263,3 +263,13 @@ export function confirmRosterImport(id: number, file: File): Promise<RosterConfi
   form.append("file", file);
   return http.post<RosterConfirmResult>(`/api/classrooms/${id}/roster-import/confirm`, form);
 }
+
+/** `GET /api/classrooms/roster/invitations` → PENDING entries awaiting consent. */
+export function getMyRosterInvitations(): Promise<RosterEntryResponse[]> {
+  return http.get<RosterEntryResponse[]>("/api/classrooms/roster/invitations");
+}
+
+/** `POST /api/classrooms/roster/{entryId}/accept` → learner consent (relink path). */
+export function acceptRosterInvitation(entryId: number): Promise<RosterEntryResponse> {
+  return http.post<RosterEntryResponse>(`/api/classrooms/roster/${entryId}/accept`, {});
+}
