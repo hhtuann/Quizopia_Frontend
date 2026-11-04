@@ -3,15 +3,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addMembers,
+  addRosterEntry,
   createClassroom,
+  declineRosterEntry,
   getClassroom,
   getClassroomMembers,
+  getClassroomRoster,
   getMyClassrooms,
+  getMyRosterEntries,
   removeMember,
+  revokeRosterEntry,
   updateClassroom,
   type AddMembersRequest,
   type ClassroomMembersParams,
   type CreateClassroomRequest,
+  type CreateRosterEntryRequest,
   type UpdateClassroomRequest,
 } from "@/lib/api/classrooms";
 
@@ -75,5 +81,51 @@ export function useRemoveMemberMutation(id: number) {
   return useMutation({
     mutationFn: (studentProfileId: number) => removeMember(id, studentProfileId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["classrooms"] }),
+  });
+}
+
+// ----- Identity-M3 roster hooks -----
+
+/** Pending/linked roster entries of a classroom (owner view). */
+export function useClassroomRosterQuery(id: number) {
+  return useQuery({
+    queryKey: ["classrooms", id, "roster"],
+    queryFn: () => getClassroomRoster(id, { size: 200 }),
+    enabled: !!id,
+  });
+}
+
+export function useAddRosterEntryMutation(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (req: CreateRosterEntryRequest) => addRosterEntry(id, req),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["classrooms"] }),
+  });
+}
+
+export function useRevokeRosterEntryMutation(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (entryId: number) => revokeRosterEntry(id, entryId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["classrooms"] }),
+  });
+}
+
+/** Learner: my linked roster entries (classes joined via email verification). */
+export function useMyRosterEntriesQuery() {
+  return useQuery({
+    queryKey: ["roster", "my"],
+    queryFn: getMyRosterEntries,
+  });
+}
+
+export function useDeclineRosterEntryMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (entryId: number) => declineRosterEntry(entryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["roster"] });
+      queryClient.invalidateQueries({ queryKey: ["classrooms"] });
+    },
   });
 }
