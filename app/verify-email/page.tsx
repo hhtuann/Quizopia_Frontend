@@ -141,19 +141,17 @@ export default function VerifyEmailPage() {
     setErrorCode(null);
     setInfo(null);
     try {
+      // R2-M1-C: resend ALWAYS answers 200 with the cooldown window — the
+      // server never signals account state; issuance happens only when
+      // actually eligible.
       const result = await authApi.resendVerificationOtp(email);
       setCooldown(result.resendCooldownSeconds);
-      setInfo("A new code is on its way. Previous codes are now invalid.");
+      setInfo("If this address is eligible, a new code is on its way; previous codes are now invalid.");
       setDigits(Array(OTP_LENGTH).fill(""));
       inputsRef.current[0]?.focus();
     } catch (err) {
       const norm = err as NormalizedApiError;
-      if (norm?.kind === "api" && norm.code === "AUTH_OTP_RESEND_COOLDOWN") {
-        setError("Please wait a moment before requesting a new code.");
-        setCooldown(30);
-      } else if (norm?.kind === "api" && norm.code === "AUTH_RATE_LIMITED") {
-        setError("Too many requests — please wait a bit and try again.");
-      } else if (norm?.kind === "network") {
+      if (norm?.kind === "network") {
         setError("Network error — check your connection and try again.");
       } else {
         setError("Could not resend the code. Please try again.");
