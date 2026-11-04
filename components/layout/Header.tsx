@@ -8,6 +8,8 @@ import { NotificationBell } from "./NotificationBell";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { QuizopiaLogo } from "./QuizopiaLogo";
 import { useAuth } from "@/hooks/useAuth";
+import { authApi } from "@/lib/auth";
+import type { NormalizedApiError } from "@/lib/api";
 
 interface HeaderProps {
   isMobileMenuOpen: boolean;
@@ -27,8 +29,31 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Review M1-06: Google account linking (authenticated + password re-auth).
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkPassword, setLinkPassword] = useState("");
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Review M1-06: offer linking only when the backend has Google configured
+  // and this account has no Google identity yet.
+  useEffect(() => {
+    let cancelled = false;
+    authApi
+      .providers()
+      .then((p) => {
+        if (!cancelled) setGoogleEnabled(p.googleEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setGoogleEnabled(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Close the profile menu on outside-click or Escape (focus returns to the
   // trigger so keyboard users are not stranded).
@@ -74,6 +99,26 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
     items[nextIndex]?.focus();
   };
 
+
+  /** Re-authenticate with the account password, then bounce to Google. */
+  const handleStartGoogleLink = async () => {
+    setLinkBusy(true);
+    setLinkError(null);
+    try {
+      const { authorizationUrl } = await authApi.startGoogleLink({ password: linkPassword });
+      window.location.assign(authorizationUrl);
+    } catch (err) {
+      const norm = err as NormalizedApiError;
+      if (norm?.kind === "api" && norm.code === "AUTH_INVALID_CREDENTIALS") {
+        setLinkError("Mật khẩu không đúng.");
+      } else if (norm?.kind === "network") {
+        setLinkError("Lỗi mạng — hãy thử lại.");
+      } else {
+        setLinkError("Không thể bắt đầu liên kết. Hãy thử lại.");
+      }
+      setLinkBusy(false);
+    }
+  };
 
   const handleLogout = async () => {
     setBusy(true);
@@ -215,6 +260,45 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
                     </span>
                   </button>
 
+                  {/* Review M1-06: link Google to THIS account (explicit,
+                      password-verified action — never silent). */}
+                  {googleEnabled && !user?.googleLinked && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setLinkPassword("");
+                        setLinkError(null);
+                        setLinkOpen(true);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-[#0052FF] outline-none transition-colors duration-200 hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF]"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={2}
+                        stroke="currentColor"
+                        className="h-5 w-5 shrink-0"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"
+                        />
+                      </svg>
+                      Liên kết đăng nhập Google
+                    </button>
+                  )}
+                  {user?.googleLinked && (
+                    <p className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-[#64748B]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#10B981]" aria-hidden="true" />
+                      Google đã được liên kết
+                    </p>
+                  )}
+
                   <div className="my-1.5 h-px bg-[#E2E8F0]" />
 
                   {/* Đăng xuất — destructive */}
@@ -284,6 +368,64 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
 
         </div>
       </div>
+      {/* Review M1-06: password re-authentication before linking */}
+      {linkOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="google-link-title"
+        >
+          <div className="absolute inset-0 bg-[#0F172A]/40 backdrop-blur-sm" onClick={() => setLinkOpen(false)} />
+          <div className="relative w-full max-w-sm rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-xl">
+            <h2 id="google-link-title" className="text-lg font-bold text-[#0F172A]">
+              Liên kết đăng nhập Google
+            </h2>
+            <p className="mt-2 text-sm font-medium text-[#64748B]">
+              Xác nhận mật khẩu Quizopia của bạn để bắt đầu. Sau khi Google xác
+              nhận, hai cách đăng nhập sẽ cùng trỏ về tài khoản này.
+            </p>
+            <input
+              type="password"
+              id="google-link-password"
+              autoComplete="current-password"
+              placeholder="Mật khẩu hiện tại"
+              aria-label="Mật khẩu hiện tại"
+              value={linkPassword}
+              disabled={linkBusy}
+              onChange={(e) => setLinkPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && linkPassword.length >= 8) void handleStartGoogleLink();
+                if (e.key === "Escape") setLinkOpen(false);
+              }}
+              className="mt-4 h-12 w-full rounded-lg border border-[#E2E8F0] bg-white px-4 text-base text-[#0F172A] outline-none transition-colors focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/30"
+            />
+            {linkError && (
+              <p role="alert" className="mt-2 text-sm font-semibold text-[#EF4444]">
+                {linkError}
+              </p>
+            )}
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setLinkOpen(false)}
+                disabled={linkBusy}
+                className="rounded-lg border border-[#E2E8F0] px-4 py-2.5 text-sm font-semibold text-[#0F172A] outline-none transition-colors hover:bg-[#F1F5F9] focus-visible:ring-2 focus-visible:ring-[#0052FF] disabled:opacity-60"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleStartGoogleLink()}
+                disabled={linkBusy || linkPassword.length < 8}
+                className="rounded-lg bg-[#0052FF] px-4 py-2.5 text-sm font-bold text-white outline-none transition-colors hover:bg-[#0044D6] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:opacity-60"
+              >
+                {linkBusy ? "Đang chuyển…" : "Tiếp tục với Google"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

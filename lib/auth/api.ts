@@ -7,6 +7,8 @@ import type {
   RegisterResponse,
   ResendOtpResponse,
   TokenResponse,
+  LinkGoogleRequest,
+  LinkGoogleResponse,
   VerifyEmailRequest,
   VerifyEmailResponse,
 } from "./types";
@@ -52,4 +54,11 @@ export const authApi = {
   /** `POST /api/auth/oauth/exchange` → 200 `TokenResponse` (one-time code from the OIDC callback). */
   exchangeOauthCode: (code: string): Promise<TokenResponse> =>
     http.post<TokenResponse>("/api/auth/oauth/exchange", { code }),
+
+  /**
+   * `POST /api/auth/oauth/google/link` → 200 with the Google authorization
+   * URL (review M1-06). Requires the signed-in account's password.
+   */
+  startGoogleLink: (req: LinkGoogleRequest): Promise<LinkGoogleResponse> =>
+    http.post<LinkGoogleResponse>("/api/auth/oauth/google/link", req),
 };

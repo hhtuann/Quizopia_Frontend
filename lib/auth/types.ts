@@ -84,6 +84,16 @@ export interface AuthProvidersResponse {
   googleEnabled: boolean;
 }
 
+/** Body of `POST /api/auth/oauth/google/link` (password re-authentication). */
+export interface LinkGoogleRequest {
+  password: string;
+}
+
+/** Response of `POST /api/auth/oauth/google/link`. */
+export interface LinkGoogleResponse {
+  authorizationUrl: string;
+}
+
 /** Backend record `CurrentUserResponse(...)` for `GET /api/auth/me`. */
 export interface CurrentUserResponse {
   id: number;
@@ -94,6 +104,8 @@ export interface CurrentUserResponse {
   status: UserStatus;
   /** Identity-M1: email verified (OTP or trusted OIDC provider). */
   emailVerified: boolean;
+  /** Review M1-06: a Google identity is linked to this account. */
+  googleLinked: boolean;
   roles: string[];
   permissions: string[];
 }
