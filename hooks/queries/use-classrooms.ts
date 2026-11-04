@@ -19,6 +19,9 @@ import {
   type CreateClassroomRequest,
   type CreateRosterEntryRequest,
   type UpdateClassroomRequest,
+  confirmRosterImport,
+  downloadRosterTemplate,
+  previewRosterImport,
 } from "@/lib/api/classrooms";
 
 /** Flat list of the caller's classrooms (feeds the list page + nav). */
@@ -129,3 +132,21 @@ export function useDeclineRosterEntryMutation() {
     },
   });
 }
+
+// ----- Identity-M4 roster import hooks -----
+
+export function useRosterPreviewMutation(id: number) {
+  return useMutation({
+    mutationFn: (file: File) => previewRosterImport(id, file),
+  });
+}
+
+export function useRosterConfirmMutation(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => confirmRosterImport(id, file),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["classrooms"] }),
+  });
+}
+
+export { downloadRosterTemplate };
