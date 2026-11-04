@@ -30,7 +30,8 @@
  * The linking flow rides the same endpoints with the link callback redirect.
  */
 import { createServer } from "node:http";
-import { generateKeyPairSync, createSign, createPublicKey, randomBytes } from "node:crypto";
+import { generateKeyPairSync, createSign, createPrivateKey, randomBytes } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const PORT = Number(process.env.PORT || 9700);
 const ISSUER = process.env.ISSUER || `http://localhost:${PORT}`;
@@ -38,12 +39,28 @@ const SUBJECT = process.env.SUB || "sim-google-sub-1";
 const EMAIL = process.env.EMAIL || "sim.learner@example.com";
 const EMAIL_VERIFIED = process.env.EMAIL_VERIFIED !== "false";
 
-const { publicKey, privateKey } = generateKeyPairSync("rsa", {
-  modulusLength: 2048,
-  publicKeyEncoding: { type: "spki", format: "jwk" },
-  privateKeyEncoding: { type: "pkcs8", format: "pem" },
-});
-const publicJwk = publicKey;
+// Stable signing key across restarts (backend JWKS caches are long-lived):
+// reuse KEYFILE when present so a simulator restart never invalidates the
+// cached JWK set of a running backend.
+const KEYFILE = process.env.KEYFILE || ".oidc-sim-key.json";
+let privateKey;
+let publicJwk;
+if (existsSync(KEYFILE)) {
+  const persisted = JSON.parse(readFileSync(KEYFILE, "utf8"));
+  privateKey = createPrivateKey(persistated.privatePem);
+  publicJwk = persisted.publicJwk;
+  console.log(`[sim] signing key loaded from ${KEYFILE}`);
+} else {
+  const pair = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "jwk" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+  });
+  privateKey = createPrivateKey(pair.privateKey);
+  publicJwk = pair.publicKey;
+  writeFileSync(KEYFILE, JSON.stringify({ privatePem: pair.privateKey, publicJwk }));
+  console.log(`[sim] signing key generated -> ${KEYFILE}`);
+}
 const KID = "sim-oidc-key-1";
 
 /** code → { nonce, clientId, sub, email, used } */
