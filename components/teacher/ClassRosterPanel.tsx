@@ -85,7 +85,10 @@ export function ClassRosterPanel({ classId }: { classId: number }) {
   }
 
   function onRevoke(entry: RosterEntryResponse) {
-    if (!window.confirm(`Revoke the pending invitation for ${entry.fullName}?`)) return;
+    const message = entry.status === "LINKED"
+      ? `Remove ${entry.fullName} from this class? Their membership will be deleted and the invitation revoked.`
+      : `Revoke the pending invitation for ${entry.fullName}?`;
+    if (!window.confirm(message)) return;
     revoke.mutate(entry.id, {
       onSuccess: () =>
         setNotice({ kind: "success", message: `Invitation for ${entry.fullName} revoked.` }),
@@ -183,11 +186,14 @@ export function ClassRosterPanel({ classId }: { classId: number }) {
                     <td className="py-2 pr-4">{entry.parentPhone ?? "—"}</td>
                     <td className="py-2 pr-4">
                       <Badge variant={statusVariant(entry.status)}>{entry.status}</Badge>
+                      {entry.status === "PENDING" && (
+                        <span className="ml-2 text-xs text-[#64748B]">awaiting learner</span>
+                      )}
                     </td>
                     <td className="py-2 pr-4">
-                      {entry.status === "PENDING" && (
+                      {(entry.status === "PENDING" || entry.status === "LINKED") && (
                         <Button variant="ghost" size="sm" onClick={() => onRevoke(entry)}>
-                          Revoke
+                          {entry.status === "LINKED" ? "Remove" : "Revoke"}
                         </Button>
                       )}
                     </td>

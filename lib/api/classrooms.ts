@@ -209,3 +209,13 @@ export function getMyRosterEntries(): Promise<RosterEntryResponse[]> {
 export function declineRosterEntry(entryId: number): Promise<void> {
   return http.post<void>(`/api/classrooms/roster/${entryId}/decline`, {});
 }
+
+/** `GET /api/classrooms/roster/invitations` → PENDING entries awaiting consent. */
+export function getMyRosterInvitations(): Promise<RosterEntryResponse[]> {
+  return http.get<RosterEntryResponse[]>("/api/classrooms/roster/invitations");
+}
+
+/** `POST /api/classrooms/roster/{entryId}/accept` → learner consent (relink path). */
+export function acceptRosterInvitation(entryId: number): Promise<RosterEntryResponse> {
+  return http.post<RosterEntryResponse>(`/api/classrooms/roster/${entryId}/accept`, {});
+}

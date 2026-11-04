@@ -2,11 +2,13 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  acceptRosterInvitation,
   addMembers,
   addRosterEntry,
   createClassroom,
   declineRosterEntry,
   getClassroom,
+  getMyRosterInvitations,
   getClassroomMembers,
   getClassroomRoster,
   getMyClassrooms,
@@ -18,6 +20,7 @@ import {
   type ClassroomMembersParams,
   type CreateClassroomRequest,
   type CreateRosterEntryRequest,
+  type RosterEntryResponse,
   type UpdateClassroomRequest,
 } from "@/lib/api/classrooms";
 
@@ -123,6 +126,25 @@ export function useDeclineRosterEntryMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (entryId: number) => declineRosterEntry(entryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["roster"] });
+      queryClient.invalidateQueries({ queryKey: ["classrooms"] });
+    },
+  });
+}
+
+/** Learner: pending invitations awaiting my consent (Identity-M3 review). */
+export function useMyRosterInvitationsQuery<T = RosterEntryResponse[]>() {
+  return useQuery<T>({
+    queryKey: ["roster", "invitations"],
+    queryFn: () => getMyRosterInvitations() as Promise<T>,
+  });
+}
+
+export function useAcceptRosterInvitationMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (entryId: number) => acceptRosterInvitation(entryId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roster"] });
       queryClient.invalidateQueries({ queryKey: ["classrooms"] });
