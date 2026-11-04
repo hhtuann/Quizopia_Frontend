@@ -7,7 +7,8 @@ import { RequireAuth } from "@/components/auth/RequireAuth";
 import { Badge, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/hooks/useAuth";
-import { navItemsForRoles } from "@/lib/navigation";
+import { navItemsForView } from "@/lib/navigation";
+import { useActiveView } from "@/lib/view/store";
 import { useAvailableSessionsQuery } from "@/hooks/queries/use-student-attempts";
 import type { NormalizedApiError } from "@/lib/api";
 
@@ -32,10 +33,12 @@ export default function Home() {
     return fallback ? (ROLE_LABELS[fallback] ?? fallback) : null;
   }, [user]);
 
-  // Functional cards = the same role-filtered nav the sidebar uses, minus the Dashboard itself.
+  // Functional cards = the same view-filtered nav the sidebar uses, minus the
+  // Dashboard itself (Identity-M2: dual-role users see their active view's cards).
+  const { view } = useActiveView();
   const cards = useMemo(
-    () => navItemsForRoles(user?.roles).filter((item) => item.href !== "/"),
-    [user]
+    () => navItemsForView(user?.roles, view).filter((item) => item.href !== "/"),
+    [user, view]
   );
 
   // ONBOARD-3: detect a student with no school profile. The available-sessions
@@ -44,15 +47,15 @@ export default function Home() {
   const sessionsQuery = useAvailableSessionsQuery();
   const sessionsError = sessionsQuery.error as unknown as NormalizedApiError | undefined;
   const isPendingStudent =
-    isStudent && sessionsQuery.isError
+    isStudent && view === "student" && sessionsQuery.isError
     && sessionsError?.kind === "api"
     && sessionsError?.code === "ATTEMPT_STUDENT_PROFILE_NOT_FOUND";
 
   const subtitle = isPendingStudent
     ? "Your account is awaiting school assignment."
-    : user?.roles?.includes("TEACHER")
+    : view === "teacher"
       ? "Manage your question banks, build exams, and run live sessions."
-      : user?.roles?.includes("STUDENT")
+      : isStudent
         ? "Jump into an available session or review your past attempts."
         : "Choose an area below to get started.";
 

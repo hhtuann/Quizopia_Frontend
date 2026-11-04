@@ -56,6 +56,13 @@ export const authApi = {
     http.post<TokenResponse>("/api/auth/oauth/exchange", { code }),
 
   /**
+   * `POST /api/auth/upgrade-teacher` → 200 with the effective roles
+   * (Identity-M2). Self-service TEACHER grant; idempotent, no body.
+   */
+  upgradeToTeacher: (): Promise<{ roles: string[] }> =>
+    http.post<{ roles: string[] }>("/api/auth/upgrade-teacher"),
+
+  /**
    * `POST /api/auth/oauth/google/link` → 200 with the Google authorization
    * URL (review M1-06). Requires the signed-in account's password.
    */

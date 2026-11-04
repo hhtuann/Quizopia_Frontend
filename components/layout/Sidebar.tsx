@@ -3,18 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { navItemsForRoles, isActive } from "@/lib/navigation";
+import { navItemsForView, isActive } from "@/lib/navigation";
+import { useActiveView } from "@/lib/view/store";
 
 /**
- * Desktop navigation. Zero props — reads the authenticated user's roles and the
- * current pathname itself, then renders the role-filtered nav items from the
- * shared `lib/navigation` source of truth. Active link is derived from
- * `usePathname` (not local state) so it survives navigation and refresh.
+ * Desktop navigation. Zero props — reads the authenticated user's roles and
+ * active view plus the current pathname itself, then renders the filtered nav
+ * items from the shared `lib/navigation` source of truth. Active link is
+ * derived from `usePathname` (not local state) so it survives navigation and
+ * refresh.
  */
 export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
-  const items = navItemsForRoles(user?.roles);
+  const { view } = useActiveView();
+  const items = navItemsForView(user?.roles, view);
 
   return (
     <aside className="app-sidebar hidden border-r border-[#E2E8F0] bg-[#FAFAFA] p-4 lg:flex lg:flex-col lg:space-y-8">

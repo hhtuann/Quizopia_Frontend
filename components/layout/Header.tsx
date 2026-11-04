@@ -9,11 +9,15 @@ import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { QuizopiaLogo } from "./QuizopiaLogo";
 import { useAuth } from "@/hooks/useAuth";
 import { authApi } from "@/lib/auth";
+import { useActiveView } from "@/lib/view/store";
 import type { NormalizedApiError } from "@/lib/api";
+import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
 
 interface HeaderProps {
   isMobileMenuOpen: boolean;
   setIsMobileMenuOpen: (open: boolean) => void;
+  /** Identity-M2: menu-driven view switch (overlay owned by AppShell). */
+  onViewSwitch?: (view: "student" | "teacher") => void;
 }
 
 /** Up to two uppercase initials from a display name (first + last word). */
@@ -24,11 +28,16 @@ function initialsOf(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: HeaderProps) {
+export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSwitch }: HeaderProps) {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
+  const { view, canStudent, canTeacher } = useActiveView();
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
+  const [justUpgraded, setJustUpgraded] = useState(false);
   // Review M1-06: Google account linking (authenticated + password re-auth).
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkPassword, setLinkPassword] = useState("");
@@ -129,12 +138,35 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
     }
   };
 
+  /** Identity-M2: explicit confirmation → backend self-upgrade → identity refresh. */
+  const handleUpgradeToTeacher = async () => {
+    setUpgrading(true);
+    setUpgradeError(null);
+    try {
+      await authApi.upgradeToTeacher();
+      await refreshUser();
+      setUpgradeOpen(false);
+      setJustUpgraded(true);
+    } catch (err) {
+      const norm = err as NormalizedApiError;
+      if (norm?.kind === "api" && norm.code === "AUTH_EMAIL_NOT_VERIFIED") {
+        setUpgradeError("Verify your email first, then try again.");
+      } else if (norm?.kind === "network") {
+        setUpgradeError("Network error — check your connection and try again.");
+      } else {
+        setUpgradeError("Could not register as a teacher. Please try again.");
+      }
+    } finally {
+      setUpgrading(false);
+    }
+  };
+
   const displayName = user?.displayName || user?.username || "Account";
   const initials = initialsOf(displayName);
   const isTeacher = user?.roles?.includes("TEACHER") ?? false;
 
   return (
-    <header className="app-topbar w-full border-b border-[#E2E8F0] bg-white/95">
+    <header className="app-topbar relative w-full border-b border-[#E2E8F0] bg-white/95">
       <div className="app-topbar-inner">
         <div className="flex h-full items-center justify-between gap-2 sm:gap-4">
 
@@ -260,6 +292,66 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
                     </span>
                   </button>
 
+                  {/* Identity-M2: student-only accounts can self-register as teacher */}
+                  {canStudent && !canTeacher && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setUpgradeOpen(true);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-[#0052FF] outline-none transition-colors duration-200 hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF]"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={2}
+                        stroke="currentColor"
+                        className="h-5 w-5 shrink-0"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.628 48.628 0 0 1 12 20.904a48.628 48.628 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"
+                        />
+                      </svg>
+                      Đăng ký làm Giáo viên
+                    </button>
+                  )}
+
+                  {/* Identity-M2: dual-role accounts switch views */}
+                  {canStudent && canTeacher && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onViewSwitch?.(view === "student" ? "teacher" : "student");
+                      }}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-[#0F172A] outline-none transition-colors duration-200 hover:bg-[#F1F5F9] focus-visible:ring-2 focus-visible:ring-[#0052FF]"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={2}
+                        stroke="currentColor"
+                        className="h-5 w-5 shrink-0 text-[#0052FF]"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"
+                        />
+                      </svg>
+                      {view === "student" ? "Chuyển sang Giáo viên" : "Chuyển sang Học sinh"}
+                    </button>
+                  )}
+
                   {/* Review M1-06: link Google to THIS account (explicit,
                       password-verified action — never silent). */}
                   {googleEnabled && !user?.googleLinked && (
@@ -368,6 +460,69 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen }: Header
 
         </div>
       </div>
+
+      {/* Identity-M2: post-upgrade success banner (independent of the menu) */}
+      {justUpgraded && canStudent && canTeacher && (
+        <div
+          role="status"
+          className="absolute left-1/2 top-full z-40 mt-2 w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-[#10B981]/30 bg-white p-4 shadow-lg"
+        >
+          <p className="text-sm font-bold text-[#10B981]">Đã đăng ký làm Giáo viên!</p>
+          <p className="mt-1 text-xs font-medium text-[#64748B]">
+            Vai trò Học sinh của bạn được giữ nguyên.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setJustUpgraded(false);
+                onViewSwitch?.("teacher");
+              }}
+              className="flex-1 rounded-md bg-[#0052FF] px-3 py-2 text-xs font-bold text-white outline-none transition-colors hover:bg-[#0044D6] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
+            >
+              Chuyển sang màn Giáo viên
+            </button>
+            <button
+              type="button"
+              onClick={() => setJustUpgraded(false)}
+ className="rounded-md border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#64748B] outline-none transition-colors hover:bg-[#F1F5F9] focus-visible:ring-2 focus-visible:ring-[#0052FF]"
+            >
+              Để sau
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Identity-M2: teacher self-upgrade confirmation */}
+      <ConfirmDialog
+        open={upgradeOpen}
+        titleId="teacher-upgrade-title"
+        title="Đăng ký làm Giáo viên?"
+        description={
+          <>
+            Tài khoản của bạn sẽ được thêm quyền Giáo viên ngay sau khi xác nhận
+            (vai trò Học sinh được giữ nguyên). Bạn có thể tạo ngân hàng câu
+            hỏi, đề thi và lớp học trong không gian cá nhân của mình.
+          </>
+        }
+        confirmLabel="Xác nhận đăng ký"
+        cancelLabel="Hủy"
+        busyLabel="Đang đăng ký…"
+        busy={upgrading}
+        onConfirm={() => void handleUpgradeToTeacher()}
+        onCancel={() => {
+          setUpgradeOpen(false);
+          setUpgradeError(null);
+        }}
+      />
+      {upgradeOpen && upgradeError && (
+        <p
+          role="alert"
+          className="sr-only"
+        >
+          {upgradeError}
+        </p>
+      )}
       {/* Review M1-06: password re-authentication before linking */}
       {linkOpen && (
         <div
