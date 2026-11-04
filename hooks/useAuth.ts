@@ -13,7 +13,7 @@ import { useAuthContext } from "@/components/providers/AuthProvider";
 export function useAuth() {
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
-  const { status, login, register, refreshUser, logout } = useAuthContext();
+  const { status, login, register, refreshUser, completeLogin, logout } = useAuthContext();
 
   return {
     user,
@@ -25,6 +25,8 @@ export function useAuth() {
     register,
     /** Identity-M2: re-fetches the identity (roles) after e.g. an upgrade. */
     refreshUser,
+    /** Review M1-04: unified session completion (OAuth exchange path). */
+    completeLogin,
     logout,
   };
 }

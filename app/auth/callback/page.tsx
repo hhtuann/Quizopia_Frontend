@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, Card } from "@/components/ui";
 import { authApi } from "@/lib/auth";
-import { useAuthStore } from "@/lib/auth";
+import { useAuth } from "@/hooks/useAuth";
 
 /**
  * Identity-M1 OAuth callback. The backend redirected here with
@@ -16,6 +16,7 @@ import { useAuthStore } from "@/lib/auth";
 function OAuthCallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { completeLogin } = useAuth();
   const code = searchParams.get("code");
   const oauthError = searchParams.get("error");
   const [phase, setPhase] = useState<"exchanging" | "done" | "failed">(
@@ -28,17 +29,18 @@ function OAuthCallbackInner() {
     started.current = true;
     void (async () => {
       try {
+        // Review M1-04: route the exchange through the provider's unified
+        // completion action so token, user AND AuthProvider.status land
+        // together — RequireAuth can never bounce a logged-in OAuth user.
         const token = await authApi.exchangeOauthCode(code);
-        useAuthStore.getState().setAccessToken(token.accessToken);
-        const me = await authApi.me();
-        useAuthStore.getState().setUser(me);
+        await completeLogin(token);
         setPhase("done");
         router.replace("/");
       } catch {
         setPhase("failed");
       }
     })();
-  }, [code, router]);
+  }, [code, router, completeLogin]);
 
   if (phase === "exchanging") {
     return (
