@@ -124,7 +124,7 @@ export function RosterImportPanel({ classId }: { classId: number }) {
         <div className="mt-4 overflow-x-auto">
           <p className="mb-2 text-sm text-[#64748B]">
             {preview.ready} of {preview.totalRows} rows ready. Rows with issues are skipped on
-            import.
+            import. One preview row per sheet row — a row may list several column issues.
           </p>
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead>
