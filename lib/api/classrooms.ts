@@ -16,7 +16,9 @@ export interface ClassroomResponse {
   description: string | null;
   status: ClassroomStatus;
   memberCount: number;
-  ownerTeacherId: number;
+  ownerTeacherId: number | null;
+  /** Identity-M3: user-based owner (independent classrooms: ownerTeacherId is null). */
+  ownerUserId: number;
   createdAt: string;
 }
 
@@ -35,7 +37,11 @@ export interface ClassroomDetailView {
   name: string;
   description: string | null;
   status: ClassroomStatus;
-  ownerTeacherId: number;
+  ownerTeacherId: number | null;
+  /** Identity-M3: user-based owner. */
+  ownerUserId: number;
+  /** True when the class belongs to an independent teacher (no school). */
+  independent: boolean;
   createdAt: string;
   memberCount: number;
   members: ClassroomMemberView[];
@@ -132,4 +138,84 @@ export function getClassroomMembers(
   params: ClassroomMembersParams = {}
 ): Promise<ClassroomMembersPage> {
   return http.get<ClassroomMembersPage>(`/api/classrooms/${id}/members`, { params });
+}
+
+// ---------------------------------------------------------------------------
+// Identity-M3 roster (pending invitations, verified-email linking)
+// ---------------------------------------------------------------------------
+
+/** Backend record `RosterEntryResponse` (teacher + learner projections). */
+export interface RosterEntryResponse {
+  id: number;
+  classroomId: number;
+  status: "PENDING" | "LINKED" | "REVOKED" | "DECLINED";
+  userId: number | null;
+  fullName: string;
+  studentNumber: string | null;
+  gender: "MALE" | "FEMALE" | "OTHER" | null;
+  dob: string | null;
+  phone: string | null;
+  parentPhone: string | null;
+  email: string | null;
+  createdAt: string;
+  linkedAt: string | null;
+}
+
+/** Body for `POST /api/classrooms/{id}/roster`. */
+export interface CreateRosterEntryRequest {
+  fullName: string;
+  studentNumber?: string | null;
+  gender?: "MALE" | "FEMALE" | "OTHER" | null;
+  dob?: string | null;
+  phone?: string | null;
+  parentPhone?: string | null;
+  email: string;
+}
+
+/** `GET /api/classrooms/{id}/roster` (page shape). */
+export interface ClassroomRosterPage {
+  items: RosterEntryResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  sort: string;
+}
+
+/** `POST /api/classrooms/{id}/roster` → 201 RosterEntryResponse. */
+export function addRosterEntry(
+  id: number,
+  req: CreateRosterEntryRequest
+): Promise<RosterEntryResponse> {
+  return http.post<RosterEntryResponse>(`/api/classrooms/${id}/roster`, req);
+}
+
+/** `GET /api/classrooms/{id}/roster` → ClassroomRosterPage. */
+export function getClassroomRoster(id: number, params: { page?: number; size?: number } = {}): Promise<ClassroomRosterPage> {
+  return http.get<ClassroomRosterPage>(`/api/classrooms/${id}/roster`, { params });
+}
+
+/** `DELETE /api/classrooms/{id}/roster/{entryId}` → 204 (revoke PENDING). */
+export function revokeRosterEntry(id: number, entryId: number): Promise<void> {
+  return http.delete<void>(`/api/classrooms/${id}/roster/${entryId}`);
+}
+
+/** `GET /api/classrooms/roster/my` → linked entries of the caller. */
+export function getMyRosterEntries(): Promise<RosterEntryResponse[]> {
+  return http.get<RosterEntryResponse[]>("/api/classrooms/roster/my");
+}
+
+/** `POST /api/classrooms/roster/{entryId}/decline` → 204 (leave class). */
+export function declineRosterEntry(entryId: number): Promise<void> {
+  return http.post<void>(`/api/classrooms/roster/${entryId}/decline`, {});
+}
+
+/** `GET /api/classrooms/roster/invitations` → PENDING entries awaiting consent. */
+export function getMyRosterInvitations(): Promise<RosterEntryResponse[]> {
+  return http.get<RosterEntryResponse[]>("/api/classrooms/roster/invitations");
+}
+
+/** `POST /api/classrooms/roster/{entryId}/accept` → learner consent (relink path). */
+export function acceptRosterInvitation(entryId: number): Promise<RosterEntryResponse> {
+  return http.post<RosterEntryResponse>(`/api/classrooms/roster/${entryId}/accept`, {});
 }

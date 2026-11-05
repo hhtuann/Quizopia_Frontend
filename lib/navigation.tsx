@@ -83,6 +83,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: DashboardIcon, roles: ["STUDENT", "TEACHER", "ACADEMIC_ADMIN", "SYSTEM_ADMIN"], exact: true, view: "shared" },
   { href: "/sessions", label: "Available sessions", icon: ExamIcon, roles: ["STUDENT"], view: "student", description: "Browse open exam sessions and join one when you’re ready." },
   { href: "/attempts", label: "My attempts", icon: ClockIcon, roles: ["STUDENT"], view: "student", description: "Review your past attempts and their detailed results." },
+  { href: "/my-classes", label: "My classes", icon: UsersIcon, roles: ["STUDENT"], view: "student", description: "Classes you joined via email invitation — leave anytime." },
   { href: "/question-banks", label: "Question banks", icon: BankIcon, roles: ["TEACHER"], view: "teacher", description: "Build and organize reusable collections of questions." },
   { href: "/exams", label: "Exams", icon: ExamIcon, roles: ["TEACHER"], view: "teacher", description: "Assemble exams from your question banks and run their sessions." },
   { href: "/classes", label: "Classes", icon: UsersIcon, roles: ["TEACHER"], view: "teacher", description: "Manage your classes and student rosters." },

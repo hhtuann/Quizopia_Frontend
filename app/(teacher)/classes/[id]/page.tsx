@@ -12,6 +12,7 @@ import {
 } from "@/hooks/queries/use-classrooms";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
 import { StudentSearchSelect } from "@/components/teacher/StudentSearchSelect";
+import { ClassRosterPanel } from "@/components/teacher/ClassRosterPanel";
 import { Badge, Button, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { updateClassroomSchema, type UpdateClassroomValues } from "@/lib/validation/classroom-schemas";
@@ -136,6 +137,8 @@ function DetailView({ classroom }: { classroom: ClassroomDetailView }) {
           setNotice({ kind: "success", message: `Added ${r.added} student${r.added === 1 ? "" : "s"}.${r.duplicated.length > 0 ? ` ${r.duplicated.length} already members.` : ""}${r.invalid.length > 0 ? ` ${r.invalid.length} invalid.` : ""}` })
         }
       />
+
+      <ClassRosterPanel classId={classroom.id} />
 
       <div className={cn(cardVariants(), "mt-6 p-4 sm:p-6")}>
         {classroom.members.length === 0 ? (
