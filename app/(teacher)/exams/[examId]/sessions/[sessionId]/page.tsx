@@ -24,6 +24,7 @@ import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
 import { ClassAssignment } from "@/components/teacher/ClassAssignment";
 import { LiveMonitor } from "@/components/teacher/LiveMonitor";
 import { ReportingSection } from "@/components/teacher/reporting/ReportingSection";
+import { SessionShareCard } from "@/components/teacher/SessionShareCard";
 import type { NormalizedApiError } from "@/lib/api";
 
 const EDITABLE_STATES: ExamSessionStatus[] = ["DRAFT", "SCHEDULED"];
@@ -217,6 +218,9 @@ function DetailView({ data, backHref }: { data: ExamSessionDetailResponse; backH
           </p>
         </div>
       )}
+
+      {/* P2-D: share the participant link for this session (copy action). */}
+      <SessionShareCard sessionId={data.id} visibility={data.visibility} />
 
       {/* Read-only facts */}
       <div className={cn(cardVariants(), "mb-6 p-6")}>

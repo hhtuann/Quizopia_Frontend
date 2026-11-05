@@ -81,6 +81,44 @@ export interface MyAttemptsResponse {
   sort: string;
 }
 
+/**
+ * Backend record `SessionEligibilityResponse` (P2-D): server-authorized
+ * pre-flight state for one shared-session deep link. `state` is one of
+ * CAN_START | CAN_RESUME | NOT_YET_STARTED | NO_ATTEMPTS_LEFT |
+ * ATTEMPT_EXPIRED | ENDED. Ineligible callers never see this shape (403
+ * ATTEMPT_NOT_ELIGIBLE / 404 EXAM_SESSION_NOT_FOUND).
+ */
+export interface SessionEligibility {
+  sessionId: number;
+  state:
+    | "CAN_START"
+    | "CAN_RESUME"
+    | "NOT_YET_STARTED"
+    | "NO_ATTEMPTS_LEFT"
+    | "ATTEMPT_EXPIRED"
+    | "ENDED";
+  sessionStatus: string;
+  title: string;
+  examTitle: string;
+  visibility: "PUBLIC" | "CLASS_RESTRICTED";
+  startsAt: string;
+  endsAt: string;
+  durationMinutes: number;
+  maxAttempts: number;
+  attemptsUsed: number;
+  remainingAttempts: number;
+  activeAttemptId: number | null;
+  activeAttemptDeadlineAt: string | null;
+  canStartNow: boolean;
+  canResume: boolean;
+  serverTime: string;
+}
+
+/** `GET /api/exam-sessions/{sessionId}/eligibility` — shared-link pre-flight. */
+export function getSessionEligibility(sessionId: number): Promise<SessionEligibility> {
+  return http.get<SessionEligibility>(`/api/exam-sessions/${sessionId}/eligibility`);
+}
+
 /** `GET /api/exam-sessions/available` — sessions the caller (STUDENT) can see. */
 export function getAvailableSessions(): Promise<AvailableSessionsResponse> {
   return http.get<AvailableSessionsResponse>("/api/exam-sessions/available");

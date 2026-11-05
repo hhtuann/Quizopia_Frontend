@@ -1,7 +1,11 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { getAvailableSessions, getMyAttempts } from "@/lib/api/student-attempts";
+import {
+  getAvailableSessions,
+  getMyAttempts,
+  getSessionEligibility,
+} from "@/lib/api/student-attempts";
 
 /**
  * Available sessions for the student. `staleTime` 15s — the status flags
@@ -22,5 +26,19 @@ export function useMyAttemptsQuery(page: number, size: number) {
     queryKey: ["student", "my-attempts", { page, size }],
     queryFn: () => getMyAttempts(page, size),
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Shared-link pre-flight for one session (P2-D): server-authorized state for
+ * the landing page. Time-sensitive flags → 15s staleness like the listing.
+ */
+export function useSessionEligibilityQuery(sessionId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ["student", "session-eligibility", sessionId],
+    queryFn: () => getSessionEligibility(sessionId),
+    enabled,
+    staleTime: 15_000,
+    retry: false,
   });
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { buildLoginRedirect } from "@/lib/auth/redirect";
 import { Card } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -26,7 +27,6 @@ export function RequireAuth({
 }) {
   const router = useRouter();
   const { status, user } = useAuth();
-
   const requiredRoles = requireRole
     ? Array.isArray(requireRole)
       ? requireRole
@@ -41,7 +41,11 @@ export function RequireAuth({
     // Redirects happen in the effect (post-mount) so the first paint stays
     // consistent with SSR (always the loader while loading/unauthenticated).
     if (status === "unauthenticated") {
-      router.replace("/login");
+      // P2-D: remember the deep link (path + query) so /login can return the
+      // participant to the shared session after authentication. Read from
+      // window inside the effect (client-only) — useSearchParams here would
+      // force every layout consumer out of static prerendering.
+      router.replace(buildLoginRedirect(window.location.pathname, window.location.search));
     } else if (forbidden) {
       router.replace("/");
     }

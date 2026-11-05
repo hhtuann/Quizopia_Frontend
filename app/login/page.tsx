@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, type LoginValues } from "@/lib/validation/auth-schemas";
+import { sanitizeReturnTo } from "@/lib/auth/redirect";
 import { Button, Card, Input } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/hooks/useAuth";
@@ -58,6 +59,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const justRegistered = searchParams.get("registered") === "1";
   const justVerified = searchParams.get("verified") === "1";
+  const returnTo = sanitizeReturnTo(searchParams.get("returnTo"));
   const { login } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
   const [needsVerificationEmail, setNeedsVerificationEmail] = useState<string | null>(null);
@@ -94,7 +96,9 @@ function LoginForm() {
     setNeedsVerificationEmail(null);
     try {
       await login(values);
-      router.replace("/");
+      // P2-D: return to the deep link that triggered the login (validated as
+      // an internal path), defaulting to home.
+      router.replace(returnTo ?? "/");
     } catch (err) {
       const norm = err as NormalizedApiError;
       if (norm?.kind === "api") {
