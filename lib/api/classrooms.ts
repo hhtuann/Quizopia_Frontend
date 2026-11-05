@@ -210,6 +210,60 @@ export function declineRosterEntry(entryId: number): Promise<void> {
   return http.post<void>(`/api/classrooms/roster/${entryId}/decline`, {});
 }
 
+// ---------------------------------------------------------------------------
+// Identity-M4 roster XLSX import (template / preview / confirm)
+// ---------------------------------------------------------------------------
+
+/** Backend record `RosterImportService.PreviewRow`. */
+export interface RosterPreviewRow {
+  sheetRow: number;
+  fullName: string | null;
+  studentNumber: string | null;
+  gender: string | null;
+  dob: string | null;
+  phone: string | null;
+  parentPhone: string | null;
+  email: string | null;
+  status: "READY" | "DUPLICATE_IN_FILE" | "DUPLICATE_IN_CLASS" | "ERROR";
+  issues: string[];
+}
+
+/** Backend record `RosterImportService.PreviewResult`. */
+export interface RosterPreviewResult {
+  totalRows: number;
+  ready: number;
+  rows: RosterPreviewRow[];
+}
+
+/** Backend record `RosterImportService.ConfirmResult`. */
+export interface RosterConfirmResult {
+  imported: number;
+  duplicates: number;
+  failed: number;
+  errors: { sheetRow: number; column: string; message: string }[];
+}
+
+/** `GET /api/classrooms/{id}/roster-import/template` (xlsx blob). */
+export function downloadRosterTemplate(id: number): Promise<Blob> {
+  return http.get<Blob>(`/api/classrooms/${id}/roster-import/template`, {
+    responseType: "blob",
+  });
+}
+
+/** `POST /api/classrooms/{id}/roster-import/preview` (read-only). */
+export function previewRosterImport(id: number, file: File): Promise<RosterPreviewResult> {
+  const form = new FormData();
+  form.append("file", file);
+  return http.post<RosterPreviewResult>(`/api/classrooms/${id}/roster-import/preview`, form);
+}
+
+/** `POST /api/classrooms/{id}/roster-import/confirm` (idempotent batch). */
+export function confirmRosterImport(id: number, file: File): Promise<RosterConfirmResult> {
+  const form = new FormData();
+  form.append("file", file);
+  return http.post<RosterConfirmResult>(`/api/classrooms/${id}/roster-import/confirm`, form);
+}
+
 /** `GET /api/classrooms/roster/invitations` → PENDING entries awaiting consent. */
 export function getMyRosterInvitations(): Promise<RosterEntryResponse[]> {
   return http.get<RosterEntryResponse[]>("/api/classrooms/roster/invitations");
