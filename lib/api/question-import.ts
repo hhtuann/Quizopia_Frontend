@@ -10,6 +10,7 @@ import { http } from "./http-client";
  * Endpoints (QuestionImportController):
  *   - GET  /api/questions/import-template                 → xlsx blob
  *   - POST /api/question-banks/{bankId}/questions/import  → ImportResponse (multipart "file")
+ *   - POST /api/question-banks/{bankId}/questions/import-markdown → ImportResponse (JSON)
  *
  * Partial success: a 200 response may carry `errors[]` (row-level) — these are
  * NOT an ApiError. Only hard pre-conditions (auth / file metadata / structure)
@@ -57,5 +58,19 @@ export function importQuestions(bankId: number, file: File): Promise<ImportRespo
   return http.post<ImportResponse>(
     `/api/question-banks/${bankId}/questions/import`,
     form
+  );
+}
+/**
+ * `POST /api/question-banks/{bankId}/questions/import-markdown` (P2-C).
+ * Teacher-only Quiz Markdown import. The whole document is imported
+ * atomically: a 200 response either reports `importedRows === totalRows` with
+ * no errors, or `importedRows === 0` with per-question `errors[]` (parse or
+ * bank-contract rejections — nothing persisted). Hard pre-conditions (auth,
+ * blank/oversized source, too many questions) reject as 4xx ApiError.
+ */
+export function importMarkdownQuestions(bankId: number, markdown: string): Promise<ImportResponse> {
+  return http.post<ImportResponse>(
+    `/api/question-banks/${bankId}/questions/import-markdown`,
+    { markdown }
   );
 }

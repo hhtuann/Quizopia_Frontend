@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useBankQuestionsQuery } from "@/hooks/queries/use-question-banks";
 import { QuestionImport } from "@/components/teacher/QuestionImport";
+import { QuestionMarkdownImport } from "@/components/teacher/QuestionMarkdownImport";
 import { Input, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type {
@@ -39,6 +40,54 @@ const TYPE_OPTIONS: QuestionType[] = [
 
 const STATUS_OPTIONS: QuestionStatus[] = ["DRAFT", "ACTIVE", "ARCHIVED"];
 
+type ImportMode = "excel" | "markdown";
+
+const IMPORT_MODE_LABEL: Record<ImportMode, string> = {
+  excel: "Excel Import",
+  markdown: "Markdown Authoring",
+};
+
+/**
+ * Segmented control switching between the two authoring/import paths
+ * (P2-C, issue #18). Both panels stay mounted; the inactive one is hidden so
+ * an in-progress Markdown draft or a chosen file survives switching.
+ */
+function ImportModeSwitch({
+  mode,
+  onModeChange,
+}: {
+  mode: ImportMode;
+  onModeChange: (mode: ImportMode) => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Import method"
+      className="mb-4 inline-flex rounded-xl border border-[#E2E8F0] bg-[#F1F5F9] p-1"
+    >
+      {(Object.keys(IMPORT_MODE_LABEL) as ImportMode[]).map((option) => {
+        const active = mode === option;
+        return (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onModeChange(option)}
+            className={cn(
+              "h-11 rounded-lg px-5 text-sm font-semibold outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2",
+              active
+                ? "bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white"
+                : "text-[#64748B] hover:text-[#0F172A]"
+            )}
+          >
+            {IMPORT_MODE_LABEL[option]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function BankQuestionsPage() {
   const { bankId } = useParams<{ bankId: string }>();
   const bankIdNum = Number(bankId);
@@ -49,6 +98,7 @@ export default function BankQuestionsPage() {
   const [type, setType] = useState<QuestionType | "">("");
   const [status, setStatus] = useState<QuestionStatus | "">("");
   const [page, setPage] = useState(0);
+  const [importMode, setImportMode] = useState<ImportMode>("excel");
   const [editTarget, setEditTarget] = useState<number | null>(null);
 
   // Debounce search; any filter change resets to page 0.
@@ -112,7 +162,13 @@ export default function BankQuestionsPage() {
 
       {validId && (
         <div className="mb-6">
-          <QuestionImport bankId={bankIdNum} />
+          <ImportModeSwitch mode={importMode} onModeChange={setImportMode} />
+          <div className={importMode === "excel" ? undefined : "hidden"}>
+            <QuestionImport bankId={bankIdNum} />
+          </div>
+          <div className={importMode === "markdown" ? undefined : "hidden"}>
+            <QuestionMarkdownImport bankId={bankIdNum} />
+          </div>
         </div>
       )}
 
