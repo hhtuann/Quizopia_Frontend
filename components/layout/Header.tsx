@@ -37,7 +37,6 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
-  const [justUpgraded, setJustUpgraded] = useState(false);
   // Review M1-06: Google account linking (authenticated + password re-auth).
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkPassword, setLinkPassword] = useState("");
@@ -146,7 +145,10 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
       await authApi.upgradeToTeacher();
       await refreshUser();
       setUpgradeOpen(false);
-      setJustUpgraded(true);
+      // UX review: consent was already given in the dialog — go straight
+      // into the branded transition overlay and land in the Teacher view
+      // (no follow-up "switch now?" prompt).
+      onViewSwitch?.("teacher");
     } catch (err) {
       const norm = err as NormalizedApiError;
       if (norm?.kind === "api" && norm.code === "AUTH_EMAIL_NOT_VERIFIED") {
@@ -460,38 +462,6 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
 
         </div>
       </div>
-
-      {/* Identity-M2: post-upgrade success banner (independent of the menu) */}
-      {justUpgraded && canStudent && canTeacher && (
-        <div
-          role="status"
-          className="absolute left-1/2 top-full z-40 mt-2 w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-[#10B981]/30 bg-white p-4 shadow-lg"
-        >
-          <p className="text-sm font-bold text-[#10B981]">Đã đăng ký làm Giáo viên!</p>
-          <p className="mt-1 text-xs font-medium text-[#64748B]">
-            Vai trò Học sinh của bạn được giữ nguyên.
-          </p>
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setJustUpgraded(false);
-                onViewSwitch?.("teacher");
-              }}
-              className="flex-1 rounded-md bg-[#0052FF] px-3 py-2 text-xs font-bold text-white outline-none transition-colors hover:bg-[#0044D6] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
-            >
-              Chuyển sang màn Giáo viên
-            </button>
-            <button
-              type="button"
-              onClick={() => setJustUpgraded(false)}
- className="rounded-md border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#64748B] outline-none transition-colors hover:bg-[#F1F5F9] focus-visible:ring-2 focus-visible:ring-[#0052FF]"
-            >
-              Để sau
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Identity-M2: teacher self-upgrade confirmation */}
       <ConfirmDialog
