@@ -33,21 +33,43 @@ export default function AppShell({ children }: AppShellProps) {
   const items = navItemsForView(user?.roles, view);
   const [transitionMessage, setTransitionMessage] = useState<string | null>(null);
   const drawerRef = useRef<HTMLElement>(null);
+  /**
+   * Minimum time the transition overlay stays on screen (ms). The switch
+   * itself settles in one commit; the deliberate beat makes the hand-off
+   * between views feel intentional instead of instantaneous.
+   */
+  const transitionTimer = useRef<number | null>(null);
+  const MIN_TRANSITION_MS = 1500;
 
-  /** Menu-driven view switch with the overlay and no artificial delay. */
+  /** Menu-driven view switch with the branded overlay (>=1.5s). */
   const switchView = (next: "student" | "teacher") => {
     if (next === view) return;
     setTransitionMessage(next === "teacher" ? TEACHER_TRANSITION_MESSAGE : STUDENT_TRANSITION_MESSAGE);
+    if (transitionTimer.current != null) {
+      window.clearTimeout(transitionTimer.current);
+    }
+    const startedAt = Date.now();
     try {
       changeView(next);
-      // Close after the next paint: the new view's nav is rendered in the
-      // same commit, so the overlay hides as soon as the switch lands.
-      requestAnimationFrame(() => requestAnimationFrame(() => setTransitionMessage(null)));
+      // Hold the branded overlay for the full beat: the new view's nav is
+      // rendered in the same commit, so we simply delay the reveal.
+      const remaining = Math.max(0, MIN_TRANSITION_MS - (Date.now() - startedAt));
+      transitionTimer.current = window.setTimeout(() => {
+        transitionTimer.current = null;
+        setTransitionMessage(null);
+      }, remaining);
     } catch {
       // Error recovery: never leave the user stuck on the overlay.
       setTransitionMessage(null);
     }
   };
+
+  // Clear any pending overlay timer on unmount.
+  useEffect(() => () => {
+    if (transitionTimer.current != null) {
+      window.clearTimeout(transitionTimer.current);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isMobileMenuOpen) return;
