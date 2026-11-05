@@ -113,10 +113,14 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
         >
           {allImported ? (
             <span>Added all {result.totalRows} questions to this bank.</span>
-          ) : (
+          ) : result.invalidRows > 0 ? (
             <span>
               Nothing was imported — {result.invalidRows} question
               {result.invalidRows === 1 ? "" : "s"} rejected (all-or-nothing).
+            </span>
+          ) : (
+            <span>
+              Nothing was imported — the document was rejected (all-or-nothing).
             </span>
           )}
         </div>

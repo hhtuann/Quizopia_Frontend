@@ -325,7 +325,6 @@ function ErrorState({ error }: { error: NormalizedApiError | undefined }) {
         showBack = true;
         break;
       case "QUESTION_BANK_ACCESS_DENIED":
-      case "QUESTION_TEACHER_PROFILE_NOT_FOUND":
         message = "You don't have access to this question bank.";
         showBack = true;
         break;
