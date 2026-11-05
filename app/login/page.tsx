@@ -214,6 +214,15 @@ function LoginForm() {
             <>
               <a
                 href={`${process.env.NEXT_PUBLIC_API_URL ?? ""}/oauth2/authorization/google`}
+                onClick={() => {
+                  // P2-D: keep the deep-link continuation across the OAuth
+                  // round-trip (consumed by the callback page).
+                  try {
+                    sessionStorage.setItem("auth.returnTo", returnTo ?? "/");
+                  } catch {
+                    // sessionStorage unavailable — continuation falls back to home.
+                  }
+                }}
                 className="mb-2 flex h-12 w-full items-center justify-center gap-3 rounded-lg border border-[#E2E8F0] bg-white font-semibold text-[#0F172A] outline-none transition-colors hover:bg-[#F1F5F9] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
               >
                 <GoogleMark className="h-5 w-5" />

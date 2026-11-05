@@ -36,15 +36,13 @@ export default function SessionLandingPage() {
   if (isError) {
     const norm = error as unknown as NormalizedApiError | undefined;
     const code = norm?.kind === "api" ? norm.code : undefined;
-    if (code === "ATTEMPT_NOT_ELIGIBLE" || code === "ATTEMPT_PARTICIPANT_BLOCKED") {
+    if (code === "ATTEMPT_NOT_ELIGIBLE") {
+      // Covers blocked participants too — the backend denies them with the
+      // same code (blocked state is conflated in isEligible).
       return (
         <DeniedState
           title="You don't have access to this session"
-          detail={
-            code === "ATTEMPT_PARTICIPANT_BLOCKED"
-              ? "You are blocked from this session. Contact your teacher if you believe this is a mistake."
-              : "This session is restricted to assigned participants. If you expected access, contact your teacher."
-          }
+          detail="This session is restricted to assigned participants, or you are blocked from it. If you expected access, contact your teacher."
         />
       );
     }

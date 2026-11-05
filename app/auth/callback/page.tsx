@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, Card } from "@/components/ui";
 import { authApi } from "@/lib/auth";
+import { sanitizeReturnTo } from "@/lib/auth/redirect";
 import { useAuth } from "@/hooks/useAuth";
 
 /**
@@ -35,7 +36,16 @@ function OAuthCallbackInner() {
         const token = await authApi.exchangeOauthCode(code);
         await completeLogin(token);
         setPhase("done");
-        router.replace("/");
+        // P2-D: return to the deep link that started the login (persisted by
+        // the login page before leaving for Google), defaulting to home.
+        let saved: string | null = null;
+        try {
+          saved = sessionStorage.getItem("auth.returnTo");
+          sessionStorage.removeItem("auth.returnTo");
+        } catch {
+          saved = null;
+        }
+        router.replace(sanitizeReturnTo(saved) ?? "/");
       } catch {
         setPhase("failed");
       }

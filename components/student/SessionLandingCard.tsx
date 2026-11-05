@@ -23,8 +23,6 @@ export function describeStartError(err: unknown): string {
         return "The session window has not started yet or is already over.";
       case "ATTEMPT_MAX_REACHED":
         return "You have used all attempts for this session.";
-      case "ATTEMPT_PARTICIPANT_BLOCKED":
-        return "You are blocked from this session. Contact your teacher.";
       case "ATTEMPT_DEADLINE_EXCEEDED":
         return "Your previous attempt's time is over.";
       case "ATTEMPT_NOT_ELIGIBLE":
