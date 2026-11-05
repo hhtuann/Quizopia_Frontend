@@ -2,17 +2,29 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  acceptRosterInvitation,
   addMembers,
+  addRosterEntry,
   createClassroom,
+  declineRosterEntry,
   getClassroom,
+  getMyRosterInvitations,
   getClassroomMembers,
+  getClassroomRoster,
   getMyClassrooms,
+  getMyRosterEntries,
   removeMember,
+  revokeRosterEntry,
   updateClassroom,
   type AddMembersRequest,
   type ClassroomMembersParams,
   type CreateClassroomRequest,
+  type CreateRosterEntryRequest,
+  type RosterEntryResponse,
   type UpdateClassroomRequest,
+  confirmRosterImport,
+  downloadRosterTemplate,
+  previewRosterImport,
 } from "@/lib/api/classrooms";
 
 /** Flat list of the caller's classrooms (feeds the list page + nav). */
@@ -75,5 +87,88 @@ export function useRemoveMemberMutation(id: number) {
   return useMutation({
     mutationFn: (studentProfileId: number) => removeMember(id, studentProfileId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["classrooms"] }),
+  });
+}
+
+// ----- Identity-M3 roster hooks -----
+
+/** Pending/linked roster entries of a classroom (owner view). */
+export function useClassroomRosterQuery(id: number) {
+  return useQuery({
+    queryKey: ["classrooms", id, "roster"],
+    queryFn: () => getClassroomRoster(id, { size: 200 }),
+    enabled: !!id,
+  });
+}
+
+export function useAddRosterEntryMutation(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (req: CreateRosterEntryRequest) => addRosterEntry(id, req),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["classrooms"] }),
+  });
+}
+
+export function useRevokeRosterEntryMutation(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (entryId: number) => revokeRosterEntry(id, entryId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["classrooms"] }),
+  });
+}
+
+/** Learner: my linked roster entries (classes joined via email verification). */
+export function useMyRosterEntriesQuery() {
+  return useQuery({
+    queryKey: ["roster", "my"],
+    queryFn: getMyRosterEntries,
+  });
+}
+
+export function useDeclineRosterEntryMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (entryId: number) => declineRosterEntry(entryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["roster"] });
+      queryClient.invalidateQueries({ queryKey: ["classrooms"] });
+    },
+  });
+}
+
+// ----- Identity-M4 roster import hooks -----
+
+export function useRosterPreviewMutation(id: number) {
+  return useMutation({
+    mutationFn: (file: File) => previewRosterImport(id, file),
+  });
+}
+
+export function useRosterConfirmMutation(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => confirmRosterImport(id, file),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["classrooms"] }),
+  });
+}
+
+export { downloadRosterTemplate };
+
+/** Learner: pending invitations awaiting my consent (Identity-M3 review). */
+export function useMyRosterInvitationsQuery<T = RosterEntryResponse[]>() {
+  return useQuery<T>({
+    queryKey: ["roster", "invitations"],
+    queryFn: () => getMyRosterInvitations() as Promise<T>,
+  });
+}
+
+export function useAcceptRosterInvitationMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (entryId: number) => acceptRosterInvitation(entryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["roster"] });
+      queryClient.invalidateQueries({ queryKey: ["classrooms"] });
+    },
   });
 }

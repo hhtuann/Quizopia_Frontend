@@ -1,17 +1,42 @@
 "use client";
 
+import { Suspense, useCallback } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useExamEditorQuery } from "@/hooks/queries/use-exams";
-import { ExamEditor } from "@/components/teacher/exam-editor/ExamEditor";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useExamQuery } from "@/hooks/queries/use-exams";
+import { ExamEditor, type ExamTab } from "@/components/teacher/exam-editor/ExamEditor";
 import type { NormalizedApiError } from "@/lib/api";
 
-export default function ExamDetailPage() {
+const VALID_TABS: ExamTab[] = ["overview", "questions", "sessions"];
+
+function parseTab(value: string | null): ExamTab {
+  return VALID_TABS.includes(value as ExamTab) ? (value as ExamTab) : "overview";
+}
+
+function ExamDetailContent() {
   const { examId } = useParams<{ examId: string }>();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const examIdNum = Number(examId);
   const validId = Number.isFinite(examIdNum);
 
-  const { data, isPending, isError, error } = useExamEditorQuery(examIdNum, validId);
+  const { data, isPending, isError, error } = useExamQuery(examIdNum, validId);
+
+  // The URL is the single source of truth for the active tab, so the sessions
+  // pages can breadcrumb straight back to the Sessions tab
+  // (/exams/{id}?tab=sessions).
+  const tab = parseTab(searchParams.get("tab"));
+
+  const onTabChange = useCallback(
+    (next: ExamTab) => {
+      const params = new URLSearchParams(window.location.search);
+      if (next === "overview") params.delete("tab");
+      else params.set("tab", next);
+      const qs = params.toString();
+      router.replace(qs ? `/exams/${examId}?${qs}` : `/exams/${examId}`, { scroll: false });
+    },
+    [examId, router]
+  );
 
   if (!validId) {
     return <NotFound />;
@@ -25,14 +50,22 @@ export default function ExamDetailPage() {
   if (!data) {
     return <NotFound />;
   }
-  return <ExamEditor data={data} />;
+  return <ExamEditor data={data} tab={tab} onTabChange={onTabChange} />;
+}
+
+export default function ExamDetailPage() {
+  return (
+    <Suspense fallback={<Skeleton />}>
+      <ExamDetailContent />
+    </Suspense>
+  );
 }
 
 function Skeleton() {
   return (
     <div role="status" aria-busy="true" aria-label="Loading exam" className="space-y-4">
       <div className="h-8 w-64 animate-pulse rounded-lg bg-[#F1F5F9]" />
-      <div className="h-40 animate-pulse rounded-xl border border-[#E2E8F0] bg-[#F1F5F9]" />
+      <div className="h-12 animate-pulse rounded-xl border border-[#E2E8F0] bg-[#F1F5F9]" />
       <div className="h-40 animate-pulse rounded-xl border border-[#E2E8F0] bg-[#F1F5F9]" />
       <span className="sr-only">Loading…</span>
     </div>

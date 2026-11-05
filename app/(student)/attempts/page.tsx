@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
 import { useMyAttemptsQuery } from "@/hooks/queries/use-student-attempts";
-import { Badge, buttonVariants, cardVariants } from "@/components/ui";
+import { Badge, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { AttemptStatus } from "@/lib/api/student-attempts";
 import type { NormalizedApiError } from "@/lib/api";
@@ -13,15 +13,15 @@ const pageBtnClass =
   "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#64748B] outline-none transition-all duration-200 group hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
 function formatDateTime(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "â€”";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "â€”";
   return d.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 function formatDuration(startIso: string, endIso: string): string {
   const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
-  if (ms <= 0) return "—";
+  if (ms <= 0) return "â€”";
   const totalSec = Math.round(ms / 1000);
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
@@ -99,14 +99,14 @@ export default function StudentHistoryPage() {
                       <Badge variant={statusVariant(a.status)}>{a.status.replace("_", " ")}</Badge>
                     </td>
                     <td className="px-3 py-3 text-center font-mono text-[#64748B] tabular-nums">
-                      {a.startedAt && a.submittedAt ? formatDuration(a.startedAt, a.submittedAt) : "—"}
+                      {a.startedAt && a.submittedAt ? formatDuration(a.startedAt, a.submittedAt) : "â€”"}
                     </td>
                     <td className="px-3 py-3 text-center text-[#64748B]">{formatDateTime(a.submittedAt)}</td>
                     <td className="px-3 py-3 text-center font-semibold tabular-nums text-[#64748B]">
-                      {a.attemptNumber ?? "—"}
+                      {a.attemptNumber ?? "â€”"}
                     </td>
                     <td className="px-3 py-3 text-center font-mono font-semibold tabular-nums text-[#0F172A]">
-                      {a.score != null && a.maxScore != null ? `${a.score}/${a.maxScore}` : "—"}
+                      {a.score != null && a.maxScore != null ? `${a.score}/${a.maxScore}` : "â€”"}
                     </td>
                   </tr>
                 ))}
@@ -118,7 +118,7 @@ export default function StudentHistoryPage() {
         {!isPending && !isError && items.length > 0 && (
           <div className="mt-4 flex items-center justify-between px-1 pt-4">
             <p className="text-xs font-medium text-[#64748B]" aria-live="polite">
-              {totalElements} attempt{totalElements === 1 ? "" : "s"} · Page {page + 1} of {Math.max(totalPages, 1)}
+              {totalElements} attempt{totalElements === 1 ? "" : "s"} Â· Page {page + 1} of {Math.max(totalPages, 1)}
             </p>
             <div className="flex gap-2">
               <button type="button" onClick={() => setPage((p) => p - 1)} disabled={page <= 0} aria-label="Previous page" className={pageBtnClass}>
@@ -141,7 +141,7 @@ function Skeleton() {
       {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="h-12 animate-pulse rounded-lg bg-[#F1F5F9]" />
       ))}
-      <span className="sr-only">Loading…</span>
+      <span className="sr-only">Loadingâ€¦</span>
     </div>
   );
 }
@@ -157,13 +157,13 @@ function ErrorState({ error }: { error: NormalizedApiError | undefined }) {
         message = "Your student profile wasn't found. Please contact your school.";
         break;
       case "AUTH_ACCESS_TOKEN_INVALID":
-        message = "Your session has expired — please sign in again.";
+        message = "Your session has expired â€” please sign in again.";
         break;
       default:
         message = error.message || "Couldn't load your attempts.";
     }
   } else if (error?.kind === "network") {
-    message = "Network error — check your connection.";
+    message = "Network error â€” check your connection.";
   } else {
     message = "Something went wrong. Please try again.";
   }

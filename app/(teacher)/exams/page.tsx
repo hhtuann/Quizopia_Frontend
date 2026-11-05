@@ -17,7 +17,7 @@ const selectClass =
 const pageBtnClass =
   "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#64748B] outline-none transition-all duration-200 group hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
-const STATUS_OPTIONS: ExamStatus[] = ["DRAFT", "READY"];
+const STATUS_OPTIONS: ExamStatus[] = ["DRAFT", "PUBLISHED", "ARCHIVED"];
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -188,8 +188,8 @@ function ExamsTable({ items }: { items: ExamListItem[] }) {
             <th scope="col" className="px-3 pb-3 text-center font-semibold">Subject</th>
             <th scope="col" className="px-3 pb-3 text-center font-semibold">Purpose</th>
             <th scope="col" className="px-3 pb-3 text-center font-semibold">Status</th>
-            <th scope="col" className="px-3 pb-3 text-center font-semibold">Ver.</th>
-            <th scope="col" className="px-3 pb-3 text-center font-semibold">Flags</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Questions</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Points</th>
             <th scope="col" className="px-3 pb-3 text-center font-semibold">Created</th>
           </tr>
         </thead>
@@ -207,24 +207,21 @@ function ExamsTable({ items }: { items: ExamListItem[] }) {
                 </Link>
               </td>
               <td className="px-3 py-3 text-center text-[#64748B]">
-                {exam.subject.name}
+                {exam.subject ? exam.subject.name : "—"}
               </td>
               <td className="px-3 py-3 text-center text-[#64748B]">
                 {exam.purpose ? exam.purpose.title : "—"}
               </td>
               <td className="px-3 py-3 text-center">
-                <Badge variant={exam.status === "READY" ? "success" : "default"}>
+                <Badge variant={exam.status === "PUBLISHED" ? "success" : exam.status === "DRAFT" ? "warn" : "default"}>
                   {exam.status}
                 </Badge>
               </td>
               <td className="px-3 py-3 text-center tabular-nums text-[#64748B]">
-                {exam.currentVersionNumber ?? "—"}
+                {exam.questionCount}
               </td>
-              <td className="px-3 py-3 text-center">
-                <div className="flex justify-center gap-1.5" aria-label={`draft ${exam.hasDraft ? "yes" : "no"}, published ${exam.hasPublished ? "yes" : "no"}`}>
-                  <VersionDot label="D" active={exam.hasDraft} hint="has draft" />
-                  <VersionDot label="P" active={exam.hasPublished} hint="has published" />
-                </div>
+              <td className="px-3 py-3 text-center tabular-nums text-[#64748B]">
+                {exam.totalPoints}
               </td>
               <td className="px-3 py-3 text-center text-[#64748B]">{formatDate(exam.createdAt)}</td>
             </tr>
@@ -232,23 +229,6 @@ function ExamsTable({ items }: { items: ExamListItem[] }) {
         </tbody>
       </table>
     </div>
-  );
-}
-
-function VersionDot({ label, active, hint }: { label: string; active: boolean; hint: string }) {
-  return (
-    <span
-      title={hint}
-      aria-hidden="true"
-      className={cn(
-        "inline-flex h-5 w-5 items-center justify-center rounded-md text-[10px] font-bold",
-        active
-          ? "bg-[#0052FF]/10 text-[#0052FF]"
-          : "bg-[#F1F5F9] text-[#94A3B8] opacity-60"
-      )}
-    >
-      {label}
-    </span>
   );
 }
 

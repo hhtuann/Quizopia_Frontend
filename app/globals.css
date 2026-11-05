@@ -28,16 +28,95 @@
 }
 
 /* ===== Base Styles ===== */
+:root {
+  /* Shared geometry: Header, Sidebar and content offsets must use these tokens. */
+  --topbar-height: 4rem;
+  --sidebar-width: 16rem;
+  --page-gutter: 1rem;
+  --z-sidebar: 20;
+  --z-drawer: 30;
+  --z-topbar: 40;
+  --z-exam: 45;
+  --z-modal: 50;
+}
+
 html {
-  /* Force scrollbar always visible → no layout shift on long pages */
-  overflow-y: scroll;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  scroll-padding-top: calc(var(--topbar-height) + 1rem);
 }
 
 body {
   background-color: var(--color-next-background);
   color: var(--color-next-foreground);
   font-family: var(--font-sans);
-  overflow-x: hidden;
+}
+
+/* ===== Adaptive application layout (DESIGN.md) =====
+   The document is the only page scroller. Do not add overflow/transform/contain
+   to the shell or main: they can clip menus or re-anchor fixed overlays. */
+.app-shell {
+  min-height: 100dvh;
+  padding-top: var(--topbar-height);
+}
+
+.app-topbar {
+  position: fixed;
+  inset: 0 0 auto;
+  height: var(--topbar-height);
+  z-index: var(--z-topbar);
+}
+
+.app-topbar-inner {
+  height: 100%;
+  padding-inline: var(--page-gutter);
+}
+
+.app-main {
+  padding: 1.5rem var(--page-gutter);
+  overflow-wrap: anywhere;
+}
+
+.app-sidebar {
+  position: fixed;
+  inset: var(--topbar-height) auto 0 0;
+  width: var(--sidebar-width);
+  z-index: var(--z-sidebar);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.app-mobile-navigation {
+  position: fixed;
+  inset: var(--topbar-height) 0 0;
+  z-index: var(--z-drawer);
+}
+
+@media (max-width: 1023px) {
+  html:has(.app-mobile-navigation) { overflow-y: hidden; }
+}
+
+.page-fluid { width: 100%; min-width: 0; }
+.page-form { width: 100%; max-width: 48rem; }
+.page-reading { width: 100%; max-width: 70ch; margin-inline: auto; }
+.page-marketing { width: 100%; max-width: 90rem; margin-inline: auto; }
+.adaptive-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 1.5rem;
+}
+
+@media (min-width: 640px) {
+  :root { --page-gutter: 1.5rem; }
+}
+
+@media (min-width: 1024px) {
+  :root { --topbar-height: 5rem; --page-gutter: 2rem; }
+  .app-main { margin-left: var(--sidebar-width); padding-block: 2rem; }
+}
+
+@media (min-width: 1920px) {
+  :root { --page-gutter: 3rem; }
 }
 
 /* ===== Custom Scrollbar ===== */

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -10,6 +10,8 @@ import { Button, Card, Input } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/hooks/useAuth";
 import { RedirectIfAuthenticated } from "@/components/auth/RedirectIfAuthenticated";
+import { authApi } from "@/lib/auth";
+import { PENDING_VERIFICATION_EMAIL } from "@/app/register/page";
 import type { NormalizedApiError } from "@/lib/api";
 
 function FieldError({ id, message }: { id: string; message?: string }) {
@@ -40,12 +42,26 @@ function FieldError({ id, message }: { id: string; message?: string }) {
   );
 }
 
+function GoogleMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.193-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
+      />
+    </svg>
+  );
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const justRegistered = searchParams.get("registered") === "1";
+  const justVerified = searchParams.get("verified") === "1";
   const { login } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
+  const [needsVerificationEmail, setNeedsVerificationEmail] = useState<string | null>(null);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
 
   const {
     register: field,
@@ -57,8 +73,25 @@ function LoginForm() {
     defaultValues: { identifier: "", password: "" },
   });
 
+  useEffect(() => {
+    // Identity-M1: only offer Google SSO when the backend has credentials.
+    let cancelled = false;
+    authApi
+      .providers()
+      .then((p) => {
+        if (!cancelled) setGoogleEnabled(p.googleEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setGoogleEnabled(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const onSubmit = async (values: LoginValues) => {
     setFormError(null);
+    setNeedsVerificationEmail(null);
     try {
       await login(values);
       router.replace("/");
@@ -68,6 +101,13 @@ function LoginForm() {
         switch (norm.code) {
           case "AUTH_INVALID_CREDENTIALS":
             setFormError("Invalid username/email or password.");
+            break;
+          case "AUTH_EMAIL_NOT_VERIFIED":
+            // Identity-M1: verified accounts only. Route to the OTP screen.
+            setNeedsVerificationEmail(
+              values.identifier.includes("@") ? values.identifier : "",
+            );
+            setFormError("Your email is not verified yet. Enter the code we sent you.");
             break;
           case "AUTH_ACCOUNT_LOCKED":
             setFormError("Your account is temporarily locked. Please try again later.");
@@ -105,12 +145,21 @@ function LoginForm() {
         </div>
 
         <Card variant="elevated" className="p-8 sm:p-10">
-          {justRegistered && (
+          {justVerified && (
             <div
               role="status"
               className="mb-6 rounded-lg border border-[#10B981]/30 bg-[#10B981]/5 p-4 text-sm font-semibold text-[#10B981]"
             >
-              Registration successful — you can sign in now.
+              Email verified — you can sign in now.
+            </div>
+          )}
+
+          {!justVerified && justRegistered && (
+            <div
+              role="status"
+              className="mb-6 rounded-lg border border-[#10B981]/30 bg-[#10B981]/5 p-4 text-sm font-semibold text-[#10B981]"
+            >
+              Registration successful — check your email for a verification code.
             </div>
           )}
 
@@ -134,8 +183,44 @@ function LoginForm() {
                   d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"
                 />
               </svg>
-              <span>{formError}</span>
+              <span>
+                {formError}{" "}
+                {needsVerificationEmail !== null && (
+                  <Link
+                    href="/verify-email"
+                    onClick={() => {
+                      if (needsVerificationEmail) {
+                        try {
+                          sessionStorage.setItem(PENDING_VERIFICATION_EMAIL, needsVerificationEmail);
+                        } catch {
+                          // sessionStorage unavailable; the page asks for it.
+                        }
+                      }
+                    }}
+                    className="font-bold underline"
+                  >
+                    Verify now
+                  </Link>
+                )}
+              </span>
             </div>
+          )}
+
+          {googleEnabled && (
+            <>
+              <a
+                href={`${process.env.NEXT_PUBLIC_API_URL ?? ""}/oauth2/authorization/google`}
+                className="mb-2 flex h-12 w-full items-center justify-center gap-3 rounded-lg border border-[#E2E8F0] bg-white font-semibold text-[#0F172A] outline-none transition-colors hover:bg-[#F1F5F9] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
+              >
+                <GoogleMark className="h-5 w-5" />
+                Continue with Google
+              </a>
+              <div className="mb-6 mt-4 flex items-center gap-3" aria-hidden="true">
+                <span className="h-px flex-1 bg-[#E2E8F0]" />
+                <span className="font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">or</span>
+                <span className="h-px flex-1 bg-[#E2E8F0]" />
+              </div>
+            </>
           )}
 
           <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-5">

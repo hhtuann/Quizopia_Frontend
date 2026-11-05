@@ -7,12 +7,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useBankQuestionsQuery } from "@/hooks/queries/use-question-banks";
 import { QuestionImport } from "@/components/teacher/QuestionImport";
-import { Badge, Input, buttonVariants, cardVariants } from "@/components/ui";
+import { Input, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type {
-  Difficulty,
   QuestionStatus,
-  QuestionSummary,
   QuestionType,
 } from "@/lib/api/question-banks";
 import type { NormalizedApiError } from "@/lib/api";
@@ -40,16 +38,6 @@ const TYPE_OPTIONS: QuestionType[] = [
 ];
 
 const STATUS_OPTIONS: QuestionStatus[] = ["DRAFT", "ACTIVE", "ARCHIVED"];
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 export default function BankQuestionsPage() {
   const { bankId } = useParams<{ bankId: string }>();
@@ -219,12 +207,6 @@ export default function BankQuestionsPage() {
       )}
     </div>
   );
-}
-
-function statusVariant(status: QuestionStatus): "default" | "success" | "warn" {
-  if (status === "ACTIVE") return "success";
-  if (status === "DRAFT") return "warn";
-  return "default";
 }
 
 function NotFound() {

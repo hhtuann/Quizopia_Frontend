@@ -26,6 +26,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  // Review M1-07: never leak one-time OAuth codes via Referer.
+  referrer: "no-referrer",
   title: "Quizopia — Interactive Quiz Platform",
   description: "Experience learning with interactive, responsive, and beautiful soft-UI quiz interface.",
 };

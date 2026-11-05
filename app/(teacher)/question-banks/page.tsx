@@ -161,7 +161,7 @@ function BanksTable({
                   </span>
                 ) : null}
               </td>
-              <td className="px-3 py-3 text-center align-top text-[#64748B]">{bank.subject.name}</td>
+              <td className="px-3 py-3 text-center align-top text-[#64748B]">{bank.subject ? bank.subject.name : "—"}</td>
               <td className="px-3 py-3 text-center align-top font-semibold tabular-nums">
                 {bank.questionCount}
               </td>

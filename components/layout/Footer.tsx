@@ -3,7 +3,7 @@ import React from "react";
 export default function Footer() {
   return (
     <footer className="mt-auto w-full select-none border-t border-[#E2E8F0] py-8">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="w-full">
         <div className="flex flex-col items-center justify-between gap-6 sm:flex-row">
 
           {/* Logo / Brand Name */}

@@ -20,11 +20,17 @@ import type { PageResponse } from "./question-banks";
 
 export type ParticipantStatus = "ELIGIBLE" | "BLOCKED";
 
-/** Backend record `ExamSessionParticipantResponse`. */
+/**
+ * Backend record `ExamSessionParticipantResponse` (user-based since V17,
+ * issue #4 P0-R9): `userId` is the primary identity; `studentProfileId`/
+ * `studentCode` are legacy provenance — nullable for profile-less
+ * participants.
+ */
 export interface ExamSessionParticipantResponse {
   id: number;
-  studentProfileId: number;
-  studentCode: string;
+  userId: number | null;
+  studentProfileId: number | null;
+  studentCode: string | null;
   displayName: string;
   status: ParticipantStatus;
   addedAt: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { AttemptDetailResponse, DetailQuestionView } from "@/lib/api/student-attempt";
 import { useAnswerStore } from "@/lib/attempt/answer-store";
 import { cardVariants } from "@/components/ui";
@@ -106,10 +106,11 @@ export function AttemptShell({
     const blockCtx = (e: MouseEvent) => e.preventDefault();
     document.addEventListener("contextmenu", blockCtx);
     const html = document.documentElement;
+    const previousOverflow = html.style.overflow;
     html.style.overflow = "hidden";
     return () => {
       document.removeEventListener("contextmenu", blockCtx);
-      html.style.overflow = "";
+      html.style.overflow = previousOverflow;
     };
   }, []);
 
@@ -136,14 +137,15 @@ export function AttemptShell({
   const hasSections = sections.length > 1 || (sections.length === 1 && sections[0].title !== null);
   const expired = remainingMs <= 0;
 
-  // Fire onExpire exactly once when the timer hits 0.
-  const [wasExpired, setWasExpired] = useState(false);
+  // Fire onExpire exactly once when the timer hits 0 (ref-guarded; no state,
+  // nothing renders from it).
+  const firedExpireRef = useRef(false);
   useEffect(() => {
-    if (expired && !wasExpired) {
-      setWasExpired(true);
+    if (expired && !firedExpireRef.current) {
+      firedExpireRef.current = true;
       onExpire?.();
     }
-  }, [expired, wasExpired, onExpire]);
+  }, [expired, onExpire]);
 
   const scrollToQuestion = (index: number) => {
     document.getElementById(`attempt-q-${index}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -152,14 +154,14 @@ export function AttemptShell({
   return (
     // Fullscreen overlay — hides the AppShell (sidebar/footer/nav).
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-[#FAFAFA]"
+      className="fixed inset-0 z-[var(--z-exam)] flex flex-col bg-[#FAFAFA]"
       onContextMenu={(e) => e.preventDefault()}
     >
-      {/* ===== Sticky top navbar ===== */}
-      <div className="sticky top-0 z-10 border-b border-[#E2E8F0] bg-white/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-3">
+      {/* Outside the exam scroller: stays visible even when actions wrap. */}
+      <div className="z-10 shrink-0 border-b border-[#E2E8F0] bg-white/95 backdrop-blur-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-[var(--page-gutter)] py-3">
           {/* Left: exam title + student name */}
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1 basis-48">
             <h1 className="truncate font-display text-base font-bold tracking-tight text-[#0F172A] sm:text-lg">
               {detail.examTitle || "Exam"}
             </h1>
@@ -168,7 +170,7 @@ export function AttemptShell({
             )}
           </div>
           {/* Right: timer + indicators + submit */}
-          <div className="flex items-center gap-4">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
             {/* Timer */}
             <div className="text-right">
               <p className="font-mono text-[9px] font-bold uppercase tracking-wider text-[#64748B]">
@@ -198,9 +200,10 @@ export function AttemptShell({
       </div>
 
       {/* ===== Main content area ===== */}
-      <div className="mx-auto flex max-w-6xl gap-6 p-6">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      <div className="grid min-w-0 gap-6 px-[var(--page-gutter)] py-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
         {/* Main column: section-grouped questions */}
-        <div className="min-w-0 flex-1">
+        <div className="w-full min-w-0 max-w-[80ch] justify-self-center">
           {expired && (
             <div role="alert" className="mb-6 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-4 text-sm font-medium text-[#0F172A]">
               Time has expired.
@@ -233,7 +236,7 @@ export function AttemptShell({
                       <div
                         key={q.attemptQuestionId}
                         id={`attempt-q-${flatIndex}`}
-                        className={cn(cardVariants(), "scroll-mt-24 p-6")}
+                        className={cn(cardVariants(), "scroll-mt-6 break-words p-4 sm:p-6")}
                       >
                         <div className="mb-4 flex items-center gap-2">
                           <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-wider text-[#64748B]">
@@ -275,7 +278,7 @@ export function AttemptShell({
 
         {/* Sidebar: question navigator only */}
         <aside className="hidden w-72 shrink-0 lg:block">
-          <div className="sticky top-24 space-y-4">
+          <div className="sticky top-6 space-y-4">
             {/* Question navigator */}
             <div className={cn(cardVariants(), "p-4")}>
               <div className="mb-3 flex items-center justify-between">
@@ -320,6 +323,7 @@ export function AttemptShell({
             </div>
           </div>
         </aside>
+      </div>
       </div>
     </div>
   );

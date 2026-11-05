@@ -263,7 +263,7 @@ function InProgressShell({
         autosaveStatus={autosaveStatus}
         submitSlot={autoSubmitted ? (
           <div className={cn(cardVariants({ variant: "elevated" }), "p-6 text-center")}>
-            <p className="font-display text-lg font-bold text-[#EF4444]">Time's up!</p>
+            <p className="font-display text-lg font-bold text-[#EF4444]">Time&apos;s up!</p>
             <p className="mt-1 text-sm font-medium text-[#64748B]">
               {submitMut.isPending ? "Auto-submitting your answers…" : "Submitting…"}
             </p>

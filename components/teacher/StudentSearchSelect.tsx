@@ -26,7 +26,7 @@ export function StudentSearchSelect({
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [selected, setSelected] = useState<StudentSearchResult[]>([]);
-  const [result, setResult] = useState<AddMembersResponse | null>(null);
+  const [, setResult] = useState<AddMembersResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const addMut = useAddMembersMutation(classId);

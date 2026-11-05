@@ -5,31 +5,49 @@ import {
   assignSessionClasses,
   cancelSession,
   closeSession,
+  createExamSession,
   getSessionClasses,
   getSessionDetail,
   getSessionRoster,
+  listExamSessions,
   listMySessions,
   openSession,
   scheduleSession,
   updateSession,
+  type CreateExamSessionRequest,
   type ExamSessionListParams,
   type SessionLifecycleAction,
   type UpdateExamSessionRequest,
 } from "@/lib/api/exam-sessions";
 
 /**
- * Sessions list query — filter-scoped key + `keepPreviousData` (no flicker on
- * page/search/filter change). Mirrors `useExamsQuery`.
+ * Sessions of ONE exam (canonical nested route, Phase 1 Task B).
+ * Key lives under ["exams", examId, ...] so exam-scoped invalidations and the
+ * flat ["exam-sessions"] tree stay separate.
  */
-export function useExamSessionsQuery(params: ExamSessionListParams) {
+export function useExamSessionsQuery(
+  examId: number,
+  params: ExamSessionListParams = {},
+  enabled = true
+) {
   return useQuery({
-    queryKey: ["exam-sessions", params],
+    queryKey: ["exams", examId, "sessions", params],
+    queryFn: () => listExamSessions(examId, params),
+    placeholderData: keepPreviousData,
+    enabled: enabled && Number.isFinite(examId) && examId > 0,
+  });
+}
+
+/** Legacy flat list (GET /api/exam-sessions/my) — deprecated, kept for transition. */
+export function useMyExamSessionsQuery(params: ExamSessionListParams) {
+  return useQuery({
+    queryKey: ["exam-sessions", "my", params],
     queryFn: () => listMySessions(params),
     placeholderData: keepPreviousData,
   });
 }
 
-/** Teacher detail for one session. `enabled` guards against an invalid id. */
+/** Teacher detail for one session (flat route, by sessionId). `enabled` guards against an invalid id. */
 export function useExamSessionDetailQuery(sessionId: number, enabled: boolean) {
   return useQuery({
     queryKey: ["exam-sessions", sessionId, "detail"],
@@ -51,9 +69,26 @@ export function useSessionRosterQuery(sessionId: number, enabled: boolean) {
 }
 
 /**
- * PUT config update. On success invalidates the detail + list. `expectedVersion`
- * is the optimistic token; a 409 EXAM_CONCURRENT_MODIFICATION rejects (caller
- * refetches + notifies — no auto-overwrite).
+ * Create a session under an exam (canonical nested route). On success
+ * invalidates the exam's sessions list, the flat ["exam-sessions"] tree and
+ * the exams list (participant/session counts may appear).
+ */
+export function useCreateExamSessionMutation(examId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (req: Omit<CreateExamSessionRequest, "examId">) =>
+      createExamSession(examId, req),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exams", examId, "sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["exam-sessions"] });
+    },
+  });
+}
+
+/**
+ * PUT config update. On success invalidates the detail + both session trees.
+ * `expectedVersion` is the optimistic token; a 409 EXAM_CONCURRENT_MODIFICATION
+ * rejects (caller refetches + notifies — no auto-overwrite).
  */
 export function useUpdateSessionMutation(sessionId: number) {
   const queryClient = useQueryClient();
@@ -62,14 +97,16 @@ export function useUpdateSessionMutation(sessionId: number) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exam-sessions", sessionId, "detail"] });
       queryClient.invalidateQueries({ queryKey: ["exam-sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["exams"] });
     },
   });
 }
 
 /**
- * Lifecycle action (schedule/open/close/cancel). On success invalidates detail
- * + list so the new status + buttons render. Idempotent at the target state.
- * Errors reject → caller maps the code + decides whether to refetch.
+ * Lifecycle action (schedule/open/close/cancel). On success invalidates the
+ * detail + BOTH trees (flat ["exam-sessions"] and every exam's nested
+ * ["exams", *, "sessions"] list via the root ["exams"] key). Idempotent at
+ * the target state; errors reject → caller maps the code.
  */
 export function useSessionActionMutation(sessionId: number) {
   const queryClient = useQueryClient();
@@ -89,6 +126,7 @@ export function useSessionActionMutation(sessionId: number) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exam-sessions", sessionId, "detail"] });
       queryClient.invalidateQueries({ queryKey: ["exam-sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["exams"] });
     },
   });
 }
@@ -102,7 +140,7 @@ export function useSessionClassesQuery(sessionId: number) {
   });
 }
 
-/** REPLACE the assigned classes (PUT .../classes). Invalidates classes + detail/list. */
+/** REPLACE the assigned classes (PUT .../classes). Invalidates classes + detail/trees. */
 export function useAssignClassesMutation(sessionId: number) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -111,6 +149,7 @@ export function useAssignClassesMutation(sessionId: number) {
       queryClient.invalidateQueries({ queryKey: ["exam-sessions", sessionId, "classes"] });
       queryClient.invalidateQueries({ queryKey: ["exam-sessions", sessionId, "detail"] });
       queryClient.invalidateQueries({ queryKey: ["exam-sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["exams"] });
     },
   });
 }
