@@ -6,27 +6,34 @@ import Link from "next/link";
 import { useSessionEligibilityQuery } from "@/hooks/queries/use-student-attempts";
 import { useStartAttemptMutation } from "@/hooks/queries/use-student-attempt";
 import { SessionLandingCard, describeStartError } from "@/components/student/SessionLandingCard";
+import { useAuth } from "@/hooks/useAuth";
 import type { NormalizedApiError } from "@/lib/api";
 
 /**
  * Shared-session deep link (P2-D, issue #20): a participant opening
  * /sessions/{sessionId} gets the SERVER-AUTHORIZED eligibility state and can
- * start/resume iff the policy allows. Unauthenticated users are routed to
- * /login with a returnTo continuation by the (student) layout's RequireAuth;
- * every denied case renders a safe card without leaking session metadata.
+ * start/resume iff the policy allows. Lives in the neutral `(participant)`
+ * group (no role requirement — TEACHER-only learners hold the V16 learner
+ * permissions); unauthenticated users are routed to /login with a returnTo
+ * continuation by RequireAuth; every denied case renders a safe card without
+ * leaking session metadata.
  */
 export default function SessionLandingPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const sessionIdNum = Number(sessionId);
   const validId = Number.isFinite(sessionIdNum);
   const router = useRouter();
+  // D-FE-01: teacher-only participants cannot use the STUDENT-gated
+  // /sessions listing — point them home instead.
+  const { user } = useAuth();
+  const backHref = user?.roles?.includes("STUDENT") ? "/sessions" : "/";
 
   const { data, isPending, isError, error } = useSessionEligibilityQuery(sessionIdNum, validId);
   const startMutation = useStartAttemptMutation();
   const [startError, setStartError] = useState<string | null>(null);
 
   if (!validId) {
-    return <NotFoundState />;
+    return <NotFoundState backHref={backHref} />;
   }
 
   if (isPending) {
@@ -36,34 +43,44 @@ export default function SessionLandingPage() {
   if (isError) {
     const norm = error as unknown as NormalizedApiError | undefined;
     const code = norm?.kind === "api" ? norm.code : undefined;
-    if (code === "ATTEMPT_NOT_ELIGIBLE") {
+    if (code === "ATTEMPT_NOT_ELIGIBLE" || code === "ATTEMPT_ACCESS_DENIED") {
       // Covers blocked participants too — the backend denies them with the
-      // same code (blocked state is conflated in isEligible).
+      // same NOT_ELIGIBLE code; ACCESS_DENIED = caller lacks the learner
+      // start capability (e.g. an admin with read-only grants).
       return (
         <DeniedState
           title="You don't have access to this session"
-          detail="This session is restricted to assigned participants, or you are blocked from it. If you expected access, contact your teacher."
+          detail={
+            code === "ATTEMPT_ACCESS_DENIED"
+              ? "Your account cannot start attempts. If you expected access, contact your teacher."
+              : "This session is restricted to assigned participants, or you are blocked from it. If you expected access, contact your teacher."
+          }
+          backHref={backHref}
         />
       );
     }
     if (code === "EXAM_SESSION_NOT_FOUND") {
-      return <NotFoundState />;
+      return <NotFoundState backHref={backHref} />;
     }
     if (code === "AUTH_ACCESS_TOKEN_INVALID") {
       return (
         <DeniedState
           title="Your session has expired"
           detail="Please sign in again to continue."
+          backHref={backHref}
         />
       );
     }
     return (
-      <ErrorState detail={(norm?.kind === "network" ? "Network error" : norm?.message) || undefined} />
+      <ErrorState
+        detail={(norm?.kind === "network" ? "Network error" : norm?.message) || undefined}
+        backHref={backHref}
+      />
     );
   }
 
   if (!data) {
-    return <NotFoundState />;
+    return <NotFoundState backHref={backHref} />;
   }
 
   const onStart = () => {
@@ -96,7 +113,15 @@ export default function SessionLandingPage() {
   );
 }
 
-function DeniedState({ title, detail }: { title: string; detail: string }) {
+function DeniedState({
+  title,
+  detail,
+  backHref,
+}: {
+  title: string;
+  detail: string;
+  backHref: string;
+}) {
   return (
     <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#F1F5F9] text-[#64748B]">
@@ -119,20 +144,26 @@ function DeniedState({ title, detail }: { title: string; detail: string }) {
       <p className="font-display text-lg font-bold text-[#0F172A]">{title}</p>
       <p className="mt-1 max-w-md text-sm text-[#64748B]">{detail}</p>
       <Link
-        href="/sessions"
+        href={backHref}
         className="mt-5 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
       >
-        Back to sessions
+        Back
       </Link>
     </div>
   );
 }
 
-function NotFoundState() {
-  return <DeniedState title="Session not found" detail="This link may be broken or the session was removed." />;
+function NotFoundState({ backHref }: { backHref: string }) {
+  return (
+    <DeniedState
+      title="Session not found"
+      detail="This link may be broken or the session was removed."
+      backHref={backHref}
+    />
+  );
 }
 
-function ErrorState({ detail }: { detail?: string }) {
+function ErrorState({ detail, backHref }: { detail?: string; backHref: string }) {
   return (
     <div
       role="alert"
@@ -141,10 +172,10 @@ function ErrorState({ detail }: { detail?: string }) {
       <p className="font-display text-lg font-bold text-[#0F172A]">Couldn&apos;t load the session</p>
       <p className="mt-1 text-sm text-[#64748B]">{detail || "Please try again in a moment."}</p>
       <Link
-        href="/sessions"
+        href={backHref}
         className="mt-4 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5"
       >
-        Back to sessions
+        Back
       </Link>
     </div>
   );
