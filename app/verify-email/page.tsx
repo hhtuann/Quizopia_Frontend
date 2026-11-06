@@ -243,6 +243,12 @@ export default function VerifyEmailPage() {
                       disabled={status === "verifying"}
                       value={digit}
                       onChange={(e) => setDigit(index, e.target.value)}
+                      onPaste={(e) => {
+                        // Paste distributes the full code across the boxes;
+                        // maxLength would otherwise truncate the pasted text.
+                        e.preventDefault();
+                        setDigit(index, e.clipboardData.getData("text"));
+                      }}
                       onKeyDown={(e) => onKeyDown(index, e)}
                       className="h-14 w-full rounded-lg border border-[#E2E8F0] bg-white text-center font-mono text-2xl font-bold text-[#0F172A] outline-none transition-colors focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/30 disabled:opacity-60"
                     />
