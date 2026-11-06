@@ -18,10 +18,13 @@ export function StudentSearchSelect({
   classId,
   excludeIds,
   onResult,
+  unboxed = false,
 }: {
   classId: number;
   excludeIds: number[];
   onResult: (r: AddMembersResponse) => void;
+  /** Render without the outer card (when embedded in AddStudentsPanel). */
+  unboxed?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -77,23 +80,27 @@ export function StudentSearchSelect({
   };
 
   return (
-    <div className={cn(cardVariants(), "p-5")}>
-      <h2 className="mb-3 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">Add students</h2>
+    <div className={unboxed ? "" : cn(cardVariants(), "p-5")}>
+      {!unboxed && (
+        <h2 className="mb-3 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
+          Add students
+        </h2>
+      )}
 
-      {/* Search input */}
-      <input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search by student code, name, or username…"
-        className="h-11 w-full rounded-lg border border-[#E2E8F0] bg-transparent px-4 text-sm text-[#0F172A] placeholder:text-[#64748B]/50 outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2"
-        aria-label="Search students"
-      />
+      {/* Search input + floating results overlay (does not expand the card) */}
+      <div className="relative">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by student code, name, or username…"
+          className="h-11 w-full rounded-lg border border-[#E2E8F0] bg-transparent px-4 text-sm text-[#0F172A] placeholder:text-[#64748B]/50 outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2"
+          aria-label="Search students"
+        />
 
-      {/* Results dropdown */}
-      {debounced.length >= 2 && results.length > 0 && (
-        <div className="mt-2 max-h-60 space-y-1 overflow-y-auto rounded-lg border border-[#E2E8F0] bg-white p-1 shadow-md">
-          {results.map((s) => (
+        {debounced.length >= 2 && results.length > 0 && (
+          <div className="absolute inset-x-0 top-full z-20 mt-2 max-h-72 space-y-1 overflow-y-auto rounded-lg border border-[#E2E8F0] bg-white p-1 shadow-lg">
+            {results.map((s) => (
             <button
               key={s.studentProfileId}
               type="button"
@@ -111,9 +118,10 @@ export function StudentSearchSelect({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
               </svg>
             </button>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
       {debounced.length >= 2 && results.length === 0 && !searchData && (
         <p className="mt-2 pl-1 text-xs text-[#64748B]">Searching…</p>
       )}

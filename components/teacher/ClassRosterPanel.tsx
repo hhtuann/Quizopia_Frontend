@@ -21,7 +21,14 @@ import { Badge, Button, Input } from "@/components/ui";
  * the member; PENDING rows can be revoked. Sensitive fields (DOB, phones)
  * are only echoed back to the classroom owner.
  */
-export function ClassRosterPanel({ classId }: { classId: number }) {
+export function ClassRosterPanel({
+  classId,
+  unboxed = false,
+}: {
+  classId: number;
+  /** Render inside AddStudentsPanel without the section heading (card provided by the host). */
+  unboxed?: boolean;
+}) {
   const { data, isPending, isError } = useClassroomRosterQuery(classId);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; message: string } | null>(null);
 
@@ -97,12 +104,16 @@ export function ClassRosterPanel({ classId }: { classId: number }) {
   }
 
   return (
-    <section className="mt-8" aria-label="Class roster">
-      <h2 className="text-lg font-semibold">Roster (email invitations)</h2>
-      <p className="mt-1 text-sm text-[#64748B]">
-        Add learners by email before they register. Once they verify that email they join
-        automatically and can leave at any time.
-      </p>
+    <section className={unboxed ? "" : "mt-8"} aria-label="Class roster">
+      {!unboxed && (
+        <>
+          <h2 className="text-lg font-semibold">Roster (email invitations)</h2>
+          <p className="mt-1 text-sm text-[#64748B]">
+            Add learners by email before they register. Once they verify that email they join
+            automatically and can leave at any time.
+          </p>
+        </>
+      )}
 
       <form
         onSubmit={form.handleSubmit(onSubmit)}

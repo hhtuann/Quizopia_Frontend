@@ -15,7 +15,14 @@ import { cn } from "@/lib/utils/cn";
  * upload for a read-only preview (row/column errors + duplicates), then
  * confirm the idempotent batch import.
  */
-export function RosterImportPanel({ classId }: { classId: number }) {
+export function RosterImportPanel({
+  classId,
+  unboxed = false,
+}: {
+  classId: number;
+  /** Render inside AddStudentsPanel without the section heading (card provided by the host). */
+  unboxed?: boolean;
+}) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<RosterPreviewResult | null>(null);
   const [result, setResult] = useState<RosterConfirmResult | null>(null);
@@ -73,25 +80,44 @@ export function RosterImportPanel({ classId }: { classId: number }) {
     });
   }
 
-  return (
-    <section className="mt-8" aria-label="Import students from Excel">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-lg font-semibold">Import học sinh (Excel)</h2>
-        <Button variant="ghost" size="sm" onClick={onDownloadTemplate}>
-          Download template (.xlsx)
-        </Button>
-      </div>
-      <p className="mt-1 text-sm text-[#64748B]">
-        Upload the filled template to preview the rows, then confirm the import. Duplicates and
-        invalid rows are reported per row — nothing is imported silently.
-      </p>
+  // Same file-input styling as the question Excel import (QuestionImport).
+  const fileInputClass =
+    "block w-full rounded-lg border border-[#E2E8F0] bg-white p-2 text-sm text-[#64748B] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2 file:mr-3 file:inline-flex file:h-11 file:cursor-pointer file:items-center file:rounded-lg file:border-0 file:bg-gradient-to-r file:from-[#0052FF] file:to-[#4D7CFF] file:px-5 file:font-semibold file:text-white file:outline-none file:transition-all file:duration-200 hover:file:brightness-110 disabled:opacity-60";
 
-      <div className={cn(cardVariants(), "mt-4 p-4")}>
+  return (
+    <section
+      className={unboxed ? "" : "mt-8"}
+      aria-label="Import students from Excel"
+    >
+      {!unboxed && (
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-lg font-semibold">Import students (Excel)</h2>
+          <Button variant="ghost" size="sm" onClick={onDownloadTemplate}>
+            Download template (.xlsx)
+          </Button>
+        </div>
+      )}
+      {!unboxed && (
+        <p className="mt-1 text-sm text-[#64748B]">
+          Upload the filled template to preview the rows, then confirm the import. Duplicates and
+          invalid rows are reported per row — nothing is imported silently.
+        </p>
+      )}
+
+      <div className={cn(cardVariants(), unboxed ? "p-4" : "mt-4 p-4")}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs font-medium text-[#64748B]">
+            Upload an .xlsx workbook (max 5 MB). Rows are previewed before anything is imported.
+          </p>
+          <Button type="button" variant="outline" onClick={onDownloadTemplate}>
+            Download template
+          </Button>
+        </div>
         <input
           ref={inputRef}
           type="file"
           accept=".xlsx"
-          className="block w-full text-sm text-[#64748B]"
+          className={cn(fileInputClass, "mt-3")}
           onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
         />
         <div className="mt-3 flex gap-3">
