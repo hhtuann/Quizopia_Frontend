@@ -87,29 +87,21 @@ export function StudentSearchSelect({
         </h2>
       )}
 
-      {/* Search input + floating results overlay (does not expand the card) */}
-      <div className="relative flex items-center gap-3">
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by student code, name, or username…"
-          className="h-11 min-w-0 flex-1 rounded-lg border border-[#E2E8F0] bg-transparent px-4 text-sm text-[#0F172A] placeholder:text-[#64748B]/50 outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2"
-          aria-label="Search students"
-        />
-        <Button
-          type="button"
-          className="shrink-0"
-          disabled={selected.length === 0 || addMut.isPending}
-          onClick={onAdd}
-        >
-          {addMut.isPending
-            ? "Adding…"
-            : `Add ${selected.length} student${selected.length === 1 ? "" : "s"}`}
-        </Button>
-
-        {query.trim().length >= 2 && (
-          <div className="absolute inset-x-0 top-full z-20 mt-2 max-h-72 space-y-1 overflow-y-auto rounded-lg border border-[#E2E8F0] bg-white p-1 shadow-lg">
+      {/* Search input + floating results overlay (does not expand the card).
+          The overlay is anchored to the input wrapper so it never stretches
+          over the Add button. */}
+      <div className="flex items-center gap-3">
+        <div className="relative min-w-0 flex-1">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by student code, name, or username…"
+            className="h-11 w-full rounded-lg border border-[#E2E8F0] bg-transparent px-4 text-sm text-[#0F172A] placeholder:text-[#64748B]/50 outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2"
+            aria-label="Search students"
+          />
+          {query.trim().length >= 2 && (
+            <div className="absolute inset-x-0 top-full z-20 mt-2 max-h-72 space-y-1 overflow-y-auto rounded-lg border border-[#E2E8F0] bg-white p-1 shadow-lg">
             {results.length === 0 && (
               <p className="px-3 py-2 text-sm text-[#64748B]">
                 {debounced.length >= 2 && searchData
@@ -136,8 +128,19 @@ export function StudentSearchSelect({
               </svg>
             </button>
             ))}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
+        <Button
+          type="button"
+          className="shrink-0"
+          disabled={selected.length === 0 || addMut.isPending}
+          onClick={onAdd}
+        >
+          {addMut.isPending
+            ? "Adding…"
+            : `Add ${selected.length} student${selected.length === 1 ? "" : "s"}`}
+        </Button>
       </div>
       {/* Selected chips */}
       {selected.length > 0 && (
