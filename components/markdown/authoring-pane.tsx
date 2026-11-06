@@ -124,7 +124,7 @@ export function QuizMarkdownAuthoringPane({
           />
         </div>
         <div
-          className={`min-h-0 lg:overflow-y-auto lg:pr-1 ${
+          className={`min-h-0 overflow-y-auto lg:pr-1 ${
             activePane === "preview" ? "" : "hidden lg:block"
           }`}
         >

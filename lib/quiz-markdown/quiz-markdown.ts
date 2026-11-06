@@ -1080,7 +1080,7 @@ function singlePrefixSuggestion(
   return markers
     .filter((marker) => isCanonicalPrefix(fragment, marker))
     .map((marker) => ({
-      id: `${id}-${marker}`,
+      id: `${id}-${marker.replace(/\s+/g, "-")}`,
       insertText: `${marker} `,
       label: marker,
       mode: "prefix-completion" as const,
