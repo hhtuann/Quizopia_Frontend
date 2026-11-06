@@ -200,7 +200,6 @@ function ErrorState({ error }: { error: NormalizedApiError | undefined }) {
   if (error?.kind === "api") {
     switch (error.code) {
       case "QUESTION_BANK_ACCESS_DENIED":
-      case "QUESTION_TEACHER_PROFILE_NOT_FOUND":
         message = "You don't have access to question banks. Please contact your administrator.";
         break;
       case "AUTH_ACCESS_TOKEN_INVALID":

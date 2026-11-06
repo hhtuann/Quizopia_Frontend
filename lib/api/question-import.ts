@@ -10,19 +10,25 @@ import { http } from "./http-client";
  * Endpoints (QuestionImportController):
  *   - GET  /api/questions/import-template                 → xlsx blob
  *   - POST /api/question-banks/{bankId}/questions/import  → ImportResponse (multipart "file")
+ *   - POST /api/question-banks/{bankId}/questions/import-markdown → ImportResponse (JSON)
  *
  * Partial success: a 200 response may carry `errors[]` (row-level) — these are
  * NOT an ApiError. Only hard pre-conditions (auth / file metadata / structure)
  * return 4xx as ApiError. See Day-5 contract §16/§19.
  */
 
-/** Backend record `RowError(int rowNumber, String questionCode, String field, String code, String message)`. */
+/** Backend record `RowError(int rowNumber, String questionCode, String field, String code, String message, Integer line, Integer column)`.
+ * `line`/`column` carry the authoritative Markdown parser's source position
+ * (1-based) for Markdown diagnostics; null for Excel rows and contract
+ * findings keyed by question number. */
 export interface RowError {
   rowNumber: number;
   questionCode: string | null;
   field: string | null;
   code: string;
   message: string;
+  line: number | null;
+  column: number | null;
 }
 
 /** Backend record `ImportResponse(int totalRows, int importedRows, int invalidRows, List<RowError> errors)`. */
@@ -57,5 +63,19 @@ export function importQuestions(bankId: number, file: File): Promise<ImportRespo
   return http.post<ImportResponse>(
     `/api/question-banks/${bankId}/questions/import`,
     form
+  );
+}
+/**
+ * `POST /api/question-banks/{bankId}/questions/import-markdown` (P2-C).
+ * Teacher-only Quiz Markdown import. The whole document is imported
+ * atomically: a 200 response either reports `importedRows === totalRows` with
+ * no errors, or `importedRows === 0` with per-question `errors[]` (parse or
+ * bank-contract rejections — nothing persisted). Hard pre-conditions (auth,
+ * blank/oversized source, too many questions) reject as 4xx ApiError.
+ */
+export function importMarkdownQuestions(bankId: number, markdown: string): Promise<ImportResponse> {
+  return http.post<ImportResponse>(
+    `/api/question-banks/${bankId}/questions/import-markdown`,
+    { markdown }
   );
 }

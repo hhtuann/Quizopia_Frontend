@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local GitNexus CLI tooling (git-ignored; never present in CI).
+    ".gitnexus/**",
   ]),
 ]);
 

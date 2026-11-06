@@ -35,8 +35,6 @@ function describeCreateError(err: unknown): { field?: "subjectId"; message: stri
         return { message: "The selected subject is not in your school." };
       case "QUESTION_BANK_ACCESS_DENIED":
         return { message: "You don't have permission to create a question bank." };
-      case "QUESTION_TEACHER_PROFILE_NOT_FOUND":
-        return { message: "Teacher profile not found for your account." };
       case "QUESTION_VALIDATION_ERROR":
         return { message: norm.message || "Please check the highlighted fields." };
       default:
