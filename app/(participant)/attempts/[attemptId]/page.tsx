@@ -11,6 +11,7 @@ import {
 import { AttemptShell } from "@/components/student/AttemptShell";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
 import { useAuth } from "@/hooks/useAuth";
+import { participantBackHref, participantHistoryHref } from "@/lib/auth/participant-links";
 import { Button, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { useAutosaveAnswers } from "@/lib/attempt/use-autosave";
@@ -31,17 +32,19 @@ export default function AttemptPage() {
 
   const { data, isPending, isError, error } = useAttemptDetailQuery(id, valid);
   const { user } = useAuth();
+  // F1: teacher-only participants cannot use the STUDENT-gated listings.
+  const backHref = participantBackHref(user?.roles);
 
-  if (!valid) return <NotFound />;
+  if (!valid) return <NotFound backHref={backHref} />;
   if (isPending) return <Skeleton />;
-  if (isError) return <LoadError error={error as unknown as NormalizedApiError | undefined} />;
-  if (!data) return <NotFound />;
+  if (isError) return <LoadError error={error as unknown as NormalizedApiError | undefined} backHref={backHref} />;
+  if (!data) return <NotFound backHref={backHref} />;
 
   return (
     <div>
       <div className="mb-6">
         <Link
-          href="/sessions"
+          href={backHref}
           className="inline-flex items-center gap-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-[#64748B] outline-none transition-colors hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
@@ -72,7 +75,10 @@ function InProgressShell({
   const autosaveStatus = useAutosaveAnswers(attemptId, new Date(detail.deadlineAt).getTime());
   const submitMut = useSubmitAttemptMutation(attemptId);
   const router = useRouter();
+  const { user: shellUser } = useAuth();
+  const historyRedirect = participantHistoryHref(shellUser?.roles);
   const queryClient = useQueryClient();
+  const backRedirect = participantBackHref(shellUser?.roles);
 
   // WebSocket: mount only for IN_PROGRESS attempts (InProgressShell is only
   // rendered for IN_PROGRESS — see AttemptPage :45). Connects, subscribes to
@@ -187,11 +193,11 @@ function InProgressShell({
         switch (norm.code) {
           case "ATTEMPT_ALREADY_SUBMITTED":
             setSubmitError("This attempt was already submitted.");
-            setTimeout(() => router.replace("/attempts"), 3000);
+            setTimeout(() => router.replace(historyRedirect), 3000);
             break;
           case "ATTEMPT_DEADLINE_EXCEEDED":
             setSubmitError("Time is over — could not submit.");
-            setTimeout(() => router.replace("/sessions"), 3000);
+            setTimeout(() => router.replace(backRedirect), 3000);
             break;
           case "ATTEMPT_IDEMPOTENCY_CONFLICT":
             setSubmitError("Submit conflict — please retry.");
@@ -199,7 +205,7 @@ function InProgressShell({
             break;
           case "ATTEMPT_INVALID_STATE":
             setSubmitError("This attempt is already submitted or graded.");
-            setTimeout(() => router.replace("/attempts"), 3000);
+            setTimeout(() => router.replace(historyRedirect), 3000);
             break;
           default:
             setSubmitError(norm.message || "Submit failed. Please try again.");
@@ -339,7 +345,7 @@ function Skeleton() {
   );
 }
 
-function NotFound() {
+function NotFound({ backHref }: { backHref: string }) {
   return (
     <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#F1F5F9] text-[#64748B]">
@@ -349,14 +355,14 @@ function NotFound() {
       </div>
       <p className="font-display text-lg font-bold text-[#0F172A]">Attempt not found</p>
       <p className="mt-1 text-sm text-[#64748B]">This attempt may have been removed or you don&apos;t have access.</p>
-      <Link href="/sessions" className="mt-5 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
+      <Link href={backHref} className="mt-5 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
         Back to sessions
       </Link>
     </div>
   );
 }
 
-function LoadError({ error }: { error: NormalizedApiError | undefined }) {
+function LoadError({ error, backHref }: { error: NormalizedApiError | undefined; backHref: string }) {
   let message: string;
   if (error?.kind === "api") {
     switch (error.code) {
@@ -384,7 +390,7 @@ function LoadError({ error }: { error: NormalizedApiError | undefined }) {
       </svg>
       <div>
         <span>{message}</span>
-        <Link href="/sessions" className="mt-3 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
+        <Link href={backHref} className="mt-3 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
           Back to sessions
         </Link>
       </div>
