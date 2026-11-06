@@ -199,10 +199,10 @@ function RowErrorsTable({ errors }: { errors: RowError[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
-            <th scope="col" className="px-3 pb-3 font-semibold">Question</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Source</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Field</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Question</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Source</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Field</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Code</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Detail</th>
           </tr>
         </thead>

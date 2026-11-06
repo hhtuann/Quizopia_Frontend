@@ -105,7 +105,7 @@ export function StudentSearchSelect({
         >
           {addMut.isPending
             ? "Adding…"
-            : `Add${selected.length > 0 ? ` ${selected.length}` : ""}`}
+            : `Add ${selected.length} student${selected.length === 1 ? "" : "s"}`}
         </Button>
 
         {debounced.length >= 2 && results.length > 0 && (

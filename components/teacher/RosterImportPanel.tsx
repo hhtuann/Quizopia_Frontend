@@ -188,10 +188,10 @@ export function RosterImportPanel({
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead>
               <tr className="border-b border-[#E2E8F0] text-xs uppercase tracking-wide text-[#64748B]">
-                <th className="py-2 pr-4">Row</th>
+                <th className="py-2 pr-4 text-center">Row</th>
                 <th className="py-2 pr-4">Name</th>
-                <th className="py-2 pr-4">Email</th>
-                <th className="py-2 pr-4">Status</th>
+                <th className="py-2 pr-4 text-center">Email</th>
+                <th className="py-2 pr-4 text-center">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -199,13 +199,13 @@ export function RosterImportPanel({
                 <tr key={row.sheetRow} className="border-b border-[#E2E8F0]/60">
                   <td className="py-2 pr-4">{row.sheetRow}</td>
                   <td className="py-2 pr-4">{row.fullName ?? "—"}</td>
-                  <td className="py-2 pr-4">{row.email ?? "—"}</td>
-                  <td className="py-2 pr-4">
+                  <td className="py-2 pr-4 text-center">{row.email ?? "—"}</td>
+                  <td className="py-2 pr-4 text-center">
                     <Badge
                       variant={rowStatusVariant(row.status)}
                       title={row.issues.length > 0 ? row.issues.join("; ") : undefined}
                     >
-                      {row.status}
+                      {row.status === "DUPLICATE_IN_CLASS" ? "DUPLICATE" : row.status}
                     </Badge>
                   </td>
                 </tr>

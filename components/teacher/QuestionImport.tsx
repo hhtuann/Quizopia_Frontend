@@ -269,21 +269,21 @@ function PreviewTable({ preview }: { preview: ExcelImportPreview }) {
       <table className="w-full min-w-[640px] text-left text-sm">
         <thead>
           <tr className="border-b border-[#E2E8F0] text-xs uppercase tracking-wide text-[#64748B]">
-            <th className="py-2 pr-4">Row</th>
+            <th className="py-2 pr-4 text-center">Row</th>
             <th className="py-2 pr-4">Question</th>
-            <th className="py-2 pr-4">Correct answers</th>
-            <th className="py-2 pr-4">Status</th>
+            <th className="py-2 pr-4 text-center">Correct answers</th>
+            <th className="py-2 pr-4 text-center">Status</th>
           </tr>
         </thead>
         <tbody>
           {preview.rows.map((row) => (
             <tr key={row.rowNumber} className="border-b border-[#E2E8F0]/60">
-              <td className="py-2 pr-4 tabular-nums">{row.rowNumber}</td>
+              <td className="py-2 pr-4 text-center tabular-nums">{row.rowNumber}</td>
               <td className="max-w-md truncate py-2 pr-4">{row.content ?? "—"}</td>
-              <td className="py-2 pr-4 font-mono text-xs text-[#64748B]">
+              <td className="py-2 pr-4 text-center font-mono text-xs text-[#64748B]">
                 {row.correctAnswers.length > 0 ? row.correctAnswers.join(", ") : "—"}
               </td>
-              <td className="py-2 pr-4">
+              <td className="py-2 pr-4 text-center">
                 <Badge
                   variant={row.status === "READY" ? "success" : "destructive"}
                   title={row.issues.length > 0 ? row.issues.join("; ") : undefined}

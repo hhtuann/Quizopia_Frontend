@@ -217,7 +217,7 @@ function MembersTable({
               <th scope="col" className="px-3 pb-3 text-center font-semibold">Username</th>
               <th scope="col" className="px-3 pb-3 text-center font-semibold">Added</th>
               <th scope="col" className="px-3 pb-3 text-center font-semibold">Status</th>
-              <th scope="col" className="px-3 pb-3 text-right font-semibold">Actions</th>
+              <th scope="col" className="px-3 pb-3 text-center font-semibold">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -235,7 +235,7 @@ function MembersTable({
                 <td className="px-3 py-3 text-center align-top">
                   <Badge variant="warn" className="uppercase">Pending</Badge>
                 </td>
-                <td className="px-3 py-3 text-right align-top">
+                <td className="px-3 py-3 text-center align-top">
                   <button
                     type="button"
                     onClick={() => setAction({ kind: "invite", entryId: e.id, name: e.fullName })}
@@ -259,9 +259,9 @@ function MembersTable({
                 <td className="px-3 py-3 text-center align-top font-mono text-xs text-[#64748B]">{m.username ?? "—"}</td>
                 <td className="px-3 py-3 text-center align-top text-[#64748B]">{formatDate(m.addedAt)}</td>
                 <td className="px-3 py-3 text-center align-top">
-                  <Badge variant="success">Member</Badge>
+                  <Badge variant="success">MEMBER</Badge>
                 </td>
-                <td className="px-3 py-3 text-right align-top">
+                <td className="px-3 py-3 text-center align-top">
                   <button
                     type="button"
                     onClick={() => setAction({ kind: "member", profileId: m.studentProfileId, code: m.studentCode, name: m.displayName })}
