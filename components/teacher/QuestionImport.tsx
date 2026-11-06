@@ -213,30 +213,31 @@ export function QuestionImport({ bankId }: { bankId: number }) {
           className={uploading ? "animate-pulse" : undefined}
           aria-busy={uploading || undefined}
         >
-          <label
-            htmlFor="q-import-file"
-            className="flex h-12 w-full cursor-pointer items-center overflow-hidden rounded-lg border border-[#E2E8F0] bg-white transition-all duration-200 focus-within:border-[#0052FF] focus-within:ring-2 focus-within:ring-[#0052FF] focus-within:ring-offset-2 aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
-            aria-disabled={busy || undefined}
-          >
-            <span className="inline-flex h-12 shrink-0 cursor-pointer items-center rounded-l-lg bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] px-5 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110">
-              Choose file
-            </span>
-            <span className="min-w-0 flex-1 truncate px-4 text-sm text-[#64748B]" aria-live="polite">
-              {uploading ? "Importing…" : (fileName ?? "No file chosen")}
-            </span>
-            <input
-              id="q-import-file"
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx"
-              onChange={handleFileChange}
-              disabled={busy}
-              className="sr-only"
-            />
-          </label>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <label
+              htmlFor="q-import-file"
+              className="flex h-12 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-lg border border-[#E2E8F0] bg-white p-2 transition-all duration-200 focus-within:border-[#0052FF] focus-within:ring-2 focus-within:ring-[#0052FF] focus-within:ring-offset-2 aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
+              aria-disabled={busy || undefined}
+            >
+              <span className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] px-5 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110">
+                Choose file
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm text-[#64748B]" aria-live="polite">
+                {uploading ? "Importing…" : (fileName ?? "No file chosen")}
+              </span>
+              <input
+                id="q-import-file"
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx"
+                onChange={handleFileChange}
+                disabled={busy}
+                className="sr-only"
+              />
+            </label>
             <Button
               type="button"
+              className="shrink-0"
               disabled={file == null || preview == null || preview.readyRows === 0 || busy}
               onClick={onImport}
             >
