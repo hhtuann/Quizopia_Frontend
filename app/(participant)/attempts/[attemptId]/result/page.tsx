@@ -6,6 +6,8 @@ import { useAttemptDetailQuery } from "@/hooks/queries/use-student-attempt";
 import { useAttemptResultQuery } from "@/hooks/queries/use-student-results";
 import { AttemptResultView } from "@/components/student/AttemptResultView";
 import type { NormalizedApiError } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
+import { participantHistoryHref } from "@/lib/auth/participant-links";
 
 export default function AttemptResultPage() {
   const { attemptId } = useParams<{ attemptId: string }>();
@@ -17,17 +19,22 @@ export default function AttemptResultPage() {
 
   const loading = detailQuery.isPending || resultQuery.isPending;
   const error = detailQuery.error ?? resultQuery.error;
+  // F1: teacher-only participants cannot use the STUDENT-gated /attempts
+  // listing — history links become home.
+  const { user } = useAuth();
+  const historyHref = participantHistoryHref(user?.roles);
 
-  if (!valid) return <NotFound />;
+
+  if (!valid) return <NotFound historyHref={historyHref} />;
   if (loading) return <Skeleton />;
-  if (error) return <LoadError error={error as unknown as NormalizedApiError | undefined} />;
-  if (!resultQuery.data) return <NotFound />;
+  if (error) return <LoadError error={error as unknown as NormalizedApiError | undefined} historyHref={historyHref} />;
+  if (!resultQuery.data) return <NotFound historyHref={historyHref} />;
 
   return (
     <div>
       <div className="mb-6">
         <Link
-          href="/attempts"
+          href={historyHref}
           className="inline-flex items-center gap-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-[#64748B] outline-none transition-colors hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
@@ -58,7 +65,7 @@ function Skeleton() {
   );
 }
 
-function NotFound() {
+function NotFound({ historyHref }: { historyHref: string }) {
   return (
     <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#F1F5F9] text-[#64748B]">
@@ -68,14 +75,14 @@ function NotFound() {
       </div>
       <p className="font-display text-lg font-bold text-[#0F172A]">Result not found</p>
       <p className="mt-1 text-sm text-[#64748B]">This result may not be available yet or you don&apos;t have access.</p>
-      <Link href="/attempts" className="mt-5 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
+      <Link href={historyHref} className="mt-5 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
         Back to history
       </Link>
     </div>
   );
 }
 
-function LoadError({ error }: { error: NormalizedApiError | undefined }) {
+function LoadError({ error, historyHref }: { error: NormalizedApiError | undefined; historyHref: string }) {
   let message: string;
   if (error?.kind === "api") {
     switch (error.code) {
@@ -111,7 +118,7 @@ function LoadError({ error }: { error: NormalizedApiError | undefined }) {
       </svg>
       <div>
         <span>{message}</span>
-        <Link href="/attempts" className="mt-3 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
+        <Link href={historyHref} className="mt-3 inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#0052FF] outline-none transition-colors hover:bg-[#0052FF]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
           Back to history
         </Link>
       </div>

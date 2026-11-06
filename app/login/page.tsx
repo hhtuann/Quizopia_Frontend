@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, type LoginValues } from "@/lib/validation/auth-schemas";
+import { sanitizeReturnTo } from "@/lib/auth/redirect";
 import { Button, Card, Input } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/hooks/useAuth";
@@ -58,6 +59,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const justRegistered = searchParams.get("registered") === "1";
   const justVerified = searchParams.get("verified") === "1";
+  const returnTo = sanitizeReturnTo(searchParams.get("returnTo"));
   const { login } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
   const [needsVerificationEmail, setNeedsVerificationEmail] = useState<string | null>(null);
@@ -94,7 +96,9 @@ function LoginForm() {
     setNeedsVerificationEmail(null);
     try {
       await login(values);
-      router.replace("/");
+      // P2-D: return to the deep link that triggered the login (validated as
+      // an internal path), defaulting to home.
+      router.replace(returnTo ?? "/");
     } catch (err) {
       const norm = err as NormalizedApiError;
       if (norm?.kind === "api") {
@@ -210,6 +214,15 @@ function LoginForm() {
             <>
               <a
                 href={`${process.env.NEXT_PUBLIC_API_URL ?? ""}/oauth2/authorization/google`}
+                onClick={() => {
+                  // P2-D: keep the deep-link continuation across the OAuth
+                  // round-trip (consumed by the callback page).
+                  try {
+                    sessionStorage.setItem("auth.returnTo", returnTo ?? "/");
+                  } catch {
+                    // sessionStorage unavailable — continuation falls back to home.
+                  }
+                }}
                 className="mb-2 flex h-12 w-full items-center justify-center gap-3 rounded-lg border border-[#E2E8F0] bg-white font-semibold text-[#0F172A] outline-none transition-colors hover:bg-[#F1F5F9] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
               >
                 <GoogleMark className="h-5 w-5" />
