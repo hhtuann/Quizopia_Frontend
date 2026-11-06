@@ -51,6 +51,34 @@ export function downloadImportTemplate(): Promise<Blob> {
   });
 }
 
+/** Backend record `ExcelImportPreviewResponse` (read-only parse; nothing persisted). */
+export interface ExcelImportPreview {
+  totalRows: number;
+  readyRows: number;
+  rows: {
+    rowNumber: number;
+    questionType: string | null;
+    content: string | null;
+    correctAnswers: string[];
+    status: "READY" | "INVALID";
+    issues: string[];
+  }[];
+}
+
+/**
+ * `POST /api/question-banks/{bankId}/questions/import-preview` (multipart/form-data).
+ * Read-only: parses the workbook authoritatively and reports per-row
+ * content/correct answers/issues WITHOUT importing.
+ */
+export function previewQuestions(bankId: number, file: File): Promise<ExcelImportPreview> {
+  const form = new FormData();
+  form.append("file", file);
+  return http.post<ExcelImportPreview>(
+    `/api/question-banks/${bankId}/questions/import-preview`,
+    form
+  );
+}
+
 /**
  * `POST /api/question-banks/{bankId}/questions/import` (multipart/form-data).
  * The part name MUST be `file` (backend `@RequestPart("file")`). Do NOT set

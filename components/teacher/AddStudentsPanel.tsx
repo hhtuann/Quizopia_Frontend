@@ -78,7 +78,7 @@ export function AddStudentsPanel({
             disabled={downloading}
             aria-label="Download template"
             title="Download template"
-            className="w-11 px-0"
+            className="aspect-square w-11 px-0"
           >
             {downloading ? (
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="h-4 w-4 animate-spin" aria-hidden="true">

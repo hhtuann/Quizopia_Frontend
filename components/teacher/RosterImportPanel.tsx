@@ -106,7 +106,7 @@ export function RosterImportPanel({
               disabled={downloading}
               aria-label="Download template"
               title="Download template"
-              className="w-11 px-0"
+              className="aspect-square w-11 px-0"
             >
               {downloading ? (
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="h-4 w-4 animate-spin" aria-hidden="true">
@@ -141,19 +141,21 @@ export function RosterImportPanel({
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] px-5 text-sm font-semibold text-white outline-none transition-all duration-200 hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
-          Choose file
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".xlsx"
-            className="sr-only"
-            onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
-          />
-        </label>
-        <span className="min-w-0 flex-1 truncate text-sm text-[#64748B]" aria-live="polite">
-          {file ? file.name : "No file chosen"}
-        </span>
+        <div className="flex h-11 min-w-0 flex-1 items-center rounded-lg border border-[#E2E8F0] bg-white">
+          <label className="inline-flex h-11 shrink-0 cursor-pointer items-center justify-center rounded-l-lg border-r border-[#E2E8F0] bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] px-5 text-sm font-semibold text-white outline-none transition-all duration-200 hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
+            Choose file
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".xlsx"
+              className="sr-only"
+              onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+            />
+          </label>
+          <span className="min-w-0 flex-1 truncate px-4 text-sm text-[#64748B]" aria-live="polite">
+            {file ? file.name : "No file chosen"}
+          </span>
+        </div>
         <Button
           type="button"
           disabled={!file || !preview || preview.ready === 0 || confirmMutation.isPending}
@@ -180,8 +182,8 @@ export function RosterImportPanel({
       {preview && (
         <div className="mt-4 overflow-x-auto">
           <p className="mb-2 text-sm text-[#64748B]">
-            {preview.ready} of {preview.totalRows} rows ready. Rows with issues are skipped on
-            import. One preview row per sheet row — a row may list several column issues.
+            {preview.ready} of {preview.totalRows} rows ready. Hover a non-READY status for its
+            details; rows with problems are skipped on import.
           </p>
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead>
@@ -190,7 +192,6 @@ export function RosterImportPanel({
                 <th className="py-2 pr-4">Name</th>
                 <th className="py-2 pr-4">Email</th>
                 <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Issues</th>
               </tr>
             </thead>
             <tbody>
@@ -200,10 +201,12 @@ export function RosterImportPanel({
                   <td className="py-2 pr-4">{row.fullName ?? "—"}</td>
                   <td className="py-2 pr-4">{row.email ?? "—"}</td>
                   <td className="py-2 pr-4">
-                    <Badge variant={rowStatusVariant(row.status)}>{row.status}</Badge>
-                  </td>
-                  <td className="py-2 pr-4 text-xs text-[#64748B]">
-                    {row.issues.length > 0 ? row.issues.join("; ") : "—"}
+                    <Badge
+                      variant={rowStatusVariant(row.status)}
+                      title={row.issues.length > 0 ? row.issues.join("; ") : undefined}
+                    >
+                      {row.status}
+                    </Badge>
                   </td>
                 </tr>
               ))}
