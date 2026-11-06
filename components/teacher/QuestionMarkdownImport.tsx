@@ -94,9 +94,15 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
   return (
     <section className={cn(cardVariants(), "p-6")} aria-label="Markdown import">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
-          Markdown authoring
-        </h2>
+        <div>
+          <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
+            Quiz Markdown authoring
+          </h2>
+          <p className="mt-1 text-xs font-medium text-[#64748B]">
+            Live editor with diagnostics and preview — confirm to add the questions
+            to this bank (all-or-nothing).
+          </p>
+        </div>
         <button
           type="button"
           aria-expanded={!collapsed}
@@ -121,7 +127,7 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
       {result && <ResultBanner result={result} />}
 
       <div className={collapsed ? "hidden" : "flex h-[70vh] min-h-[32rem] flex-col"}>
-        <QuizMarkdownAuthoringPane value={source} onChange={setSource} />
+        <QuizMarkdownAuthoringPane title={null} value={source} onChange={setSource} />
       </div>
 
       {tooLong && (

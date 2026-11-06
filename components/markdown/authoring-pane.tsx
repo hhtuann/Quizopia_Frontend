@@ -54,7 +54,8 @@ export interface QuizMarkdownAuthoringPaneProps {
   readonly onChange: (value: string) => void;
   /** Authoring mode shows answers/explanations in the preview. */
   readonly readOnly?: boolean;
-  readonly title?: string;
+  /** Internal heading; pass null to render none (host supplies its own). */
+  readonly title?: string | null;
   readonly value: string;
 }
 
@@ -102,9 +103,13 @@ export function QuizMarkdownAuthoringPane({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
-          {title ?? "Quiz Markdown authoring"}
-        </h2>
+        {title !== null ? (
+          <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
+            {title ?? "Quiz Markdown authoring"}
+          </h2>
+        ) : (
+          <span aria-hidden="true" />
+        )}
         <div className="lg:hidden">
           <PaneSwitch active={activePane} onChange={setActivePane} />
         </div>
