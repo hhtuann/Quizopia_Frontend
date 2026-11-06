@@ -233,7 +233,7 @@ function MembersTable({
                 <td className="px-3 py-3 text-center align-top font-mono text-xs text-[#64748B]">—</td>
                 <td className="px-3 py-3 text-center align-top text-[#64748B]">{formatDate(e.createdAt)}</td>
                 <td className="px-3 py-3 text-center align-top">
-                  <Badge variant="warn">Pending</Badge>
+                  <Badge variant="warn" className="uppercase">Pending</Badge>
                 </td>
                 <td className="px-3 py-3 text-right align-top">
                   <button
