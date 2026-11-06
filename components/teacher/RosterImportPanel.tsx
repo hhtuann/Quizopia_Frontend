@@ -31,8 +31,10 @@ export function RosterImportPanel({
   const previewMutation = useRosterPreviewMutation(classId);
   const confirmMutation = useRosterConfirmMutation(classId);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [downloading, setDownloading] = useState(false);
 
   async function onDownloadTemplate() {
+    setDownloading(true);
     try {
       const blob = await downloadRosterTemplate(classId);
       const url = URL.createObjectURL(blob);
@@ -43,6 +45,8 @@ export function RosterImportPanel({
       URL.revokeObjectURL(url);
     } catch {
       setNotice({ kind: "error", message: "Could not download the template." });
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -92,9 +96,38 @@ export function RosterImportPanel({
       {!unboxed && (
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-lg font-semibold">Import students (Excel)</h2>
-          <Button variant="ghost" size="sm" onClick={onDownloadTemplate}>
-            Download template (.xlsx)
-          </Button>
+<Button
+              type="button"
+              variant="outline"
+              onClick={onDownloadTemplate}
+              disabled={downloading}
+              aria-label="Download template"
+              title="Download template"
+              className="w-11 px-0"
+            >
+              {downloading ? (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="h-4 w-4 animate-spin" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" className="opacity-25" />
+                  <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              className="h-4 w-4"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+              />
+            </svg>
+              )}
+            </Button>
         </div>
       )}
       {!unboxed && (
@@ -109,9 +142,38 @@ export function RosterImportPanel({
           <p className="text-xs font-medium text-[#64748B]">
             Upload an .xlsx workbook (max 5 MB). Rows are previewed before anything is imported.
           </p>
-          <Button type="button" variant="outline" onClick={onDownloadTemplate}>
-            Download template
-          </Button>
+<Button
+              type="button"
+              variant="outline"
+              onClick={onDownloadTemplate}
+              disabled={downloading}
+              aria-label="Download template"
+              title="Download template"
+              className="w-11 px-0"
+            >
+              {downloading ? (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="h-4 w-4 animate-spin" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" className="opacity-25" />
+                  <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              className="h-4 w-4"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+              />
+            </svg>
+              )}
+            </Button>
         </div>
         <input
           ref={inputRef}
