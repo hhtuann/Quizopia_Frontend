@@ -120,7 +120,7 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
 
       {result && <ResultBanner result={result} />}
 
-      <div className={collapsed ? "hidden" : "h-[70vh] min-h-[32rem]"}>
+      <div className={collapsed ? "hidden" : "flex h-[70vh] min-h-[32rem] flex-col"}>
         <QuizMarkdownAuthoringPane value={source} onChange={setSource} />
       </div>
 
