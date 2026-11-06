@@ -54,11 +54,16 @@ export function RosterImportPanel({
     setFile(f);
     setPreview(null);
     setResult(null);
+    setNotice(null);
+    if (f !== null) {
+      // Auto-preview as soon as a workbook is picked (owner request): rows or
+      // a read error appear immediately; the Import button sits on this row.
+      void runPreview(f);
+    }
   }
 
-  function onPreview() {
-    if (!file) return;
-    previewMutation.mutate(file, {
+  function runPreview(f: File) {
+    previewMutation.mutate(f, {
       onSuccess: (data) => {
         setPreview(data);
         setNotice(null);
@@ -96,7 +101,7 @@ export function RosterImportPanel({
       {!unboxed && (
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-lg font-semibold">Import students (Excel)</h2>
-<Button
+          <Button
               type="button"
               variant="outline"
               onClick={onDownloadTemplate}
@@ -137,66 +142,32 @@ export function RosterImportPanel({
         </p>
       )}
 
-      <div className={cn(cardVariants(), unboxed ? "p-4" : "mt-4 p-4")}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs font-medium text-[#64748B]">
-            Upload an .xlsx workbook (max 5 MB). Rows are previewed before anything is imported.
-          </p>
-<Button
-              type="button"
-              variant="outline"
-              onClick={onDownloadTemplate}
-              disabled={downloading}
-              aria-label="Download template"
-              title="Download template"
-              className="w-11 px-0"
-            >
-              {downloading ? (
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="h-4 w-4 animate-spin" aria-hidden="true">
-                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" className="opacity-25" />
-                  <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                </svg>
-              ) : (
-                <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-              className="h-4 w-4"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
-              />
-            </svg>
-              )}
-            </Button>
-        </div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".xlsx"
-          className={cn(fileInputClass, "mt-3")}
-          onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
-        />
-        <div className="mt-3 flex gap-3">
-          <Button variant="outline" disabled={!file || previewMutation.isPending} onClick={onPreview}>
-            {previewMutation.isPending ? "Reading…" : "Preview"}
-          </Button>
-          <Button
-            disabled={!file || !preview || preview.ready === 0 || confirmMutation.isPending}
-            onClick={onConfirm}
-          >
-            {confirmMutation.isPending
-              ? "Importing…"
-              : preview
-                ? `Import ${preview.ready} row${preview.ready === 1 ? "" : "s"}`
-                : "Import"}
-          </Button>
-        </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] px-5 text-sm font-semibold text-white outline-none transition-all duration-200 hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
+          Choose file
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".xlsx"
+            className="sr-only"
+            onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+          />
+        </label>
+        <span className="min-w-0 flex-1 truncate text-sm text-[#64748B]" aria-live="polite">
+          {file ? file.name : "No file chosen"}
+        </span>
+        <Button
+          type="button"
+          disabled={!file || !preview || preview.ready === 0 || confirmMutation.isPending}
+          onClick={onConfirm}
+          className="shrink-0"
+        >
+          {confirmMutation.isPending
+            ? "Importing…"
+            : preview
+              ? `Import ${preview.ready} row${preview.ready === 1 ? "" : "s"}`
+              : "Import"}
+        </Button>
       </div>
 
       {notice && (

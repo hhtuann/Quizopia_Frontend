@@ -118,11 +118,11 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
     } catch (err) {
       const norm = err as NormalizedApiError;
       if (norm?.kind === "api" && norm.code === "AUTH_INVALID_CREDENTIALS") {
-        setLinkError("Mật khẩu không đúng.");
+        setLinkError("Incorrect password.");
       } else if (norm?.kind === "network") {
-        setLinkError("Lỗi mạng — hãy thử lại.");
+        setLinkError("Network error — please try again.");
       } else {
-        setLinkError("Không thể bắt đầu liên kết. Hãy thử lại.");
+        setLinkError("Could not start linking. Please try again.");
       }
       setLinkBusy(false);
     }
@@ -226,7 +226,7 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
-                aria-label="Tài khoản"
+                aria-label="Account"
                 title={user?.email ? `${displayName} — ${user.email}` : displayName}
                 className="flex h-11 items-center gap-2 rounded-lg border border-[#E2E8F0] bg-white px-2 text-sm font-medium text-[#0F172A] shadow-sm outline-none transition-all duration-200 hover:bg-[#F1F5F9] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFAFA] sm:w-[176px] sm:px-3"
               >
@@ -265,7 +265,7 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
                     </p>
                   </div>
 
-                  {/* Hồ sơ — not shipped yet */}
+                  {/* Profile — not shipped yet */}
                   <button
                     type="button"
                     role="menuitem"
@@ -288,9 +288,9 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
                         d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
                       />
                     </svg>
-                    Hồ sơ
+                    Profile
                     <span className="ml-auto rounded-md bg-[#F1F5F9] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[#64748B]">
-                      Sắp ra mắt
+                      Coming soon
                     </span>
                   </button>
 
@@ -320,7 +320,7 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
                           d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.628 48.628 0 0 1 12 20.904a48.628 48.628 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"
                         />
                       </svg>
-                      Đăng ký làm Giáo viên
+                      Register as a Teacher
                     </button>
                   )}
 
@@ -350,7 +350,7 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
                           d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"
                         />
                       </svg>
-                      {view === "student" ? "Chuyển sang Giáo viên" : "Chuyển sang Học sinh"}
+                      {view === "student" ? "Switch to Teacher view" : "Switch to Student view"}
                     </button>
                   )}
 
@@ -395,13 +395,13 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
 
                   <div className="my-1.5 h-px bg-[#E2E8F0]" />
 
-                  {/* Đăng xuất — destructive */}
+                  {/* Sign out — destructive */}
                   <button
                     type="button"
                     role="menuitem"
                     disabled={busy}
                     onClick={handleLogout}
-                    aria-label="Đăng xuất"
+                    aria-label="Sign out"
                     className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-[#EF4444] outline-none transition-colors duration-200 hover:bg-[#EF4444]/5 focus-visible:ring-2 focus-visible:ring-[#0052FF] disabled:opacity-60"
                   >
                     <svg
@@ -419,7 +419,7 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
                         d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9"
                       />
                     </svg>
-                    {busy ? "Đang đăng xuất…" : "Đăng xuất"}
+                    {busy ? "Signing out…" : "Sign out"}
                   </button>
                 </div>
               )}
@@ -467,17 +467,17 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
       <ConfirmDialog
         open={upgradeOpen}
         titleId="teacher-upgrade-title"
-        title="Đăng ký làm Giáo viên?"
+        title="Register as a Teacher?"
         description={
           <>
-            Tài khoản của bạn sẽ được thêm quyền Giáo viên ngay sau khi xác nhận
-            (vai trò Học sinh được giữ nguyên). Bạn có thể tạo ngân hàng câu
-            hỏi, đề thi và lớp học trong không gian cá nhân của mình.
+            Your account will be granted the Teacher role immediately after you
+            confirm (your Student role is kept). You can create question banks,
+            exams and classes in your personal workspace.
           </>
         }
-        confirmLabel="Xác nhận đăng ký"
-        cancelLabel="Hủy"
-        busyLabel="Đang đăng ký…"
+        confirmLabel="Confirm registration"
+        cancelLabel="Cancel"
+        busyLabel="Registering…"
         busy={upgrading}
         onConfirm={() => void handleUpgradeToTeacher()}
         onCancel={() => {
@@ -545,7 +545,7 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
                 disabled={linkBusy || linkPassword.length < 8}
                 className="rounded-lg bg-[#0052FF] px-4 py-2.5 text-sm font-bold text-white outline-none transition-colors hover:bg-[#0044D6] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:opacity-60"
               >
-                {linkBusy ? "Đang chuyển…" : "Tiếp tục với Google"}
+                {linkBusy ? "Redirecting…" : "Continue with Google"}
               </button>
             </div>
           </div>

@@ -44,5 +44,5 @@ export function ViewTransitionOverlay({
   );
 }
 
-export const TEACHER_TRANSITION_MESSAGE = "Đang chuyển sang màn Giáo viên...";
-export const STUDENT_TRANSITION_MESSAGE = "Đang chuyển sang màn Học sinh...";
+export const TEACHER_TRANSITION_MESSAGE = "Switching to Teacher view…";
+export const STUDENT_TRANSITION_MESSAGE = "Switching to Student view…";

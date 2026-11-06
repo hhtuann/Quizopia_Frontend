@@ -4,8 +4,9 @@ import { useState } from "react";
 import { StudentSearchSelect } from "@/components/teacher/StudentSearchSelect";
 import { RosterImportPanel } from "@/components/teacher/RosterImportPanel";
 import { ClassRosterPanel } from "@/components/teacher/ClassRosterPanel";
-import { SegmentedControl, cardVariants } from "@/components/ui";
+import { Button, SegmentedControl, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
+import { downloadRosterTemplate } from "@/hooks/queries/use-classrooms";
 import type { AddMembersResponse } from "@/lib/api/classrooms";
 
 type AddStudentsMode = "search" | "excel" | "email";
@@ -39,15 +40,59 @@ export function AddStudentsPanel({
   onSearchResult: (r: AddMembersResponse) => void;
 }) {
   const [mode, setMode] = useState<AddStudentsMode>("search");
+  const [downloading, setDownloading] = useState(false);
+
+  async function onDownloadTemplate() {
+    setDownloading(true);
+    try {
+      const blob = await downloadRosterTemplate(classId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "quizopia-roster-template.xlsx";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // Surface quietly; the roster panel shows its own error notice.
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <section className={cn(cardVariants(), "p-6")} aria-label="Add students">
-      <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
-        Add students
-      </h2>
-      <p className="mt-1 text-xs font-medium text-[#64748B]">
-        {MODE_DESCRIPTION[mode]}
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
+            Add students
+          </h2>
+          <p className="mt-1 text-xs font-medium text-[#64748B]">
+            {MODE_DESCRIPTION[mode]}
+          </p>
+        </div>
+        {mode === "excel" && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onDownloadTemplate}
+            disabled={downloading}
+            aria-label="Download template"
+            title="Download template"
+            className="w-11 px-0"
+          >
+            {downloading ? (
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="h-4 w-4 animate-spin" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" className="opacity-25" />
+                <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+            )}
+          </Button>
+        )}
+      </div>
 
       <div className="mt-4">
         <SegmentedControl

@@ -13,9 +13,6 @@ import type { NormalizedApiError } from "@/lib/api";
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MiB (backend is the source of truth).
 
-const fileInputClass =
-  "block w-full rounded-lg border border-[#E2E8F0] bg-white p-2 text-sm text-[#64748B] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2 file:mr-3 file:inline-flex file:h-11 file:cursor-pointer file:items-center file:rounded-lg file:border-0 file:bg-gradient-to-r file:from-[#0052FF] file:to-[#4D7CFF] file:px-5 file:font-semibold file:text-white file:outline-none file:transition-all file:duration-200 hover:file:brightness-110 disabled:opacity-60";
-
 /**
  * Maps a file-level error (NormalizedApiError) to a friendly message.
  *
@@ -193,18 +190,27 @@ export function QuestionImport({ bankId }: { bankId: number }) {
           className={uploading ? "animate-pulse" : undefined}
           aria-busy={uploading || undefined}
         >
-          <label htmlFor="q-import-file" className="sr-only">
-            Choose an .xlsx workbook to import
-          </label>
-          <input
-            id="q-import-file"
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx"
-            onChange={handleFileChange}
-            disabled={busy}
-            className={fileInputClass}
-          />
+          <div className="flex flex-wrap items-center gap-3">
+            <label
+              htmlFor="q-import-file"
+              className="inline-flex h-11 cursor-pointer items-center justify-center rounded-lg bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] px-5 text-sm font-semibold text-white outline-none transition-all duration-200 hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
+              aria-disabled={busy || undefined}
+            >
+              Choose file
+              <input
+                id="q-import-file"
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx"
+                onChange={handleFileChange}
+                disabled={busy}
+                className="sr-only"
+              />
+            </label>
+            <span className="min-w-0 flex-1 truncate text-sm text-[#64748B]" aria-live="polite">
+              {uploading ? "Importing…" : fileInputRef.current?.files?.[0]?.name ?? "No file chosen"}
+            </span>
+          </div>
           {uploading && (
             <p role="status" className="mt-3 pl-1 text-xs font-medium text-[#64748B]">
               Importing…

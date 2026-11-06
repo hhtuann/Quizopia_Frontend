@@ -430,7 +430,7 @@ function CreateSubjectModal({
           <Input
             id="subject-name"
             type="text"
-            placeholder="Toán"
+            placeholder="Math"
             aria-invalid={!!errors.name}
             aria-describedby={errors.name ? "subject-name-error" : undefined}
             className={cn(errors.name && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")}

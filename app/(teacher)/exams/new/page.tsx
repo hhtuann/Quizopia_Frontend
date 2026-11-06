@@ -273,7 +273,7 @@ export default function NewExamPage() {
             <Input
               id="exam-title"
               type="text"
-              placeholder="Đề giữa kỳ Toán 2026"
+              placeholder="Math midterm 2026"
               aria-invalid={!!errors.title}
               aria-describedby={errors.title ? "exam-title-error" : undefined}
               className={cn(errors.title && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")}

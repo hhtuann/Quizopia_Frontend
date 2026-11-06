@@ -117,11 +117,11 @@ export function ClassRosterPanel({
 
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="mt-4 grid gap-4 rounded-lg border border-[#E2E8F0] p-4 sm:grid-cols-2"
+        className="mt-4 grid gap-4 sm:grid-cols-2"
         noValidate
       >
         <Field label="Full name *" error={form.formState.errors.fullName?.message}>
-          <Input {...form.register("fullName")} placeholder="Nguyễn Văn A" />
+          <Input {...form.register("fullName")} placeholder="Nguyen Van A" />
         </Field>
         <Field label="Student number" error={form.formState.errors.studentNumber?.message}>
           <Input {...form.register("studentNumber")} placeholder="HS001" />
@@ -150,12 +150,12 @@ export function ClassRosterPanel({
         <Field label="Email *" error={form.formState.errors.email?.message}>
           <Input type="email" {...form.register("email")} placeholder="learner@example.com" />
         </Field>
-        <div className="flex items-end">
-          <Button type="submit" disabled={add.isPending}>
-            {add.isPending ? "Adding…" : "Thêm học sinh"}
-          </Button>
-        </div>
       </form>
+      <div className="mt-2 flex justify-end">
+        <Button type="submit" disabled={add.isPending} onClick={() => form.handleSubmit(onSubmit)()}>
+          {add.isPending ? "Adding…" : "Add student"}
+        </Button>
+      </div>
 
       {notice && (
         <p
