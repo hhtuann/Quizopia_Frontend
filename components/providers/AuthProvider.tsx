@@ -1,159 +1,99 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { httpClient } from "@/lib/api";
 import { authApi, initAuth, useAuthStore } from "@/lib/auth";
-import type {
-  CurrentUserResponse,
-  LoginRequest,
-  RegisterRequest,
-  RegisterResponse,
-  TokenResponse,
-} from "@/lib/auth";
+import { assertCurrentSession, beginSession, invalidateSession, isCurrentSession, registerSessionCleanup, sessionGeneration, type AuthStatus } from "@/lib/auth/store";
+import type { CurrentUserResponse, LoginRequest, RegisterRequest, RegisterResponse, TokenResponse } from "@/lib/auth";
 
-export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
-
-interface AuthContextValue {
+export type { AuthStatus } from "@/lib/auth/store";
+export interface AuthContextValue {
   status: AuthStatus;
   login: (req: LoginRequest) => Promise<CurrentUserResponse>;
   register: (req: RegisterRequest) => Promise<RegisterResponse>;
-  /** Identity-M2: re-fetches /api/auth/me into the store (e.g. after a role upgrade). */
   refreshUser: () => Promise<CurrentUserResponse>;
-  /**
-   * Review M1-04: the SINGLE session-completion path for any token source
-   * (password login, OAuth exchange). Updates access token, user AND
-   * AuthProvider status together, so Zustand, the provider and the route
-   * guards can never disagree after an OAuth callback.
-   */
-  completeLogin: (token: TokenResponse) => Promise<CurrentUserResponse>;
+  completeLogin: (token: TokenResponse, generation: number) => Promise<CurrentUserResponse>;
   logout: () => Promise<void>;
+  invalidateSession: () => void;
 }
-
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-/**
- * Auth boot + session provider.
- *
- * On mount (client only):
- *   1. `initAuth(httpClient)` — wires the access-token getter + the FE3
- *      single-flight refresh interceptor (idempotent; safe under StrictMode).
- *   2. Try silent session hydration: `refresh()` → `me()`. On success the user
- *      is authenticated; on failure (no valid refresh cookie) → unauthenticated.
- *
- * Hydration-safety: `status` starts at `"loading"` for the FIRST render (SSR +
- * first client paint), so no auth-dependent UI renders during SSR. Status only
- * changes inside the effect (after mount), so server and client first-paint
- * match — no hydration mismatch. Pages gate on `status` client-side.
- *
- * Race safety (review M1-04): the silent-boot refresh and an OAuth callback
- * completing at the same moment are serialized through a monotonic session
- * sequence — only the LATEST completion may touch store/status, so a stale
- * `refresh()` failure can never clobber a fresh OAuth login (and vice versa).
- */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<AuthStatus>("loading");
+  const status = useAuthStore((state) => state.status);
   const booted = useRef(false);
-  const sessionSeq = useRef(0);
+  const qc = useQueryClient();
+  useEffect(() => registerSessionCleanup(() => qc.clear()), [qc]);
+
+  const completeLogin = useCallback(async (token: TokenResponse, generation: number) => {
+    assertCurrentSession(generation);
+    useAuthStore.getState().setAccessToken(token.accessToken);
+    try {
+      const me = await authApi.me();
+      assertCurrentSession(generation);
+      useAuthStore.getState().setUser(me);
+      return me;
+    } catch (error) {
+      assertCurrentSession(generation);
+      invalidateSession();
+      throw error;
+    }
+  }, []);
 
   useEffect(() => {
-    // Guard against React StrictMode double-invoke in dev (in addition to
-    // initAuth's own idempotent guard).
+    initAuth(httpClient);
     if (booted.current) return;
     booted.current = true;
-
+    // Child OAuth effects may already have begun acquisition before this effect.
+    if (useAuthStore.getState().status !== "loading") return;
+    const generation = sessionGeneration();
     void (async () => {
-      initAuth(httpClient);
-      const seq = ++sessionSeq.current;
       try {
         const token = await authApi.refresh();
-        if (seq !== sessionSeq.current) return; // superseded by a newer login
-        useAuthStore.getState().setAccessToken(token.accessToken);
-        const me = await authApi.me();
-        if (seq !== sessionSeq.current) return;
-        useAuthStore.getState().setUser(me);
-        setStatus("authenticated");
+        await completeLogin(token, generation);
       } catch {
-        // refresh failed (no session / expired / revoked) → not logged in.
-        // Swallowed deliberately: unauthenticated is a normal boot state —
-        // unless a newer session (e.g. OAuth callback) already landed.
-        if (seq !== sessionSeq.current) return;
-        useAuthStore.getState().clearAuth();
-        setStatus("unauthenticated");
+        if (isCurrentSession(generation)) invalidateSession();
       }
     })();
-  }, []);
+  }, [completeLogin]);
 
-  /** Shared completion: token → store, then identity → store + status. */
-  const completeLogin = useCallback(async (token: TokenResponse) => {
-    const seq = ++sessionSeq.current;
-    useAuthStore.getState().setAccessToken(token.accessToken);
-    const me = await authApi.me();
-    if (seq !== sessionSeq.current) {
-      // A newer session superseded this one; keep the newer state untouched.
-      return me;
-    }
-    useAuthStore.getState().setUser(me);
-    setStatus("authenticated");
-    return me;
-  }, []);
-
-  const login = useCallback(
-    async (req: LoginRequest) => completeLogin(await authApi.login(req)),
-    [completeLogin],
-  );
-
-  const register = useCallback(async (req: RegisterRequest) => {
-    // 201 RegisterResponse; backend returns no token → caller redirects to /login.
-    return authApi.register(req);
-  }, []);
-
-  /** Identity-M2: pulls the freshest identity (roles) into the store. */
-  const refreshUser = useCallback(async () => {
-    const seq = ++sessionSeq.current;
-    const me = await authApi.me();
-    if (seq !== sessionSeq.current) return me;
-    useAuthStore.getState().setUser(me);
-    return me;
-  }, []);
-
-  const qc = useQueryClient();
-
-  const logout = useCallback(async () => {
-    // Invalidate any in-flight session completion before clearing.
-    ++sessionSeq.current;
+  const login = useCallback(async (req: LoginRequest) => {
+    const generation = beginSession();
+    let token: TokenResponse;
     try {
-      await authApi.logout();
-    } finally {
-      // Clear local state regardless of network result (cookie cleared server-side on 204).
-      useAuthStore.getState().clearAuth();
-      qc.clear();
-      setStatus("unauthenticated");
+      token = await authApi.login(req);
+    } catch (error) {
+      assertCurrentSession(generation);
+      invalidateSession();
+      throw error;
     }
-  }, [qc]);
-
-  const value = useMemo<AuthContextValue>(
-    () => ({ status, login, register, refreshUser, completeLogin, logout }),
-    [status, login, register, refreshUser, completeLogin, logout],
-  );
-
+    return completeLogin(token, generation);
+  }, [completeLogin]);
+  const register = useCallback((req: RegisterRequest) => authApi.register(req), []);
+  const refreshUser = useCallback(async () => {
+    const generation = sessionGeneration();
+    try {
+      const me = await authApi.me();
+      assertCurrentSession(generation);
+      useAuthStore.getState().setUser(me);
+      return me;
+    } catch (error) {
+      assertCurrentSession(generation);
+      throw error;
+    }
+  }, []);
+  const logout = useCallback(async () => {
+    // Dispatch with the old bearer, then invalidate synchronously. Never let a
+    // late logout response clear a newer session.
+    const request = authApi.logout();
+    invalidateSession();
+    await request;
+  }, []);
+  const value = useMemo<AuthContextValue>(() => ({ status, login, register, refreshUser, completeLogin, logout, invalidateSession }), [status, login, register, refreshUser, completeLogin, logout]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-
-/** Internal hook — use `useAuth` from `@/hooks/useAuth` in components. */
 export function useAuthContext(): AuthContextValue {
   const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error("AuthProvider is missing — wrap the tree with <AuthProvider>.");
-  }
+  if (!ctx) throw new Error("AuthProvider is missing — wrap the tree with <AuthProvider>.");
   return ctx;
 }

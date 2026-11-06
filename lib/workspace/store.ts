@@ -23,6 +23,7 @@ interface WorkspacePreferenceState {
   /** Restore from localStorage once, on the client (call from a component). */
   hydrate: () => void;
   setActiveWorkspace: (workspaceId: number) => void;
+  reset: () => void;
 }
 
 function readStoredId(): number | null {
@@ -51,6 +52,10 @@ export const useWorkspacePreference = create<WorkspacePreferenceState>(
   (set, get) => ({
     activeWorkspaceId: null,
     hydrated: false,
+    reset: () => {
+      persistId(null);
+      set({ activeWorkspaceId: null, hydrated: true });
+    },
     hydrate: () => {
       if (get().hydrated || typeof window === "undefined") return;
       set({ activeWorkspaceId: readStoredId(), hydrated: true });

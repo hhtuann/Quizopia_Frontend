@@ -11,6 +11,7 @@ import { Button, Card, Input } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/hooks/useAuth";
 import { RedirectIfAuthenticated } from "@/components/auth/RedirectIfAuthenticated";
+import { StaleSessionError } from "@/lib/auth/store";
 import { authApi } from "@/lib/auth";
 import { PENDING_VERIFICATION_EMAIL } from "@/app/register/page";
 import type { NormalizedApiError } from "@/lib/api";
@@ -59,6 +60,8 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const justRegistered = searchParams.get("registered") === "1";
   const justVerified = searchParams.get("verified") === "1";
+  const passwordChanged = searchParams.get("passwordChanged") === "1";
+  const passwordReset = searchParams.get("passwordReset") === "1";
   const returnTo = sanitizeReturnTo(searchParams.get("returnTo"));
   const { login } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
@@ -100,6 +103,11 @@ function LoginForm() {
       // an internal path), defaulting to home.
       router.replace(returnTo ?? "/");
     } catch (err) {
+      if (err instanceof StaleSessionError) {
+        // A newer sign-in attempt superseded this one — stay quiet; the newer
+        // attempt owns the UI and any error surface.
+        return;
+      }
       const norm = err as NormalizedApiError;
       if (norm?.kind === "api") {
         switch (norm.code) {
@@ -149,6 +157,19 @@ function LoginForm() {
         </div>
 
         <Card variant="elevated" className="p-8 sm:p-10">
+          {passwordReset && (
+            <div
+              role="status"
+              className="mb-6 rounded-lg border border-[#10B981]/30 bg-[#10B981]/5 p-4 text-sm font-semibold text-[#10B981]"
+            >
+              Your password was reset. Sign in with your new password.
+            </div>
+          )}
+          {passwordChanged && (
+            <div role="status" className="mb-6 flex items-start gap-2 rounded-lg border border-[#15803D]/30 bg-[#15803D]/5 p-4 text-sm font-medium text-[#15803D]">
+              Your password was changed. All sessions were signed out — sign in with your new password.
+            </div>
+          )}
           {justVerified && (
             <div
               role="status"
@@ -283,6 +304,14 @@ function LoginForm() {
           </form>
 
           <p className="mt-6 text-center text-sm font-medium text-[#64748B]">
+            <Link
+              href="/forgot-password"
+              className="rounded font-semibold text-[#0052FF] outline-none transition-colors hover:underline focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFAFA]"
+            >
+              Forgot password?
+            </Link>
+          </p>
+          <p className="mt-2 text-center text-sm font-medium text-[#64748B]">
             Don&apos;t have an account?{" "}
             <Link
               href="/register"
