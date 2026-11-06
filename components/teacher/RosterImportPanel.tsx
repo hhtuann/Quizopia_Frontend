@@ -101,12 +101,11 @@ export function RosterImportPanel({
           <h2 className="text-lg font-semibold">Import students (Excel)</h2>
           <Button
               type="button"
-              variant="outline"
               onClick={onDownloadTemplate}
               disabled={downloading}
               aria-label="Download template"
               title="Download template"
-              className="aspect-square w-11 px-0"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-[#64748B] outline-none transition-colors hover:bg-[#0052FF]/5 hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {downloading ? (
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="h-4 w-4 animate-spin" aria-hidden="true">

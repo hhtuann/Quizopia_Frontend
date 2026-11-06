@@ -154,12 +154,11 @@ export function QuestionImport({ bankId }: { bankId: number }) {
         </div>
         <Button
           type="button"
-          variant="outline"
           onClick={handleDownload}
           disabled={busy}
           aria-label="Download template"
           title="Download template"
-          className="aspect-square w-11 px-0"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-[#64748B] outline-none transition-colors hover:bg-[#0052FF]/5 hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {downloading ? (
             <svg
@@ -269,7 +268,7 @@ function PreviewTable({ preview }: { preview: ExcelImportPreview }) {
       <table className="w-full min-w-[640px] text-left text-sm">
         <thead>
           <tr className="border-b border-[#E2E8F0] text-xs uppercase tracking-wide text-[#64748B]">
-            <th className="py-2 pr-4 text-center">Row</th>
+            <th className="py-2 pr-4">Row</th>
             <th className="py-2 pr-4">Question</th>
             <th className="py-2 pr-4 text-center">Correct answers</th>
             <th className="py-2 pr-4 text-center">Status</th>
@@ -278,7 +277,7 @@ function PreviewTable({ preview }: { preview: ExcelImportPreview }) {
         <tbody>
           {preview.rows.map((row) => (
             <tr key={row.rowNumber} className="border-b border-[#E2E8F0]/60">
-              <td className="py-2 pr-4 text-center tabular-nums">{row.rowNumber}</td>
+              <td className="py-2 pr-4 tabular-nums">{row.rowNumber}</td>
               <td className="max-w-md truncate py-2 pr-4">{row.content ?? "—"}</td>
               <td className="py-2 pr-4 text-center font-mono text-xs text-[#64748B]">
                 {row.correctAnswers.length > 0 ? row.correctAnswers.join(", ") : "—"}
