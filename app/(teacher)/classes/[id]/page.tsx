@@ -233,7 +233,7 @@ function MembersTable({
                 <td className="px-3 py-3 align-top font-mono text-xs text-[#64748B]">—</td>
                 <td className="px-3 py-3 align-top text-[#64748B]">{formatDate(e.createdAt)}</td>
                 <td className="px-3 py-3 align-top">
-                  <span className="text-xs font-medium text-[#D97706]">Awaiting email verification</span>
+                  <Badge variant="warn">Awaiting email verification</Badge>
                 </td>
                 <td className="px-3 py-3 text-right align-top">
                   <button
@@ -259,7 +259,7 @@ function MembersTable({
                 <td className="px-3 py-3 align-top font-mono text-xs text-[#64748B]">{m.username ?? "—"}</td>
                 <td className="px-3 py-3 align-top text-[#64748B]">{formatDate(m.addedAt)}</td>
                 <td className="px-3 py-3 align-top">
-                  <span className="text-xs font-medium text-[#10B981]">Member</span>
+                  <Badge variant="success">Member</Badge>
                 </td>
                 <td className="px-3 py-3 text-right align-top">
                   <button
