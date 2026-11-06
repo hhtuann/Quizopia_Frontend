@@ -108,8 +108,15 @@ export function StudentSearchSelect({
             : `Add ${selected.length} student${selected.length === 1 ? "" : "s"}`}
         </Button>
 
-        {debounced.length >= 2 && results.length > 0 && (
+        {query.trim().length >= 2 && (
           <div className="absolute inset-x-0 top-full z-20 mt-2 max-h-72 space-y-1 overflow-y-auto rounded-lg border border-[#E2E8F0] bg-white p-1 shadow-lg">
+            {results.length === 0 && (
+              <p className="px-3 py-2 text-sm text-[#64748B]">
+                {debounced.length >= 2 && searchData
+                  ? "No students found (or already added)."
+                  : "Searching…"}
+              </p>
+            )}
             {results.map((s) => (
             <button
               key={s.studentProfileId}
@@ -132,13 +139,6 @@ export function StudentSearchSelect({
           </div>
         )}
       </div>
-      {debounced.length >= 2 && results.length === 0 && !searchData && (
-        <p className="mt-2 pl-1 text-xs text-[#64748B]">Searching…</p>
-      )}
-      {debounced.length >= 2 && results.length === 0 && searchData && (
-        <p className="mt-2 pl-1 text-xs text-[#64748B]">No students found (or already added).</p>
-      )}
-
       {/* Selected chips */}
       {selected.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
