@@ -213,10 +213,10 @@ function MembersTable({
             <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
               <th scope="col" className="px-3 pb-3 font-semibold">Student</th>
               <th scope="col" className="px-3 pb-3 font-semibold">Name</th>
-              <th scope="col" className="px-3 pb-3 font-semibold">Email</th>
-              <th scope="col" className="px-3 pb-3 font-semibold">Username</th>
-              <th scope="col" className="px-3 pb-3 font-semibold">Added</th>
-              <th scope="col" className="px-3 pb-3 font-semibold">Status</th>
+              <th scope="col" className="px-3 pb-3 text-center font-semibold">Email</th>
+              <th scope="col" className="px-3 pb-3 text-center font-semibold">Username</th>
+              <th scope="col" className="px-3 pb-3 text-center font-semibold">Added</th>
+              <th scope="col" className="px-3 pb-3 text-center font-semibold">Status</th>
               <th scope="col" className="px-3 pb-3 text-right font-semibold">Actions</th>
             </tr>
           </thead>
@@ -229,11 +229,11 @@ function MembersTable({
                   </span>
                 </td>
                 <td className="px-3 py-3 align-top font-medium">{e.fullName}</td>
-                <td className="px-3 py-3 align-top text-[#64748B]">{e.email ?? "—"}</td>
-                <td className="px-3 py-3 align-top font-mono text-xs text-[#64748B]">—</td>
-                <td className="px-3 py-3 align-top text-[#64748B]">{formatDate(e.createdAt)}</td>
-                <td className="px-3 py-3 align-top">
-                  <Badge variant="warn">Awaiting email verification</Badge>
+                <td className="px-3 py-3 text-center align-top text-[#64748B]">{e.email ?? "—"}</td>
+                <td className="px-3 py-3 text-center align-top font-mono text-xs text-[#64748B]">—</td>
+                <td className="px-3 py-3 text-center align-top text-[#64748B]">{formatDate(e.createdAt)}</td>
+                <td className="px-3 py-3 text-center align-top">
+                  <Badge variant="warn">Pending</Badge>
                 </td>
                 <td className="px-3 py-3 text-right align-top">
                   <button
@@ -255,10 +255,10 @@ function MembersTable({
                   </span>
                 </td>
                 <td className="px-3 py-3 align-top font-medium">{m.displayName}</td>
-                <td className="px-3 py-3 align-top text-[#64748B]">{m.email ?? "—"}</td>
-                <td className="px-3 py-3 align-top font-mono text-xs text-[#64748B]">{m.username ?? "—"}</td>
-                <td className="px-3 py-3 align-top text-[#64748B]">{formatDate(m.addedAt)}</td>
-                <td className="px-3 py-3 align-top">
+                <td className="px-3 py-3 text-center align-top text-[#64748B]">{m.email ?? "—"}</td>
+                <td className="px-3 py-3 text-center align-top font-mono text-xs text-[#64748B]">{m.username ?? "—"}</td>
+                <td className="px-3 py-3 text-center align-top text-[#64748B]">{formatDate(m.addedAt)}</td>
+                <td className="px-3 py-3 text-center align-top">
                   <Badge variant="success">Member</Badge>
                 </td>
                 <td className="px-3 py-3 text-right align-top">
