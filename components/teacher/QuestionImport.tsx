@@ -64,6 +64,7 @@ export function QuestionImport({ bankId }: { bankId: number }) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportResponse | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
 
   const handleDownload = async () => {
     setDownloadError(null);
@@ -87,12 +88,14 @@ export function QuestionImport({ bankId }: { bankId: number }) {
 
   const reset = () => {
     setResult(null);
+    setFileName(null);
     setClientError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    setFileName(file?.name ?? null);
     if (!file) return;
     setClientError(null);
     setResult(null);
@@ -208,7 +211,7 @@ export function QuestionImport({ bankId }: { bankId: number }) {
               />
             </label>
             <span className="min-w-0 flex-1 truncate text-sm text-[#64748B]" aria-live="polite">
-              {uploading ? "Importing…" : fileInputRef.current?.files?.[0]?.name ?? "No file chosen"}
+              {uploading ? "Importing…" : (fileName ?? "No file chosen")}
             </span>
           </div>
           {uploading && (

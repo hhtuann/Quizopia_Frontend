@@ -90,8 +90,6 @@ export function RosterImportPanel({
   }
 
   // Same file-input styling as the question Excel import (QuestionImport).
-  const fileInputClass =
-    "block w-full rounded-lg border border-[#E2E8F0] bg-white p-2 text-sm text-[#64748B] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2 file:mr-3 file:inline-flex file:h-11 file:cursor-pointer file:items-center file:rounded-lg file:border-0 file:bg-gradient-to-r file:from-[#0052FF] file:to-[#4D7CFF] file:px-5 file:font-semibold file:text-white file:outline-none file:transition-all file:duration-200 hover:file:brightness-110 disabled:opacity-60";
 
   return (
     <section
