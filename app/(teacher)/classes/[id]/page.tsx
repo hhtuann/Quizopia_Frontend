@@ -187,6 +187,8 @@ function MembersTable({
             <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
               <th scope="col" className="px-3 pb-3 font-semibold">Student</th>
               <th scope="col" className="px-3 pb-3 font-semibold">Name</th>
+              <th scope="col" className="px-3 pb-3 font-semibold">Email</th>
+              <th scope="col" className="px-3 pb-3 font-semibold">Username</th>
               <th scope="col" className="px-3 pb-3 font-semibold">Added</th>
               <th scope="col" className="px-3 pb-3 text-right font-semibold">Actions</th>
             </tr>
@@ -200,6 +202,8 @@ function MembersTable({
                   </span>
                 </td>
                 <td className="px-3 py-3 align-top font-medium">{m.displayName}</td>
+                <td className="px-3 py-3 align-top text-[#64748B]">{m.email ?? "—"}</td>
+                <td className="px-3 py-3 align-top font-mono text-xs text-[#64748B]">{m.username ?? "—"}</td>
                 <td className="px-3 py-3 align-top text-[#64748B]">{formatDate(m.addedAt)}</td>
                 <td className="px-3 py-3 text-right align-top">
                   <button

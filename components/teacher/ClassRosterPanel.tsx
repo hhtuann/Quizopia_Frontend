@@ -157,15 +157,8 @@ export function ClassRosterPanel({
         </Button>
       </div>
 
-      {notice && (
-        <p
-          role="status"
-          className={
-            notice.kind === "success"
-              ? "mt-3 text-sm text-green-600"
-              : "mt-3 text-sm text-red-600"
-          }
-        >
+      {notice?.kind === "error" && (
+        <p role="alert" className="mt-3 text-sm text-red-600">
           {notice.message}
         </p>
       )}
