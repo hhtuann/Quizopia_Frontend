@@ -234,10 +234,25 @@ export function DraftEditor({
 
       {sections.map((section, sIndex) => (
         <div key={section.uid} className={cn(cardVariants(), "p-5")}>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs font-bold uppercase tracking-wider text-[#64748B]">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="shrink-0 rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs font-bold uppercase tracking-wider text-[#64748B]">
               Section {sIndex + 1}
             </span>
+            {readOnly ? (
+              <p className="min-w-0 flex-1 truncate rounded-lg border border-transparent px-3 py-2 text-sm font-semibold text-[#0F172A]">
+                {section.title}
+              </p>
+            ) : (
+              <Input
+                type="text"
+                value={section.title}
+                onChange={(e) => patchSection(section.uid, { title: e.target.value })}
+                placeholder="Section title"
+                aria-label={`Section ${sIndex + 1} title`}
+                aria-invalid={section.title.trim() === ""}
+                className="min-w-40 flex-1"
+              />
+            )}
             {!readOnly && (
               <button
                 type="button"
@@ -259,24 +274,6 @@ export function DraftEditor({
               </button>
             )}
           </div>
-
-          <label className="mb-1.5 block pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
-            Title
-          </label>
-          {readOnly ? (
-            <p className="mb-4 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-4 py-3 text-sm font-medium text-[#0F172A]">
-              {section.title}
-            </p>
-          ) : (
-            <Input
-              type="text"
-              value={section.title}
-              onChange={(e) => patchSection(section.uid, { title: e.target.value })}
-              placeholder="Section title"
-              aria-invalid={section.title.trim() === ""}
-              className="mb-4"
-            />
-          )}
 
           <div className="mb-3 flex items-center justify-between">
             <p className="font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">

@@ -94,14 +94,16 @@ function PreviewQuestion({
           {canSelectQuestion ? (
             <button
               aria-label={`Jump to source for question ${question.number}, line ${question.source.line}`}
-              className="rounded-md text-left text-sm font-semibold text-[#0F172A] transition-colors hover:text-[#0052FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 motion-reduce:transition-none"
+              className="rounded-md border border-[#E2E8F0] bg-white px-2 py-0.5 font-mono text-xs font-bold text-[#0F172A] transition-colors hover:border-[#0052FF]/40 hover:text-[#0052FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 motion-reduce:transition-none"
               onClick={() => onQuestionSelect(question)}
               type="button"
             >
-              Câu {question.number}
+              Question {question.number}
             </button>
           ) : (
-            `Câu ${question.number}`
+            <span className="rounded-md border border-[#E2E8F0] bg-white px-2 py-0.5 font-mono text-xs font-bold text-[#0F172A]">
+              Question {question.number}
+            </span>
           )}
         </h3>
         <span className="font-mono text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">
@@ -179,7 +181,7 @@ function PreviewQuestion({
       {question.numericAnswer !== null ? (
         <div className="mt-3 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-3 py-2 text-xs">
           <span className="font-mono font-semibold uppercase tracking-wide text-[#64748B]">
-            Đáp án / Expected answer
+            Expected answer
           </span>{" "}
           <code className="font-mono font-bold text-[#0052FF]">
             {question.numericAnswer}
@@ -189,7 +191,7 @@ function PreviewQuestion({
       {question.explanation !== null ? (
         <div className="mt-3 border-t border-[#E2E8F0] pt-3">
           <p className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">
-            Lời giải
+            Explanation
           </p>
           <div className="text-sm leading-relaxed text-[#64748B]">
             <MarkdownContent value={question.explanation} />
@@ -279,7 +281,7 @@ export function QuizMarkdownPreview({
       </h2>
 
       {analysis.diagnostics.length > 0 ? (
-        <section aria-labelledby={`${generatedId}-diagnostics`}>
+        <section aria-labelledby={`${generatedId}-diagnostics`} className="mb-4">
           <h3
             className="font-mono text-[10px] font-semibold uppercase tracking-wide text-[#EF4444]"
             id={`${generatedId}-diagnostics`}
@@ -301,7 +303,7 @@ export function QuizMarkdownPreview({
       {analysis.questions.length === 0 ? (
         <div className="rounded-lg border border-dashed border-[#E2E8F0] bg-[#F1F5F9]/50 px-4 py-6 text-center text-xs leading-relaxed text-[#64748B]">
           Start a question with{" "}
-          <code className="font-mono text-[#0F172A]">Câu 1 [TYPE]:</code> to
+          <code className="font-mono text-[#0F172A]">Question 1 [TYPE]:</code> to
           see the preview.
         </div>
       ) : (

@@ -27,7 +27,7 @@ describe("QuizMarkdownAuthoringPane", () => {
   it("renders editor and preview panes with the switch controls", () => {
     const { view } = setup(sample);
     expect(view.getByLabelText("Quiz Markdown source")).not.toBeNull();
-    expect(view.getByText("Câu 1")).not.toBeNull();
+    expect(view.getByText("Question 1")).not.toBeNull();
     expect(view.getByRole("button", { name: "Editor" })).not.toBeNull();
     expect(view.getByRole("button", { name: "Preview" })).not.toBeNull();
   });

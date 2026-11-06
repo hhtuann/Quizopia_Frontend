@@ -13,17 +13,6 @@ import type { NormalizedApiError } from "@/lib/api";
 /** Mirrors the backend MarkdownQuestionImportService.MAX_MARKDOWN_CHARS. */
 const MAX_MARKDOWN_CHARS = 262_144;
 
-const SAMPLE = `Câu 1 [SINGLE_CHOICE]: 2 + 2 bằng bao nhiêu?
-*A. 4
-B. 3
-C. 5
-D. 6
-Lời giải: 2 + 2 = 4
-
-Câu 2 [NUMERIC_FILL]: 10 / 4 (viết hai chữ số thập phân)?
-Đáp án: 2.50
-`;
-
 function describeError(err: unknown): string {
   const norm = err as NormalizedApiError | undefined;
   if (norm?.kind === "api") {
@@ -66,7 +55,8 @@ function describeError(err: unknown): string {
 export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
   const mutation = useImportMarkdownQuestionsMutation(bankId);
 
-  const [source, setSource] = useState(SAMPLE);
+  const [source, setSource] = useState("");
+  const [collapsed, setCollapsed] = useState(true);
   const [result, setResult] = useState<ImportResponse | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
 
@@ -82,83 +72,56 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
     violations.length === 0 &&
     questionCount > 0;
 
-  const reset = () => {
-    setResult(null);
-    setClientError(null);
-  };
-
   const handleConfirm = () => {
     setClientError(null);
     setResult(null);
     mutation.mutate(source, {
-      onSuccess: (data) => setResult(data),
+      onSuccess: (data) => {
+        setResult(data);
+        if (data.importedRows === data.totalRows && data.errors.length === 0) {
+          // Success clears the editor for the next document (no separate
+          // result view / "Write another" round-trip) and folds the pane.
+          setSource("");
+          setCollapsed(true);
+        }
+      },
       onError: (err) => setClientError(describeError(err)),
     });
   };
 
   const importing = mutation.isPending;
 
-  if (result) {
-    const allImported = result.importedRows === result.totalRows && result.errors.length === 0;
-    return (
-      <section className={cn(cardVariants(), "p-6")} aria-label="Markdown import result">
-        <div
-          role="status"
-          className={cn(
-            "mb-4 rounded-lg border p-4 text-sm font-medium",
-            allImported
-              ? "border-[#10B981]/30 bg-[#10B981]/5 text-[#10B981]"
-              : "border-[#F59E0B]/30 bg-[#F59E0B]/5 text-[#0F172A]"
-          )}
-        >
-          {allImported ? (
-            <span>Added all {result.totalRows} questions to this bank.</span>
-          ) : result.invalidRows > 0 ? (
-            <span>
-              Nothing was imported — {result.invalidRows} question
-              {result.invalidRows === 1 ? "" : "s"} rejected (all-or-nothing).
-            </span>
-          ) : (
-            <span>
-              Nothing was imported — the document was rejected (all-or-nothing).
-            </span>
-          )}
-        </div>
-        {result.errors.length > 0 && <RowErrorsTable errors={result.errors} />}
-        <Button type="button" variant="outline" onClick={reset} disabled={importing}>
-          Write another
-        </Button>
-      </section>
-    );
-  }
-
   return (
     <section className={cn(cardVariants(), "p-6")} aria-label="Markdown import">
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
-          Author questions in Quiz Markdown
+          Markdown authoring
         </h2>
-        <p className="mt-1 text-xs font-medium text-[#64748B]">
-          Live preview with diagnostics. Review, then explicitly confirm adding the
-          questions to this bank — the whole document imports atomically or not at all.
-        </p>
+        <button
+          type="button"
+          aria-expanded={!collapsed}
+          onClick={() => setCollapsed((value) => !value)}
+          className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-[#E2E8F0] px-4 text-sm font-semibold text-[#64748B] outline-none transition-colors hover:border-[#0052FF]/30 hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
+        >
+          {collapsed ? "Write questions" : "Collapse"}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2.5}
+            stroke="currentColor"
+            className={cn("h-3.5 w-3.5 transition-transform", collapsed ? "" : "rotate-180")}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
       </div>
 
-      <QuizMarkdownAuthoringPane value={source} onChange={setSource} />
+      {result && <ResultBanner result={result} />}
 
-      {/* Preflight summary (mirror of the backend checks; server decides). */}
-      <div
-        role="status"
-        className={cn(
-          "mt-4 rounded-lg border p-4 text-sm font-medium",
-          importable
-            ? "border-[#10B981]/30 bg-[#10B981]/5 text-[#10B981]"
-            : "border-[#E2E8F0] bg-[#F1F5F9] text-[#0F172A]"
-        )}
-      >
-        {questionCount} question{questionCount === 1 ? "" : "s"} parsed · {parseErrors} grammar
-        diagnostic{parseErrors === 1 ? "" : "s"} · {violations.length} bank-contract issue
-        {violations.length === 1 ? "" : "s"}
+      <div className={collapsed ? "hidden" : "h-[70vh] min-h-[32rem]"}>
+        <QuizMarkdownAuthoringPane value={source} onChange={setSource} />
       </div>
 
       {tooLong && (
@@ -186,6 +149,8 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
         </div>
       )}
 
+      {result && result.errors.length > 0 && <RowErrorsTable errors={result.errors} />}
+
       {clientError && (
         <p role="alert" className="mt-3 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-3 text-sm font-medium text-[#EF4444]">
           {clientError}
@@ -208,6 +173,32 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
         )}
       </div>
     </section>
+  );
+}
+
+function ResultBanner({ result }: { result: ImportResponse }) {
+  const allImported = result.importedRows === result.totalRows && result.errors.length === 0;
+  return (
+    <div
+      role="status"
+      className={cn(
+        "mb-4 rounded-lg border p-4 text-sm font-medium",
+        allImported
+          ? "border-[#10B981]/30 bg-[#10B981]/5 text-[#10B981]"
+          : "border-[#F59E0B]/30 bg-[#F59E0B]/5 text-[#0F172A]"
+      )}
+    >
+      {allImported ? (
+        <span>Added all {result.totalRows} questions to this bank.</span>
+      ) : result.invalidRows > 0 ? (
+        <span>
+          Nothing was imported — {result.invalidRows} question
+          {result.invalidRows === 1 ? "" : "s"} rejected (all-or-nothing).
+        </span>
+      ) : (
+        <span>Nothing was imported — the document was rejected (all-or-nothing).</span>
+      )}
+    </div>
   );
 }
 

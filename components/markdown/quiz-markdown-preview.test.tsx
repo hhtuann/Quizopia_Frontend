@@ -104,7 +104,7 @@ describe("QuizMarkdownPreview", () => {
     expect(view.getAllByText("True").length).toBe(1);
     expect(view.getAllByText("False").length).toBe(3);
     expect(view.getByText("2.50")).not.toBeNull();
-    expect(view.getAllByText("Lời giải").length).toBeGreaterThan(0);
+    expect(view.getAllByText("Explanation").length).toBeGreaterThan(0);
   });
 
   it("moves the sole star for SINGLE_CHOICE without touching anything else", () => {

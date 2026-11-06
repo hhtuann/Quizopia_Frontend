@@ -72,7 +72,9 @@ interface MutableOption {
 interface MutableQuestion {
   answerCount: number;
   answerLine: number | null;
+  answerPrefixLength: number;
   answerRaw: string | null;
+  markerPrefixLength: number;
   explanation: string[];
   explanationLine: number | null;
   explanationSeen: boolean;
@@ -88,11 +90,26 @@ interface MutableQuestion {
 type ContentTarget =
   "none" | "stem" | "option" | "after-answer" | "explanation";
 
-const QUESTION_HEADER = /^Câu ([0-9]+) \[([^\]]+)]:(.*)$/;
-const QUESTION_HEADER_LIKE = /^Câu [0-9]+(?: \[.*)?$/;
+// Bilingual structural markers (owner decision 2026-11-06): English markers
+// are the authored default; Vietnamese markers remain accepted. Diagnostics
+// use identical codes/positions for both languages.
+const QUESTION_HEADER = /^(Câu|Question) ([0-9]+) \[([^\]]+)]:(.*)$/;
+const QUESTION_HEADER_LIKE = /^(Câu|Question) [0-9]+(?: \[.*)?$/;
 const OPTION = /^(\*)?([A-D])\.(.*)$/;
-const ANSWER_PREFIX = "Đáp án:";
-const EXPLANATION_PREFIX = "Lời giải:";
+const ANSWER_PREFIXES: readonly string[] = ["Đáp án:", "Expected answer:"];
+const EXPLANATION_PREFIXES: readonly string[] = ["Lời giải:", "Explanation:"];
+/** Marker aliases the editor offers/inserts (English-first defaults). */
+const ANSWER_MARKER_DEFAULT = "Expected answer:";
+const EXPLANATION_MARKER_DEFAULT = "Explanation:";
+
+function matchedPrefix(line: string, prefixes: readonly string[]): string | null {
+  for (const prefix of prefixes) {
+    if (line.startsWith(prefix)) {
+      return prefix;
+    }
+  }
+  return null;
+}
 const OPTION_LABELS: readonly QuizOptionLabel[] = ["A", "B", "C", "D"];
 
 function diagnostic(
@@ -136,17 +153,17 @@ function javaWhitespacePrefixLength(value: string): number {
   return count;
 }
 
-/** Column of the `[TYPE]` token: `Câu `.length + raw digits + ` [`.length + 1. */
-function questionTypeColumn(numberTokenLength: number): number {
-  // Raw digit token length: "Câu 007" must report where the type token
-  // actually starts, not the normalized integer's length (Java parity).
-  return "Câu ".length + numberTokenLength + 3;
+/** Column of the `[TYPE]` token: matched prefix + raw digits + ` [`.length + 1. */
+function questionTypeColumn(markerPrefixLength: number, numberTokenLength: number): number {
+  // Raw digit token length: "Câu/Question 007" must report where the type
+  // token actually starts — from the ACTUAL matched marker prefix (Java parity).
+  return markerPrefixLength + numberTokenLength + 3;
 }
 
-/** Column of the numeric token after `Đáp án:` + leading whitespace (Java parity). */
-function numericAnswerColumn(answerRaw: string | null): number {
+/** Column of the numeric token after the matched answer marker + whitespace (Java parity). */
+function numericAnswerColumn(answerRaw: string | null, answerPrefixLength: number): number {
   return (
-    "Đáp án:".length +
+    answerPrefixLength +
     (answerRaw === null ? 0 : javaWhitespacePrefixLength(answerRaw)) +
     1
   );
@@ -324,7 +341,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
 
     const header = QUESTION_HEADER.exec(line);
     if (header) {
-      const parsedNumber = Number.parseInt(header[1], 10);
+      const parsedNumber = Number.parseInt(header[2], 10);
       // Java Integer.parseInt rejects anything above Integer.MAX_VALUE with
       // MALFORMED_QUESTION_HEADER (Backend PR #3); Number.parseInt would keep
       // an unsafe float instead.
@@ -346,16 +363,18 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
         answerCompleteAtExplanation: false,
         answerCount: 0,
         answerLine: null,
+        answerPrefixLength: 0,
         answerRaw: null,
+        markerPrefixLength: header[1].length + 1,
         explanation: [],
         explanationLine: null,
         explanationSeen: false,
         headerLine: lineNumber,
         number: parsedNumber,
-        numberTokenLength: header[1].length,
+        numberTokenLength: header[2].length,
         options: [],
-        stem: [header[3].startsWith(" ") ? header[3].slice(1) : header[3]],
-        type: header[2],
+        stem: [header[4].startsWith(" ") ? header[4].slice(1) : header[4]],
+        type: header[3],
       };
       questions.push(current);
       target = "stem";
@@ -363,14 +382,14 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
     }
 
     if (QUESTION_HEADER_LIKE.test(line)) {
-      const numberMatch = /^Câu ([0-9]+)/.exec(line);
+      const numberMatch = /^(?:Câu|Question) ([0-9]+)/.exec(line);
       diagnostics.push(
         diagnostic(
           "MALFORMED_QUESTION_HEADER",
           numberMatch ? Number.parseInt(numberMatch[1], 10) : null,
           lineNumber,
           1,
-          "Question header must match 'Câu <number> [<TYPE>]:'",
+          "Question header must match 'Câu/Question <number> [<TYPE>]:'",
         ),
       );
       current = null;
@@ -399,7 +418,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
             current.number,
             lineNumber,
             1,
-            "Options cannot appear after Lời giải:",
+            "Options cannot appear after an explanation marker",
           ),
         );
       }
@@ -413,7 +432,8 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
       return;
     }
 
-    if (line.startsWith(ANSWER_PREFIX)) {
+    const answerPrefix = matchedPrefix(line, ANSWER_PREFIXES);
+    if (answerPrefix !== null) {
       if (current === null) {
         diagnostics.push(
           diagnostic(
@@ -421,14 +441,15 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
             null,
             lineNumber,
             1,
-            "Đáp án: appears before a question",
+            "An answer marker (Đáp án:/Expected answer:) appears before a question",
           ),
         );
         return;
       }
       current.answerCount += 1;
       current.answerLine = lineNumber;
-      current.answerRaw = line.slice(ANSWER_PREFIX.length);
+      current.answerPrefixLength = answerPrefix.length;
+      current.answerRaw = line.slice(answerPrefix.length);
       if (current.answerCount > 1) {
         diagnostics.push(
           diagnostic(
@@ -436,7 +457,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
             current.number,
             lineNumber,
             1,
-            "A question may contain only one Đáp án: marker",
+            "A question may contain only one answer marker (Đáp án:/Expected answer:)",
           ),
         );
       }
@@ -447,7 +468,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
             current.number,
             lineNumber,
             1,
-            "Đáp án: cannot appear after Lời giải:",
+            "An answer marker (Đáp án:/Expected answer:) cannot appear after an explanation marker",
           ),
         );
       }
@@ -455,7 +476,8 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
       return;
     }
 
-    if (line.startsWith(EXPLANATION_PREFIX)) {
+    const explanationPrefix = matchedPrefix(line, EXPLANATION_PREFIXES);
+    if (explanationPrefix !== null) {
       if (current === null) {
         diagnostics.push(
           diagnostic(
@@ -463,7 +485,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
             null,
             lineNumber,
             1,
-            "Lời giải: appears before a question",
+            "An explanation marker (Lời giải:/Explanation:) appears before a question",
           ),
         );
         return;
@@ -475,7 +497,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
             current.number,
             lineNumber,
             1,
-            "A question may contain at most one Lời giải: block",
+            "A question may contain at most one explanation marker (Lời giải:/Explanation:)",
           ),
         );
         return;
@@ -490,7 +512,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
               : stripLikeJava(current.answerRaw).length > 0)
           : orderedOptionsComplete(current.options)
         : false;
-      const suffix = line.slice(EXPLANATION_PREFIX.length);
+      const suffix = line.slice(explanationPrefix.length);
       current.explanation.push(
         suffix.startsWith(" ") ? suffix.slice(1) : suffix,
       );
@@ -521,7 +543,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
             current.number,
             lineNumber,
             1,
-            "Only Lời giải: or the next question may follow a NUMERIC_FILL answer",
+            "Only an explanation marker or the next question may follow a NUMERIC_FILL answer",
           ),
         );
       }
@@ -614,7 +636,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
           "UNKNOWN_QUESTION_TYPE",
           question.number,
           question.headerLine,
-          questionTypeColumn(question.numberTokenLength),
+          questionTypeColumn(question.markerPrefixLength, question.numberTokenLength),
           `Unknown or incorrectly cased question type: ${question.type}`,
         ),
       );
@@ -652,7 +674,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
             question.number,
             question.headerLine,
             1,
-            "NUMERIC_FILL requires Đáp án: <token> on the same line",
+            "NUMERIC_FILL requires an answer marker (Đáp án:/Expected answer:) <token> on the same line",
           ),
         );
       } else if (!isValidNumericAnswerToken(question.answerRaw)) {
@@ -661,7 +683,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
             "NUMERIC_ANSWER_INVALID",
             question.number,
             question.answerLine ?? question.headerLine,
-            numericAnswerColumn(question.answerRaw),
+            numericAnswerColumn(question.answerRaw, question.answerPrefixLength),
             "Numeric answer must be exactly four ASCII characters and follow the accepted '-' and '.' rules",
           ),
         );
@@ -767,7 +789,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
             question.number,
             question.answerLine ?? question.headerLine,
             1,
-            "Đáp án: is valid only for NUMERIC_FILL",
+            "An answer marker (Đáp án:/Expected answer:) is valid only for NUMERIC_FILL",
           ),
         );
       }
@@ -780,7 +802,7 @@ export function analyzeQuizMarkdown(source: string): QuizMarkdownAnalysis {
           question.number,
           question.explanationLine ?? question.headerLine,
           1,
-          "Lời giải: may appear only after the complete answer structure",
+          "An explanation marker may appear only after the complete answer structure",
         ),
       );
     }
@@ -937,15 +959,15 @@ function scanEditorState(sourceBeforeCurrentLine: string): EditorState {
       continue;
     }
     const header = QUESTION_HEADER.exec(line);
-    if (header && isAcceptedType(header[2])) {
+    if (header && isAcceptedType(header[3])) {
       questionCount += 1;
       current = {
         answerPresent: false,
         answerTextPresent: false,
         explanationSeen: false,
         options: [],
-        stemHasContent: header[3].trim().length > 0,
-        type: header[2],
+        stemHasContent: header[4].trim().length > 0,
+        type: header[3],
       };
       target = "stem";
       continue;
@@ -962,14 +984,15 @@ function scanEditorState(sourceBeforeCurrentLine: string): EditorState {
       target = "option";
       continue;
     }
-    if (line.startsWith(ANSWER_PREFIX)) {
+    const scanAnswerPrefix = matchedPrefix(line, ANSWER_PREFIXES);
+    if (scanAnswerPrefix !== null) {
       current.answerPresent = true;
       current.answerTextPresent =
-        line.slice(ANSWER_PREFIX.length).trim().length > 0;
+        line.slice(scanAnswerPrefix.length).trim().length > 0;
       target = "after-answer";
       continue;
     }
-    if (line.startsWith(EXPLANATION_PREFIX)) {
+    if (matchedPrefix(line, EXPLANATION_PREFIXES) !== null) {
       current.explanationSeen = true;
       target = "explanation";
       continue;
@@ -1022,9 +1045,12 @@ function questionMarkerSuggestions(
   replaceEnd: number,
   mode: QuizAutocompleteSuggestion["mode"],
   fragment?: string,
+  /** Header word to keep when REPLACING an existing marker ("Câu" is preserved). */
+  existingPrefix?: string,
 ): readonly QuizAutocompleteSuggestion[] {
+  const prefix = existingPrefix ?? "Question";
   return QUIZ_QUESTION_TYPES.map((type) => {
-    const marker = `Câu ${number} [${type}]:`;
+    const marker = `${prefix} ${number} [${type}]:`;
     return {
       id: `${mode}-question-${type}`,
       insertText: mode === "prefix-completion" ? `${marker} ` : marker,
@@ -1042,27 +1068,25 @@ function questionMarkerSuggestions(
 function singlePrefixSuggestion(
   id: string,
   fragment: string,
-  canonicalMarker: string,
+  /** English-default marker first; a Vietnamese alias may follow. */
+  markers: readonly string[],
   replaceStart: number,
   replaceEnd: number,
   allowEmptyFragment = false,
 ): readonly QuizAutocompleteSuggestion[] {
-  if (
-    (fragment.length === 0 && !allowEmptyFragment) ||
-    !isCanonicalPrefix(fragment, canonicalMarker)
-  ) {
+  if (fragment.length === 0 && !allowEmptyFragment) {
     return [];
   }
-  return [
-    {
+  return markers
+    .filter((marker) => isCanonicalPrefix(fragment, marker))
+    .map((marker) => ({
       id,
-      insertText: `${canonicalMarker} `,
-      label: canonicalMarker,
-      mode: "prefix-completion",
+      insertText: `${marker} `,
+      label: marker,
+      mode: "prefix-completion" as const,
       replaceEnd,
       replaceStart,
-    },
-  ];
+    }));
 }
 
 export function getQuizAutocompleteSuggestions(
@@ -1084,8 +1108,8 @@ export function getQuizAutocompleteSuggestions(
   const range = { replaceStart: bounds.start, replaceEnd: safeCaret };
 
   const existingHeader = QUESTION_HEADER.exec(fullLine);
-  if (existingHeader && isAcceptedType(existingHeader[2])) {
-    const marker = `Câu ${existingHeader[1]} [${existingHeader[2]}]:`;
+  if (existingHeader && isAcceptedType(existingHeader[3])) {
+    const marker = `${existingHeader[1]} ${existingHeader[2]} [${existingHeader[3]}]:`;
     const markerEnd = bounds.start + marker.length;
     if (
       safeCaret >= bounds.start &&
@@ -1093,10 +1117,12 @@ export function getQuizAutocompleteSuggestions(
       (fullLine.slice(marker.length).length > 0 || safeCaret < markerEnd)
     ) {
       return questionMarkerSuggestions(
-        Number.parseInt(existingHeader[1], 10),
+        Number.parseInt(existingHeader[2], 10),
         bounds.start,
         markerEnd,
         "question-marker-replacement",
+        undefined,
+        existingHeader[1],
       );
     }
   }
@@ -1131,16 +1157,26 @@ export function getQuizAutocompleteSuggestions(
   }
 
   if (atLineEnd && linePrefix.length > 0) {
-    const explicitNumber = /^Câu ([0-9]+)/iu.exec(linePrefix);
+    const explicitNumber = /^(?:Câu|Question) ([0-9]+)/iu.exec(linePrefix);
     const questionNumber = explicitNumber
       ? Number.parseInt(explicitNumber[1], 10)
       : state.questionCount + 1;
+    // Bilingual assistance: complete in the language the author started
+    // typing ("C..." → Câu, "Q..." → Question).
+    const headerWord = explicitNumber
+      ? /^question/iu.test(explicitNumber[0])
+        ? "Question"
+        : "Câu"
+      : /^q/iu.test(linePrefix)
+        ? "Question"
+        : "Câu";
     const questionSuggestions = questionMarkerSuggestions(
       questionNumber,
       bounds.start,
       safeCaret,
       "prefix-completion",
       linePrefix,
+      headerWord,
     );
     if (questionSuggestions.length > 0) {
       return questionSuggestions;
@@ -1156,7 +1192,7 @@ export function getQuizAutocompleteSuggestions(
       return singlePrefixSuggestion(
         "numeric-answer",
         linePrefix,
-        "Đáp án:",
+        [ANSWER_MARKER_DEFAULT, "Đáp án:"],
         range.replaceStart,
         range.replaceEnd,
         current.stemHasContent,
@@ -1166,7 +1202,7 @@ export function getQuizAutocompleteSuggestions(
       return singlePrefixSuggestion(
         "explanation",
         linePrefix,
-        "Lời giải:",
+        [EXPLANATION_MARKER_DEFAULT, "Lời giải:"],
         range.replaceStart,
         range.replaceEnd,
       );
@@ -1201,7 +1237,7 @@ export function getQuizAutocompleteSuggestions(
     return singlePrefixSuggestion(
       "explanation",
       linePrefix,
-      "Lời giải:",
+      [EXPLANATION_MARKER_DEFAULT, "Lời giải:"],
       range.replaceStart,
       range.replaceEnd,
     );

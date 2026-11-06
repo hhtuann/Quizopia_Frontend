@@ -73,6 +73,8 @@ describe("bank question page import modes", () => {
       screen.getByRole("button", { name: "Markdown Authoring" }).getAttribute("aria-pressed")
     ).toBe("true");
 
+    // The authoring pane starts folded; expand it before editing.
+    fireEvent.click(screen.getByRole("button", { name: "Write questions" }));
     const textarea = screen.getByLabelText("Quiz Markdown source") as HTMLTextAreaElement;
     expect(textarea.closest("div.hidden")).toBeNull();
     fireEvent.change(textarea, {
