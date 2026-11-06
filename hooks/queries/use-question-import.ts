@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  importMarkdownQuestions,
   importQuestions,
   type ImportResponse,
 } from "@/lib/api/question-import";
@@ -24,6 +25,25 @@ export function useImportQuestionsMutation(bankId: number) {
       queryClient.invalidateQueries({
         queryKey: ["question-banks", bankId, "questions"],
       });
+    },
+  });
+}
+
+/**
+ * Markdown import mutation (P2-C). On success it refreshes the bank's
+ * question list AND the bank list (question counts) — same cache keys as the
+ * Excel mutation plus `["question-banks"]` because the bank card shows a
+ * question count.
+ */
+export function useImportMarkdownQuestionsMutation(bankId: number) {
+  const queryClient = useQueryClient();
+  return useMutation<ImportResponse, Error, string>({
+    mutationFn: (markdown: string) => importMarkdownQuestions(bankId, markdown),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["question-banks", bankId, "questions"],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["question-banks"] });
     },
   });
 }
