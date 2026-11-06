@@ -30,7 +30,7 @@
 /* ===== Base Styles ===== */
 :root {
   /* Shared geometry: Header, Sidebar and content offsets must use these tokens. */
-  --topbar-height: 3rem;
+  --topbar-height: 4rem;
   --sidebar-width: 16rem;
   --page-gutter: 1rem;
   --z-sidebar: 20;
@@ -111,7 +111,7 @@ body {
 }
 
 @media (min-width: 1024px) {
-  :root { --topbar-height: 4rem; --page-gutter: 2rem; }
+  :root { --topbar-height: 5rem; --page-gutter: 2rem; }
   .app-main { margin-left: var(--sidebar-width); padding-block: 2rem; }
 }
 
