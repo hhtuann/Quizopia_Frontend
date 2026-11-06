@@ -106,17 +106,18 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
         <button
           type="button"
           aria-expanded={!collapsed}
+          aria-label={collapsed ? "Write questions" : "Collapse"}
           onClick={() => setCollapsed((value) => !value)}
-          className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-[#E2E8F0] px-4 text-sm font-semibold text-[#64748B] outline-none transition-colors hover:border-[#0052FF]/30 hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
+          title={collapsed ? "Write questions" : "Collapse"}
+          className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-[#64748B] outline-none transition-colors hover:bg-[#0052FF]/5 hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 motion-reduce:transition-none"
         >
-          {collapsed ? "Write questions" : "Collapse"}
           <svg
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
             strokeWidth={2.5}
             stroke="currentColor"
-            className={cn("h-3.5 w-3.5 transition-transform", collapsed ? "" : "rotate-180")}
+            className={cn("h-4 w-4 transition-transform", collapsed ? "" : "rotate-180")}
             aria-hidden="true"
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />

@@ -82,7 +82,7 @@ describe("QuestionMarkdownImport", () => {
     });
     expect(banner).not.toBeNull();
     await waitFor(() => expect((screen.getByLabelText("Quiz Markdown source") as HTMLTextAreaElement).value).toBe(""));
-    expect(screen.getByRole("button", { name: /Write questions|Collapse/ }).textContent).toContain("Write questions");
+    expect(screen.getByRole("button", { name: "Write questions" })).not.toBeNull();
     expect(screen.queryByRole("button", { name: "Write another" })).toBeNull();
   });
 
