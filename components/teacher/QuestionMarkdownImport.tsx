@@ -218,6 +218,7 @@ function RowErrorsTable({ errors }: { errors: RowError[] }) {
         <thead>
           <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
             <th scope="col" className="px-3 pb-3 font-semibold">Question</th>
+            <th scope="col" className="px-3 pb-3 font-semibold">Source</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Field</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Detail</th>
@@ -230,6 +231,9 @@ function RowErrorsTable({ errors }: { errors: RowError[] }) {
               className="border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 hover:bg-[#F1F5F9]"
             >
               <td className="px-3 py-2 tabular-nums">{e.rowNumber}</td>
+              <td className="px-3 py-2 font-mono text-xs tabular-nums text-[#64748B]">
+                {e.line != null && e.column != null ? `L${e.line}:C${e.column}` : "—"}
+              </td>
               <td className="px-3 py-2 text-[#64748B]">{e.field ?? "—"}</td>
               <td className="px-3 py-2">
                 <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs text-[#64748B]">

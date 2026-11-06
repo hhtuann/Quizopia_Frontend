@@ -17,13 +17,18 @@ import { http } from "./http-client";
  * return 4xx as ApiError. See Day-5 contract §16/§19.
  */
 
-/** Backend record `RowError(int rowNumber, String questionCode, String field, String code, String message)`. */
+/** Backend record `RowError(int rowNumber, String questionCode, String field, String code, String message, Integer line, Integer column)`.
+ * `line`/`column` carry the authoritative Markdown parser's source position
+ * (1-based) for Markdown diagnostics; null for Excel rows and contract
+ * findings keyed by question number. */
 export interface RowError {
   rowNumber: number;
   questionCode: string | null;
   field: string | null;
   code: string;
   message: string;
+  line: number | null;
+  column: number | null;
 }
 
 /** Backend record `ImportResponse(int totalRows, int importedRows, int invalidRows, List<RowError> errors)`. */

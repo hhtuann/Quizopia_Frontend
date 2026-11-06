@@ -150,6 +150,8 @@ describe("QuestionMarkdownImport", () => {
           field: "correctAnswers",
           code: "MULTIPLE_CHOICE_MIN_TWO_CORRECT",
           message: "Question 1: MULTIPLE_CHOICE requires at least 2 correct options",
+          line: null,
+          column: null,
         },
       ],
     });
@@ -159,6 +161,60 @@ describe("QuestionMarkdownImport", () => {
 
     expect(await screen.findByText(/Nothing was imported/)).not.toBeNull();
     expect(screen.getByText("MULTIPLE_CHOICE_MIN_TWO_CORRECT")).not.toBeNull();
+  });
+
+  it("shows authoritative parser source coordinates in the rejection table", async () => {
+    importMock.mockResolvedValue({
+      totalRows: 0,
+      importedRows: 0,
+      invalidRows: 1,
+      errors: [
+        {
+          rowNumber: 1,
+          questionCode: null,
+          field: null,
+          code: "NUMERIC_ANSWER_INVALID",
+          message: "Invalid numeric answer token",
+          line: 2,
+          column: 11,
+        },
+      ],
+    });
+    renderComponent();
+    fireEvent.change(editor(), { target: { value: VALID_DOC } });
+    fireEvent.click(confirmButton());
+
+    expect(await screen.findByText(/Nothing was imported/)).not.toBeNull();
+    expect(screen.getByText("L2:C11")).not.toBeNull();
+  });
+
+  it("shows an em dash for contract errors without source coordinates", async () => {
+    importMock.mockResolvedValue({
+      totalRows: 1,
+      importedRows: 0,
+      invalidRows: 1,
+      errors: [
+        {
+          rowNumber: 2,
+          questionCode: null,
+          field: "correctAnswers",
+          code: "MULTIPLE_CHOICE_MIN_TWO_CORRECT",
+          message: "Question 2: MULTIPLE_CHOICE requires at least 2 correct options",
+          line: null,
+          column: null,
+        },
+      ],
+    });
+    renderComponent();
+    fireEvent.change(editor(), { target: { value: VALID_DOC } });
+    fireEvent.click(confirmButton());
+
+    expect(await screen.findByText(/Nothing was imported/)).not.toBeNull();
+    const sourceCells = screen
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => (row as HTMLTableRowElement).cells?.[1]?.textContent);
+    expect(sourceCells).toEqual(["—"]);
   });
 
   it("invalidates the bank question cache after a successful import", async () => {
