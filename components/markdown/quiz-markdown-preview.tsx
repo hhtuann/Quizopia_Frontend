@@ -8,6 +8,7 @@ import {
   type QuizPreviewQuestion,
 } from "@/lib/quiz-markdown";
 import { MarkdownContent } from "./markdown-content";
+import { bankContractViolations } from "@/lib/quiz-markdown/bank-contract";
 
 /**
  * Authoring-only live preview of Quiz Markdown questions. Interaction model
@@ -180,7 +181,7 @@ function PreviewQuestion({
       ) : null}
       {question.numericAnswer !== null ? (
         <div className="mt-3 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-3 py-2 text-xs">
-          <span className="font-mono font-semibold uppercase tracking-wide text-[#64748B]">
+          <span className="font-mono uppercase tracking-wide text-[#64748B]">
             Expected answer
           </span>{" "}
           <code className="font-mono font-bold text-[#0052FF]">
@@ -205,6 +206,7 @@ function PreviewQuestion({
 function DiagnosticItem({
   diagnostic,
   onSelect,
+  testId,
 }: {
   readonly diagnostic: {
     readonly code: string;
@@ -213,6 +215,7 @@ function DiagnosticItem({
     readonly message: string;
   };
   readonly onSelect?: (line: number, column: number) => void;
+  readonly testId?: string;
 }) {
   const body = (
     <>
@@ -229,13 +232,16 @@ function DiagnosticItem({
   );
   if (onSelect === undefined) {
     return (
-      <li className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 px-3 py-2 text-xs">
+      <li
+        className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 px-3 py-2 text-xs"
+        data-testid={testId}
+      >
         {body}
       </li>
     );
   }
   return (
-    <li>
+    <li data-testid={testId}>
       <button
         className="w-full rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 px-3 py-2 text-left transition-colors hover:bg-[#EF4444]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 motion-reduce:transition-none"
         onClick={() => onSelect(diagnostic.line, diagnostic.column)}
@@ -248,6 +254,8 @@ function DiagnosticItem({
 }
 
 export interface QuizMarkdownPreviewProps {
+  /** Put the diagnostics + question cards in a bordered, independently scrolling box (the heading stays fixed above it). */
+  readonly boxed?: boolean;
   readonly onChange?: (value: string) => void;
   readonly onDiagnosticSelect?: (line: number, column: number) => void;
   readonly onQuestionSelect?: (question: QuizPreviewQuestion) => void;
@@ -258,6 +266,7 @@ export interface QuizMarkdownPreviewProps {
 }
 
 export function QuizMarkdownPreview({
+  boxed = false,
   onChange,
   onDiagnosticSelect,
   onQuestionSelect,
@@ -267,20 +276,34 @@ export function QuizMarkdownPreview({
 }: QuizMarkdownPreviewProps) {
   const analysis = analyzeQuizMarkdown(source);
   const generatedId = useId();
+  // Bank-contract findings (issue #10) surface as individual Editor
+  // diagnostics in authoring mode — one card per finding, with the question
+  // header's source position, exactly like grammar diagnostics.
+  interface PreviewDiagnostic {
+    readonly code: string;
+    readonly column: number;
+    readonly line: number;
+    readonly message: string;
+  }
+  const contractDiagnostics: readonly PreviewDiagnostic[] = readOnly
+    ? []
+    : bankContractViolations(analysis).map((violation) => ({
+        code: violation.code as string,
+        column: violation.column,
+        line: violation.line,
+        message: violation.message,
+      }));
+  const diagnostics: readonly PreviewDiagnostic[] = [
+    ...analysis.diagnostics,
+    ...contractDiagnostics,
+  ].sort((a, b) => a.line - b.line || a.column - b.column);
   // Toggling depends only on the source-change callback, never on the
   // optional question-navigation callback.
   const canToggle = !readOnly && onChange !== undefined;
 
-  return (
-    <section aria-labelledby={`${generatedId}-title`}>
-      <h2
-        className="mb-3 block pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]"
-        id={`${generatedId}-title`}
-      >
-        {title ?? "Live preview (authoring)"}
-      </h2>
-
-      {analysis.diagnostics.length > 0 ? (
+  const content = (
+    <>
+      {diagnostics.length > 0 ? (
         <section aria-labelledby={`${generatedId}-diagnostics`} className="mb-4">
           <h3
             className="font-mono text-[10px] font-semibold uppercase tracking-wide text-[#EF4444]"
@@ -289,11 +312,16 @@ export function QuizMarkdownPreview({
             Editor diagnostics
           </h3>
           <ul className="mt-2 space-y-2">
-            {analysis.diagnostics.slice(0, 12).map((item, index) => (
+            {diagnostics.map((item, index) => (
               <DiagnosticItem
                 diagnostic={item}
-                key={`${item.code}-${item.line}-${index}`}
+                key={`${item.code}-${item.line}-${item.column}-${index}`}
                 onSelect={onDiagnosticSelect}
+                testId={
+                  contractDiagnostics.includes(item)
+                    ? "bank-contract-violation"
+                    : undefined
+                }
               />
             ))}
           </ul>
@@ -330,6 +358,37 @@ export function QuizMarkdownPreview({
           ))}
         </div>
       )}
+    </>
+  );
+
+  if (boxed) {
+    return (
+      <section
+        aria-labelledby={`${generatedId}-title`}
+        className="flex h-full min-h-0 flex-col"
+      >
+        <h2
+          className="mb-2 block pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]"
+          id={`${generatedId}-title`}
+        >
+          {title ?? "Live preview (authoring)"}
+        </h2>
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-[#E2E8F0] bg-white p-3 shadow-[0_4px_6px_rgba(0,0,0,0.05)] sm:p-4">
+          {content}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section aria-labelledby={`${generatedId}-title`}>
+      <h2
+        className="mb-3 block pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]"
+        id={`${generatedId}-title`}
+      >
+        {title ?? "Live preview (authoring)"}
+      </h2>
+      {content}
     </section>
   );
 }

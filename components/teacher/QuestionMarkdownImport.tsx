@@ -65,6 +65,8 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
   const questionCount = analysis.questions.length;
   const parseErrors = analysis.diagnostics.length;
   const tooLong = source.length > MAX_MARKDOWN_CHARS;
+  // Bank-contract findings surface in the preview's Editor diagnostics, so a
+  // clean diagnostics list means the document is addable as-is.
   const importable =
     source.trim().length > 0 &&
     !tooLong &&
@@ -136,24 +138,6 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
           The document exceeds {MAX_MARKDOWN_CHARS.toLocaleString()} characters — split it into
           smaller imports.
         </p>
-      )}
-
-      {violations.length > 0 && (
-        <div className="mt-3 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-4">
-          <p className="text-sm font-semibold text-[#0F172A]">
-            Fix these before importing — the Question Bank rejects them at edit/publish time:
-          </p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[#0F172A]">
-            {violations.map((v) => (
-              <li key={`${v.questionNumber}-${v.code}`} data-testid="bank-contract-violation">
-                <span className="rounded-md border border-[#E2E8F0] bg-white px-2 py-0.5 font-mono text-xs text-[#64748B]">
-                  {v.code}
-                </span>{" "}
-                {v.message}
-              </li>
-            ))}
-          </ul>
-        </div>
       )}
 
       {result && result.errors.length > 0 && <RowErrorsTable errors={result.errors} />}

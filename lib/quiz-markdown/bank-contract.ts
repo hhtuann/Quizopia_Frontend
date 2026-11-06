@@ -21,6 +21,10 @@ export const BANK_NUMERIC_PATTERN = /^-?[0-9]+([.][0-9]+)?$/;
 export interface BankContractViolation {
   /** Question number in the Markdown document (1-based). */
   readonly questionNumber: number;
+  /** Source line of the question header (1-based) for the diagnostics list. */
+  readonly line: number;
+  /** Source column of the question header (always 1 — the marker start). */
+  readonly column: number;
   readonly field: "correctAnswers" | "expectedAnswer";
   readonly code: "MULTIPLE_CHOICE_MIN_TWO_CORRECT" | "NUMERIC_ANSWER_BANK_CONTRACT";
   readonly message: string;
@@ -36,6 +40,8 @@ export function bankContractViolations(
       if (correct < 2) {
         violations.push({
           questionNumber: question.number,
+          line: question.source.line,
+          column: 1,
           field: "correctAnswers",
           code: "MULTIPLE_CHOICE_MIN_TWO_CORRECT",
           message:
@@ -50,6 +56,8 @@ export function bankContractViolations(
     ) {
       violations.push({
         questionNumber: question.number,
+        line: question.source.line,
+        column: 1,
         field: "expectedAnswer",
         code: "NUMERIC_ANSWER_BANK_CONTRACT",
         message:
