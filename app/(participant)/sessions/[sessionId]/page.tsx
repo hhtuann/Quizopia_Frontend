@@ -7,6 +7,7 @@ import { useSessionEligibilityQuery } from "@/hooks/queries/use-student-attempts
 import { useStartAttemptMutation } from "@/hooks/queries/use-student-attempt";
 import { SessionLandingCard, describeStartError } from "@/components/student/SessionLandingCard";
 import { useAuth } from "@/hooks/useAuth";
+import { participantBackHref, participantHistoryHref } from "@/lib/auth/participant-links";
 import type { NormalizedApiError } from "@/lib/api";
 
 /**
@@ -23,10 +24,10 @@ export default function SessionLandingPage() {
   const sessionIdNum = Number(sessionId);
   const validId = Number.isFinite(sessionIdNum);
   const router = useRouter();
-  // D-FE-01: teacher-only participants cannot use the STUDENT-gated
-  // /sessions listing — point them home instead.
+  // N1: teacher-only participants cannot use the STUDENT-gated listings.
   const { user } = useAuth();
-  const backHref = user?.roles?.includes("STUDENT") ? "/sessions" : "/";
+  const backHref = participantBackHref(user?.roles);
+  const historyHref = participantHistoryHref(user?.roles);
 
   const { data, isPending, isError, error } = useSessionEligibilityQuery(sessionIdNum, validId);
   const startMutation = useStartAttemptMutation();
@@ -100,6 +101,7 @@ export default function SessionLandingPage() {
         eligibility={data}
         onStart={onStart}
         starting={startMutation.isPending}
+        historyHref={historyHref}
       />
       {startError && (
         <p

@@ -61,10 +61,13 @@ export function SessionLandingCard({
   eligibility,
   onStart,
   starting,
+  historyHref = "/attempts",
 }: {
   eligibility: SessionEligibility;
   onStart: () => void;
   starting: boolean;
+  /** Where the ENDED card links for history (role-aware, N1). */
+  historyHref?: string;
 }) {
   const copy = STATE_COPY[eligibility.state];
   const unlimited = eligibility.maxAttempts === 0;
@@ -132,7 +135,7 @@ export function SessionLandingCard({
           className="mt-6 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] p-4 text-sm font-medium text-[#64748B]"
         >
           This session is closed or its time window has passed. Check your{" "}
-          <Link href="/attempts" className="font-semibold text-[#0052FF] hover:underline">
+          <Link href={historyHref} className="font-semibold text-[#0052FF] hover:underline">
             attempt history
           </Link>
           .

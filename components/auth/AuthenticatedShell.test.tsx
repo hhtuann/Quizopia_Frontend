@@ -70,6 +70,17 @@ describe("AuthenticatedShell", () => {
     expect(screen.getByText("b")).not.toBeNull();
   });
 
+  it("shows the loader while auth status is loading", () => {
+    stubAuth("loading", null);
+    render(
+      <AuthenticatedShell>
+        <p>landing</p>
+      </AuthenticatedShell>
+    );
+    expect(screen.queryByText("landing")).toBeNull();
+    expect(screen.getByRole("status")).not.toBeNull();
+  });
+
   it("shows the loader and never renders children while unauthenticated", () => {
     stubAuth("unauthenticated", null);
     render(
