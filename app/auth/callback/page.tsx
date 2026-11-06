@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, Card } from "@/components/ui";
-import { authApi } from "@/lib/auth";
+import { authApi, beginSession, isCurrentSession, StaleSessionError } from "@/lib/auth";
 import { sanitizeReturnTo } from "@/lib/auth/redirect";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -28,13 +28,18 @@ function OAuthCallbackInner() {
   useEffect(() => {
     if (!code || started.current) return;
     started.current = true;
+    const generation = beginSession();
     void (async () => {
       try {
         // Review M1-04: route the exchange through the provider's unified
         // completion action so token, user AND AuthProvider.status land
         // together — RequireAuth can never bounce a logged-in OAuth user.
-        const token = await authApi.exchangeOauthCode(code);
-        await completeLogin(token);
+        const token = await authApi.exchangeOauthCode(code).catch((error: unknown) => {
+          if (!isCurrentSession(generation)) throw new StaleSessionError();
+          throw error;
+        });
+        await completeLogin(token, generation);
+        if (!isCurrentSession(generation)) return;
         setPhase("done");
         // P2-D: return to the deep link that started the login (persisted by
         // the login page before leaving for Google), defaulting to home.
@@ -46,7 +51,8 @@ function OAuthCallbackInner() {
           saved = null;
         }
         router.replace(sanitizeReturnTo(saved) ?? "/");
-      } catch {
+      } catch (error) {
+        if (error instanceof StaleSessionError) return;
         setPhase("failed");
       }
     })();

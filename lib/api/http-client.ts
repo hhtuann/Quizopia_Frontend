@@ -25,6 +25,19 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
 import { normalizeAxiosError } from "./errors";
+import { sessionGeneration } from "@/lib/auth/store";
+
+declare module "axios" {
+  interface AxiosRequestConfig {
+    _sessionGeneration?: number;
+    _retried?: boolean;
+  }
+}
+
+export function isPublicPasswordRequest(url = ""): boolean {
+  const path = url.split(/[?#]/, 1)[0].replace(/^https?:\/\/[^/]+/, "");
+  return path === "/api/auth/password/forgot" || path === "/api/auth/password/reset";
+}
 
 const RAW_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -61,20 +74,20 @@ export function setAccessTokenGetter(fn: () => string | null): void {
 }
 
 httpClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = accessTokenGetter();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  config._sessionGeneration ??= sessionGeneration();
+  if (isPublicPasswordRequest(config.url)) {
+    config.headers.delete("Authorization");
+  } else {
+    const token = accessTokenGetter();
+    if (token) config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
-});
+}, undefined, { synchronous: true });
 
 /* ------------------------------------------------------------------ */
 /* Response error normalization.                                       */
 /* ------------------------------------------------------------------ */
 
-// TODO[FE3]: add a response interceptor here for 401 single-flight refresh
-// (call refresh-token endpoint → retry the original request once → reject on
-// failure). FE2 intentionally does NOT implement refresh / queue / retry.
 httpClient.interceptors.response.use(
   (response) => response,
   (error) => Promise.reject(normalizeAxiosError(error))
