@@ -140,27 +140,26 @@ export function RosterImportPanel({
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex h-11 min-w-0 flex-1 items-center rounded-lg border border-[#E2E8F0] bg-white">
-          <label className="inline-flex h-11 shrink-0 cursor-pointer items-center justify-center rounded-l-lg border-r border-[#E2E8F0] bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] px-5 text-sm font-semibold text-white outline-none transition-all duration-200 hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2">
-            Choose file
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".xlsx"
-              className="sr-only"
-              onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
-            />
-          </label>
-          <span className="min-w-0 flex-1 truncate px-4 text-sm text-[#64748B]" aria-live="polite">
-            {file ? file.name : "No file chosen"}
-          </span>
-        </div>
+      <label className="flex h-12 w-full cursor-pointer items-center overflow-hidden rounded-lg border border-[#E2E8F0] bg-white transition-all duration-200 focus-within:border-[#0052FF] focus-within:ring-2 focus-within:ring-[#0052FF] focus-within:ring-offset-2">
+        <span className="inline-flex h-12 shrink-0 cursor-pointer items-center rounded-l-lg bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] px-5 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110">
+          Choose file
+        </span>
+        <span className="min-w-0 flex-1 truncate px-4 text-sm text-[#64748B]" aria-live="polite">
+          {file ? file.name : "No file chosen"}
+        </span>
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".xlsx"
+          className="sr-only"
+          onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+        />
+      </label>
+      <div className="mt-3">
         <Button
           type="button"
           disabled={!file || !preview || preview.ready === 0 || confirmMutation.isPending}
           onClick={onConfirm}
-          className="shrink-0"
         >
           {confirmMutation.isPending
             ? "Importing…"
