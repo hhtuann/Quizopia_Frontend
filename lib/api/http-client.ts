@@ -108,6 +108,8 @@ export const http = {
     unwrap<T>(httpClient.post<T>(url, body, config)),
   put: <T>(url: string, body?: unknown, config?: AxiosRequestConfig): Promise<T> =>
     unwrap<T>(httpClient.put<T>(url, body, config)),
+  patch: <T>(url: string, body?: unknown, config?: AxiosRequestConfig): Promise<T> =>
+    unwrap<T>(httpClient.patch<T>(url, body, config)),
   delete: <T>(url: string, config?: AxiosRequestConfig): Promise<T> =>
     unwrap<T>(httpClient.delete<T>(url, config)),
 };
