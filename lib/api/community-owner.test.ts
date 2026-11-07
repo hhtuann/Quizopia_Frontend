@@ -34,12 +34,26 @@ beforeEach(() => {
 
 describe("community owner + moderation API (ADR-006 §7)", () => {
   it("targets the frozen owner routes", async () => {
-    await listMyPublications();
+    await listMyPublications({ page: 0, size: 10 });
     await publishCommunityPublication(7);
     await unpublishCommunityPublication(7);
-    expect(get).toHaveBeenCalledWith("/api/community/me/publications");
+    expect(get).toHaveBeenCalledWith("/api/community/me/publications", {
+      params: { page: 0, size: 10 },
+    });
     expect(post).toHaveBeenCalledWith("/api/community/publications/7/publish");
     expect(post).toHaveBeenCalledWith("/api/community/publications/7/unpublish");
+  });
+
+  it("lists own publications with clamped paging params", async () => {
+    await listMyPublications({ page: 2, size: 500 });
+    await listMyPublications({ page: -3, size: 0 });
+
+    expect(get).toHaveBeenNthCalledWith(1, "/api/community/me/publications", {
+      params: { page: 2, size: 50 },
+    });
+    expect(get).toHaveBeenNthCalledWith(2, "/api/community/me/publications", {
+      params: { page: 0, size: 1 },
+    });
   });
 
   it("creates with the §4 create body", async () => {

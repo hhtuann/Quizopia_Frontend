@@ -16,6 +16,7 @@ import {
   updateCommunityPublication,
   type CreateCommunityPublicationRequest,
   type ModerationReportListParams,
+  type OwnerPublicationListParams,
   type UpdateCommunityPublicationRequest,
 } from "@/lib/api/community-owner";
 import type { NormalizedApiError } from "@/lib/api";
@@ -39,11 +40,16 @@ function isConflict(norm: NormalizedApiError | undefined): boolean {
   return norm.code === "COMMUNITY_CONCURRENT_MODIFICATION";
 }
 
-/** Owner list — own publications, `created_at DESC, id DESC` (§3 index). */
-export function useMyPublicationsQuery() {
+/**
+ * Owner list — own publications as a paged envelope, `created_at DESC, id DESC`
+ * (§3 index). Filter-scoped key + `keepPreviousData` so page flips don't
+ * flicker (same pattern as `useMyBookmarksQuery`/`useModerationReportsQuery`).
+ */
+export function useMyPublicationsQuery(params: OwnerPublicationListParams) {
   return useQuery({
-    queryKey: ["community", "mine"],
-    queryFn: () => listMyPublications(),
+    queryKey: ["community", "mine", params],
+    queryFn: () => listMyPublications(params),
+    placeholderData: keepPreviousData,
   });
 }
 

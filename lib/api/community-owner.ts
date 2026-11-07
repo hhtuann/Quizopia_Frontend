@@ -13,7 +13,8 @@ import { http } from "./http-client";
  * Owner DTO allowlist (§7): the public card fields PLUS `examId, status,
  * moderationState, reusePolicy, version, openReportCount, createdAt,
  * updatedAt, publishedAt, authorAlias`. Still never any answer material,
-/** §3 `reuse_policy` — NO_FORK is the default; ALLOW_FORK is explicit consent. */
+ * username, email, or phone ever.
+ */
 
 /** §3 `community_publications.status`. */
 export type CommunityPublicationStatus = "UNPUBLISHED" | "PUBLISHED";
@@ -21,7 +22,7 @@ export type CommunityPublicationStatus = "UNPUBLISHED" | "PUBLISHED";
 /** §3 `community_publications.moderation_state`. */
 export type CommunityModerationState = "VISIBLE" | "HIDDEN";
 
-/** §3 `reuse_policy` — NO_FORK is the default; ALLOW_Fork is explicit consent. */
+/** §3 `reuse_policy` — NO_FORK is the default; ALLOW_FORK is explicit consent. */
 export type CommunityReusePolicy = "NO_FORK" | "ALLOW_FORK";
 
 /** §3 `community_reports.reason_code` allowlist. */
@@ -101,9 +102,45 @@ export interface UpdateCommunityPublicationRequest {
   expectedVersion: number;
 }
 
-/** `GET /api/community/me/publications` — own rows, `created_at DESC, id DESC`. */
-export function listMyPublications(): Promise<OwnerPublication[]> {
-  return http.get<OwnerPublication[]>("/api/community/me/publications");
+/** Owner list params — 0-based page, fixed `created_at DESC, id DESC` order server-side. */
+export interface OwnerPublicationListParams {
+  /** 0-based page index. */
+  page?: number;
+  /** Clamped to [1, 50]. */
+  size?: number;
+}
+
+/** `PageResponse` envelope for the owner list (0-based page/size). */
+export interface OwnerPublicationPage {
+  items: OwnerPublication[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+/** Owner list page size bounds (the backend PageResponse clamps too). */
+export const MAX_OWNER_PAGE_SIZE = 50;
+/** Page size used by the /community/mine owner console. */
+export const DEFAULT_OWNER_PAGE_SIZE = 10;
+
+/**
+ * `GET /api/community/me/publications?page&size` — own rows as a paged
+ * envelope, `created_at DESC, id DESC` (§3 index).
+ */
+export function listMyPublications(
+  params: OwnerPublicationListParams = {}
+): Promise<OwnerPublicationPage> {
+  const size = Math.min(
+    Math.max(1, params.size ?? DEFAULT_OWNER_PAGE_SIZE),
+    MAX_OWNER_PAGE_SIZE
+  );
+  return http.get<OwnerPublicationPage>("/api/community/me/publications", {
+    params: {
+      page: Math.max(0, params.page ?? 0),
+      size,
+    },
+  });
 }
 
 /**

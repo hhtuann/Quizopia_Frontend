@@ -10,6 +10,7 @@ import {
   unpublishCommunityPublication,
   updateCommunityPublication,
   type OwnerPublication,
+  type OwnerPublicationPage,
 } from "@/lib/api/community-owner";
 import { listPublicCategories } from "@/lib/api/community";
 
@@ -26,6 +27,7 @@ vi.mock("@/lib/api/community-owner", () => ({
   publishCommunityPublication: vi.fn(),
   unpublishCommunityPublication: vi.fn(),
   updateCommunityPublication: vi.fn(),
+  DEFAULT_OWNER_PAGE_SIZE: 10,
 }));
 
 vi.mock("@/lib/api/community", () => ({
@@ -59,6 +61,15 @@ function pub(overrides: Partial<OwnerPublication> = {}): OwnerPublication {
   };
 }
 
+/** `GET /api/community/me/publications` paged envelope (confirmed shape). */
+function pageOf(
+  items: OwnerPublication[],
+  totalPages = 1,
+  totalElements = items.length
+): OwnerPublicationPage {
+  return { items, page: 0, size: 10, totalElements, totalPages };
+}
+
 function mount() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -75,7 +86,7 @@ beforeEach(() => {
     { id: 3, code: "toan", title: "Mathematics" },
   ]);
   vi.mocked(listMyPublications).mockReset();
-  vi.mocked(listMyPublications).mockResolvedValue([]);
+  vi.mocked(listMyPublications).mockResolvedValue(pageOf([]));
   vi.mocked(publishCommunityPublication).mockReset();
   vi.mocked(unpublishCommunityPublication).mockReset();
   vi.mocked(updateCommunityPublication).mockReset();
@@ -84,7 +95,7 @@ afterEach(cleanup);
 
 describe("/community/mine", () => {
   it("renders owner cards with status, moderation and reuse badges", async () => {
-    vi.mocked(listMyPublications).mockResolvedValue([
+    vi.mocked(listMyPublications).mockResolvedValue(pageOf([
       pub(), // PUBLISHED + VISIBLE
       pub({
         publicationId: 13,
@@ -99,7 +110,7 @@ describe("/community/mine", () => {
         title: "Forkable physics",
         reusePolicy: "ALLOW_FORK",
       }),
-    ]);
+    ]));
     mount();
     expect(await screen.findByText("Algebra fundamentals")).toBeTruthy();
 
@@ -129,9 +140,9 @@ describe("/community/mine", () => {
   });
 
   it("publishes an UNPUBLISHED row, shows success and refetches the list", async () => {
-    vi.mocked(listMyPublications).mockResolvedValue([
+    vi.mocked(listMyPublications).mockResolvedValue(pageOf([
       pub({ status: "UNPUBLISHED", moderationState: "VISIBLE", publishedAt: null }),
-    ]);
+    ]));
     vi.mocked(publishCommunityPublication).mockResolvedValue(pub());
     mount();
 
@@ -150,7 +161,7 @@ describe("/community/mine", () => {
   });
 
   it("unpublishes a PUBLISHED row (idempotent no-op still succeeds)", async () => {
-    vi.mocked(listMyPublications).mockResolvedValue([pub()]);
+    vi.mocked(listMyPublications).mockResolvedValue(pageOf([pub()]));
     vi.mocked(unpublishCommunityPublication).mockResolvedValue(
       pub({ status: "UNPUBLISHED", publishedAt: null })
     );
@@ -163,9 +174,9 @@ describe("/community/mine", () => {
   });
 
   it("surfaces a publish blocked-by-moderation error with actionable copy", async () => {
-    vi.mocked(listMyPublications).mockResolvedValue([
+    vi.mocked(listMyPublications).mockResolvedValue(pageOf([
       pub({ status: "UNPUBLISHED", moderationState: "VISIBLE", publishedAt: null }),
-    ]);
+    ]));
     vi.mocked(publishCommunityPublication).mockRejectedValue({
       kind: "api",
       status: 409,
@@ -184,7 +195,7 @@ describe("/community/mine", () => {
   });
 
   it("PATCHes with expectedVersion and surfaces the conflict copy on 409", async () => {
-    vi.mocked(listMyPublications).mockResolvedValue([pub({ version: 6 })]);
+    vi.mocked(listMyPublications).mockResolvedValue(pageOf([pub({ version: 6 })]));
     vi.mocked(updateCommunityPublication).mockRejectedValue({
       kind: "api",
       status: 409,
@@ -218,7 +229,7 @@ describe("/community/mine", () => {
   });
 
   it("renders the empty state with a path to /exams", async () => {
-    vi.mocked(listMyPublications).mockResolvedValue([]);
+    vi.mocked(listMyPublications).mockResolvedValue(pageOf([]));
     mount();
 
     expect(await screen.findByText("Nothing published yet")).toBeTruthy();
@@ -237,5 +248,26 @@ describe("/community/mine", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Network error");
+  });
+
+  it("consumes the paged envelope with aria-live pagination controls", async () => {
+    vi.mocked(listMyPublications)
+      .mockResolvedValueOnce(pageOf([pub()], 2, 12))
+      .mockResolvedValueOnce(
+        pageOf([pub({ publicationId: 15, title: "Page two quiz" })], 2, 12)
+      );
+    mount();
+
+    expect(await screen.findByText("Algebra fundamentals")).toBeTruthy();
+    const count = screen.getByText(/12 publications · Page 1 of 2/);
+    expect(count.getAttribute("aria-live")).toBe("polite");
+
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+
+    await waitFor(() =>
+      expect(listMyPublications).toHaveBeenLastCalledWith({ page: 1, size: 10 })
+    );
+    expect(await screen.findByText("Page two quiz")).toBeTruthy();
+    expect(screen.getByText(/Page 2 of 2/)).toBeTruthy();
   });
 });

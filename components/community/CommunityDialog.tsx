@@ -8,8 +8,9 @@ import { cn } from "@/lib/utils/cn";
  * Shared modal shell for the Community dialogs (issue #44). Same a11y
  * baseline as the exam-editor `ConfirmDialog`: `role=dialog`/`aria-modal`,
  * labelled by the title, Esc + click-outside cancel (suppressed while busy),
- * focus lands on `[data-autofocus]` (or the panel) when the dialog opens, and
- * Tab/Shift+Tab cycle inside the panel (modal focus trap).
+ * focus lands on `[data-autofocus]` (or the panel) when the dialog opens,
+ * Tab/Shift+Tab cycle inside the panel (modal focus trap), and focus returns
+ * to the opener when the dialog closes or unmounts.
  */
 
 /** Keyboard-focusable descendants inside a dialog panel (Tab trap targets). */
@@ -37,6 +38,19 @@ export function CommunityDialog({
   children: ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // Capture the opener on open; restore its focus on close/unmount (WAI-ARIA
+  // modal dialog pattern). Keyed on `open` only — a `busy`/`onCancel` identity
+  // change must NOT re-run this (the cleanup would steal focus mid-dialog).
+  useEffect(() => {
+    if (!open) return;
+    const opener =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const restore = () => {
+      if (opener && opener.isConnected) opener.focus();
+    };
+    return restore;
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;

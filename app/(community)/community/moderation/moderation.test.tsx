@@ -18,10 +18,11 @@ import {
 } from "@/lib/api/community-owner";
 
 /**
- * P3-A-FE2 (#44) — moderation console: the grant gate (403 → denied state,
- * queue never fetched), queue rendering + status filter, hide with MANDATORY
- * reason (empty submit blocked), dismiss with optional note, and the
- * append-only history view rendered newest-first.
+ * P3-A-FE2 (#44) — moderation console: the grant gate (403/api → denied
+ * state, non-API/network → retryable Try-again; queue never fetched until
+ * granted), queue rendering + status filter, publication-summary fallback,
+ * hide with MANDATORY reason (empty submit blocked), dismiss with optional
+ * note, and the append-only history view rendered newest-first.
  */
 
 vi.mock("@/lib/api/community-owner", () => ({
@@ -122,6 +123,25 @@ describe("/community/moderation", () => {
     expect(screen.queryByRole("button", { name: "Hide" })).toBeNull();
   });
 
+  it("offers a retryable error when the grant check fails non-API (network)", async () => {
+    vi.mocked(getModerationGrant)
+      .mockRejectedValueOnce({ kind: "network", message: "offline", raw: {} })
+      .mockResolvedValueOnce({ granted: true });
+    vi.mocked(listModerationReports).mockResolvedValue(pageOf([report()]));
+    mount();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Network error");
+    // A transport failure is never a denial — and the queue stays unfetched.
+    expect(screen.queryByText(/You are not a community moderator/)).toBeNull();
+    expect(listModerationReports).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByText("Inappropriate content")).toBeTruthy();
+    expect(getModerationGrant).toHaveBeenCalledTimes(2);
+  });
+
   it("renders the queue with report + publication summaries and OPEN actions", async () => {
     vi.mocked(getModerationGrant).mockResolvedValue({ granted: true });
     vi.mocked(listModerationReports).mockResolvedValue(pageOf([report()]));
@@ -132,6 +152,9 @@ describe("/community/moderation", () => {
     expect(screen.getByText("Algebra fundamentals")).toBeTruthy();
     expect(screen.getByText(/publication #3/)).toBeTruthy();
     expect(screen.getByText(/report #9/)).toBeTruthy();
+
+    // Month + year render — old rows stay unambiguous (fix round FE-1).
+    expect(screen.getByText(/Reported/).textContent).toMatch(/Nov 2026/);
     for (const name of ["Hide", "Restore", "History", "Dismiss report", "Resolve report"]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     }
@@ -264,5 +287,22 @@ describe("/community/moderation", () => {
     expect(rows[2].textContent).toContain("Hide");
     expect(rows[2].textContent).toContain("spam cleanup");
     expect(getPublicationHistory).toHaveBeenCalledWith(3);
+  });
+
+  it("degrades a null publication summary to the id fallback instead of crashing", async () => {
+    vi.mocked(getModerationGrant).mockResolvedValue({ granted: true });
+    vi.mocked(listModerationReports).mockResolvedValue(
+      pageOf([
+        report({ publication: null as unknown as ModerationReportItem["publication"] }),
+      ])
+    );
+    mount();
+
+    expect(await screen.findByText("Publication #3")).toBeTruthy();
+    const meta = screen.getByText(/publication #3/);
+    expect(meta.textContent).toContain("by —");
+    expect(meta.textContent).toContain("0 questions");
+    expect(meta.textContent).toContain("0 sections");
+    expect(meta.textContent).toContain("0 min");
   });
 });

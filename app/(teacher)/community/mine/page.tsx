@@ -8,7 +8,7 @@ import {
   useUnpublishCommunityPublicationMutation,
 } from "@/hooks/queries/use-community-owner";
 import { useCommunityCategoriesQuery } from "@/hooks/queries/use-community";
-import type { OwnerPublication } from "@/lib/api/community-owner";
+import { DEFAULT_OWNER_PAGE_SIZE, type OwnerPublication } from "@/lib/api/community-owner";
 import type { NormalizedApiError } from "@/lib/api";
 import { Badge, Button, Card, buttonVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
@@ -38,6 +38,9 @@ const NOTICE_STYLES: Record<Notice["kind"], string> = {
   conflict: "border-[#F59E0B]/30 bg-[#F59E0B]/5 text-[#0F172A]",
 };
 
+const pageBtnClass =
+  "inline-flex h-11 w-11 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#64748B] outline-none transition-all duration-200 hover:bg-[#F1F5F9] hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -50,7 +53,9 @@ function formatDate(iso: string | null): string {
 }
 
 export default function MyCommunityPublicationsPage() {
-  const { data, isPending, isError, error } = useMyPublicationsQuery();
+  const [page, setPage] = useState(0);
+  const { data, isPending, isError, error, isPlaceholderData } =
+    useMyPublicationsQuery({ page, size: DEFAULT_OWNER_PAGE_SIZE });
   const { data: categoriesData } = useCommunityCategoriesQuery();
   const publishMut = usePublishCommunityPublicationMutation();
   const unpublishMut = useUnpublishCommunityPublicationMutation();
@@ -58,7 +63,9 @@ export default function MyCommunityPublicationsPage() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [editing, setEditing] = useState<OwnerPublication | null>(null);
 
-  const items = data ?? [];
+  const items = data?.items ?? [];
+  const totalPages = data?.totalPages ?? 0;
+  const totalElements = data?.totalElements ?? 0;
   // The row the dialog edits may be stale after a refetch — match by id.
   const editingCurrent =
     (editing !== null && items.find((p) => p.publicationId === editing.publicationId)) ??
@@ -156,7 +163,7 @@ export default function MyCommunityPublicationsPage() {
         </div>
       )}
 
-      <section aria-label="My community publications" aria-busy={isPending}>
+      <section aria-label="My community publications" aria-busy={isPending || isPlaceholderData}>
         {isPending ? (
           <ListSkeleton />
         ) : isError ? (
@@ -164,24 +171,73 @@ export default function MyCommunityPublicationsPage() {
         ) : items.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className="space-y-4">
-            {items.map((item) => (
-              <OwnerPublicationCard
-                key={item.publicationId}
-                item={item}
-                publishPending={publishMut.isPending && publishMut.variables === item.publicationId}
-                unpublishPending={
-                  unpublishMut.isPending && unpublishMut.variables === item.publicationId
-                }
-                onPublish={() => onPublish(item)}
-                onUnpublish={() => onUnpublish(item)}
-                onEdit={() => {
-                  setNotice(null);
-                  setEditing(item);
-                }}
-              />
-            ))}
-          </div>
+          <>
+            <div className="space-y-4">
+              {items.map((item) => (
+                <OwnerPublicationCard
+                  key={item.publicationId}
+                  item={item}
+                  publishPending={publishMut.isPending && publishMut.variables === item.publicationId}
+                  unpublishPending={
+                    unpublishMut.isPending && unpublishMut.variables === item.publicationId
+                  }
+                  onPublish={() => onPublish(item)}
+                  onUnpublish={() => onUnpublish(item)}
+                  onEdit={() => {
+                    setNotice(null);
+                    setEditing(item);
+                  }}
+                />
+              ))}
+            </div>
+
+            <div className="mt-6 flex items-center justify-between px-1 pt-4">
+              <p className="text-xs font-medium text-[#64748B]" aria-live="polite">
+                {totalElements} publication{totalElements === 1 ? "" : "s"} · Page{" "}
+                {page + 1} of {Math.max(totalPages, 1)}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page <= 0}
+                  aria-label="Previous page"
+                  className={pageBtnClass}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2.5}
+                    stroke="currentColor"
+                    className="h-4 w-4"
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  aria-label="Next page"
+                  className={pageBtnClass}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2.5}
+                    stroke="currentColor"
+                    className="h-4 w-4"
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </section>
 

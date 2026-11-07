@@ -27,8 +27,10 @@ import { CommunityDialog } from "@/components/community/CommunityDialog";
 /**
  *
  * Explicit gate: the grant query (`GET /api/community/moderation/grant`) —
- * 200 `{granted:true}` renders the console, 403 (or any error) renders the
- * "not a moderator" state and the queue is never fetched. Queue actions:
+ * 200 `{granted:true}` renders the console; API errors (the 403 denial et
+ * al.) render the "not a moderator" state, while non-API failures
+ * (network/unknown) render a retryable error instead — in both cases the
+ * queue is never fetched. Queue actions:
  * hide/restore (reason mandatory), dismiss/resolve (note optional), plus the
  * append-only per-publication audit history rendered newest-first.
  *
@@ -86,9 +88,16 @@ function formatDateTime(iso: string): string {
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleString("en-GB", {
     day: "2-digit",
+    month: "short",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/** Queue fallback — a null/odd embedded summary degrades to the id, never a crash. */
+function publicationTitle(report: ModerationReportItem): string {
+  return report.publication?.title ?? `Publication #${report.publicationId}`;
 }
 
 export default function CommunityModerationPage() {
@@ -148,7 +157,34 @@ export default function CommunityModerationPage() {
     );
   }
 
-  // 403 (no grant) — or any other failure — never renders the console. The
+  // Non-API failures (network/unknown) are transient, not a denial — offer a
+  // retry instead of the "not a moderator" copy.
+  const grantError = grant.error as unknown as NormalizedApiError | undefined;
+  if (grant.isError && grantError?.kind !== "api") {
+    return (
+      <Card className="mx-auto max-w-lg p-10 text-center">
+        <h1 className="font-display text-2xl tracking-tight text-[#0F172A]">
+          Community moderation
+        </h1>
+        <p role="alert" className="mt-3 text-sm font-medium text-[#EF4444]">
+          {grantError?.kind === "network"
+            ? "Network error — check your connection and try again."
+            : "Couldn't verify moderator access. Please try again."}
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-6 h-11"
+          onClick={() => grant.refetch()}
+        >
+          Try again
+        </Button>
+      </Card>
+    );
+  }
+
+  // 403 (no grant) — or any other API error — never renders the console. The
   // queue query stays disabled (`granted === false`), so nothing is fetched.
   if (!granted) {
     return (
@@ -250,26 +286,26 @@ export default function CommunityModerationPage() {
                     setPending({
                       kind: "hide",
                       publicationId: report.publicationId,
-                      title: report.publication.title,
+                      title: publicationTitle(report),
                     })
                   }
                   onRestore={() =>
                     setPending({
                       kind: "restore",
                       publicationId: report.publicationId,
-                      title: report.publication.title,
+                      title: publicationTitle(report),
                     })
                   }
                   onDismiss={() =>
-                    setPending({ kind: "dismiss", reportId: report.id, title: report.publication.title })
+                    setPending({ kind: "dismiss", reportId: report.id, title: publicationTitle(report) })
                   }
                   onResolve={() =>
-                    setPending({ kind: "resolve", reportId: report.id, title: report.publication.title })
+                    setPending({ kind: "resolve", reportId: report.id, title: publicationTitle(report) })
                   }
                   onHistory={() =>
                     setHistory({
                       publicationId: report.publicationId,
-                      title: report.publication.title,
+                      title: publicationTitle(report),
                     })
                   }
                 />
@@ -381,12 +417,12 @@ function ReportCard({
       )}
 
       <div className="mt-4 rounded-lg border border-[#E2E8F0] p-4">
-        <p className="text-sm font-semibold text-[#0F172A]">{pub.title}</p>
+        <p className="text-sm font-semibold text-[#0F172A]">{publicationTitle(report)}</p>
         <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-[#64748B]">
-          by <span className="normal-case text-[#0F172A]">{pub.authorName ?? "—"}</span>
-          {pub.categoryTitle ? ` · ${pub.categoryTitle}` : ""} · {pub.questionCount} question
-          {pub.questionCount === 1 ? "" : "s"} · {pub.sectionCount} section
-          {pub.sectionCount === 1 ? "" : "s"} · {pub.durationMinutes} min · publication #
+          by <span className="normal-case text-[#0F172A]">{pub?.authorName ?? "—"}</span>
+          {pub?.categoryTitle ? ` · ${pub.categoryTitle}` : ""} · {pub?.questionCount ?? 0} question
+          {pub?.questionCount === 1 ? "" : "s"} · {pub?.sectionCount ?? 0} section
+          {pub?.sectionCount === 1 ? "" : "s"} · {pub?.durationMinutes ?? 0} min · publication #
           {report.publicationId}
         </p>
       </div>
