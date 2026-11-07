@@ -114,7 +114,6 @@ function LoadError({ error }: { error: NormalizedApiError | undefined }) {
         message = "This exam could not be found.";
         break;
       case "EXAM_ACCESS_DENIED":
-      case "EXAM_TEACHER_PROFILE_NOT_FOUND":
         message = "You don't have access to this exam.";
         break;
       case "AUTH_ACCESS_TOKEN_INVALID":

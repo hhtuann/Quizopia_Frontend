@@ -149,6 +149,7 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
           <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
             {item.exam.title}
           </h2>
+          <p className="mt-0.5 text-sm text-[#64748B]">{item.exam.subjectName ?? "General"}</p>
         </div>
         <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B]">
           {item.code}

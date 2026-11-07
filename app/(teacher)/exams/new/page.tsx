@@ -20,7 +20,7 @@ const textareaClass =
   "w-full min-h-[96px] rounded-lg border border-[#E2E8F0] bg-transparent px-4 py-3 text-sm text-[#0F172A] placeholder:text-[#64748B]/50 outline-none transition-all duration-200 resize-y focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
 
 const selectClass =
-  "h-12 w-full rounded-lg border border-[#E2E8F0] bg-transparent px-4 pr-9 text-sm text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-[#0052FF] focus:ring-offset-2";
+  "h-12 w-full rounded-lg border border-[#E2E8F0] bg-transparent px-4 pr-9 text-sm text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
 
 function describeCreateError(
   err: unknown
@@ -36,8 +36,6 @@ function describeCreateError(
         return { field: "purposeId", message: "Exam purpose not found." };
       case "EXAM_ACCESS_DENIED":
         return { message: "You don't have permission to create an exam." };
-      case "EXAM_TEACHER_PROFILE_NOT_FOUND":
-        return { message: "Teacher profile not found for your account." };
       case "EXAM_VALIDATION_ERROR":
         return { message: norm.message || "Please check the highlighted fields." };
       default:

@@ -16,8 +16,6 @@ export interface ClassroomResponse {
   description: string | null;
   status: ClassroomStatus;
   memberCount: number;
-  ownerTeacherId: number | null;
-  /** Identity-M3: user-based owner (independent classrooms: ownerTeacherId is null). */
   ownerUserId: number;
   createdAt: string;
 }
@@ -38,8 +36,6 @@ export interface ClassroomDetailView {
   name: string;
   description: string | null;
   status: ClassroomStatus;
-  ownerTeacherId: number | null;
-  /** Identity-M3: user-based owner. */
   ownerUserId: number;
   createdAt: string;
   memberCount: number;

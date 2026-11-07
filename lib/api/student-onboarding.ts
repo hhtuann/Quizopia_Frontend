@@ -6,10 +6,9 @@ import { http } from "./http-client";
  * backend records in the students search controller.
  */
 
-/** Backend record `StudentSearchResult` (GET /api/students/search). User-based; `studentCode` is always null now (kept for shape compatibility). */
+/** Backend record `StudentSearchResult` (GET /api/students/search). */
 export interface StudentSearchResult {
   userId: number;
-  studentCode: string | null;
   displayName: string;
   username: string;
   email: string;

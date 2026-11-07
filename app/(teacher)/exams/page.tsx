@@ -251,8 +251,7 @@ function ErrorState({ error }: { error: NormalizedApiError | undefined }) {
   if (error?.kind === "api") {
     switch (error.code) {
       case "EXAM_ACCESS_DENIED":
-      case "EXAM_TEACHER_PROFILE_NOT_FOUND":
-        message = "You don't have access to exams, or your teacher profile is missing. Please contact your administrator.";
+        message = "You don't have access to exams.";
         break;
       case "AUTH_ACCESS_TOKEN_INVALID":
         message = "Your session has expired — please sign in again.";

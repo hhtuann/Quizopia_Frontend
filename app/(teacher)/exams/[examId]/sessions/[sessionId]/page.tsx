@@ -463,7 +463,6 @@ function LoadError({ error, backHref }: { error: NormalizedApiError | undefined;
         message = "This session could not be found.";
         break;
       case "EXAM_SESSION_ACCESS_DENIED":
-      case "EXAM_TEACHER_PROFILE_NOT_FOUND":
         message = "You don't have access to this session.";
         break;
       case "AUTH_ACCESS_TOKEN_INVALID":

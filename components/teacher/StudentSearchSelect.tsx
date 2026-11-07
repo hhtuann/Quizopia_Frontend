@@ -116,11 +116,6 @@ export function StudentSearchSelect({
               onClick={() => addStudent(s)}
               className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm outline-none transition-colors hover:bg-[#F1F5F9] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
             >
-              {s.studentCode && (
-                <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-1.5 py-0.5 font-mono text-xs text-[#64748B]">
-                  {s.studentCode}
-                </span>
-              )}
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium text-[#0F172A]">{s.displayName}</span>
                 <span className="block truncate text-xs text-[#64748B]">{s.username} · {s.email}</span>
@@ -152,7 +147,6 @@ export function StudentSearchSelect({
               key={s.userId}
               className="inline-flex items-center gap-2 rounded-lg border border-[#0052FF]/30 bg-[#0052FF]/5 px-3 py-1.5 text-sm"
             >
-              {s.studentCode && <span className="font-mono text-xs text-[#0052FF]">{s.studentCode}</span>}
               <span className="font-medium text-[#0F172A]">{s.displayName}</span>
               <button
                 type="button"
