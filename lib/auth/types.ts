@@ -100,7 +100,7 @@ export interface CurrentUserResponse {
   username: string;
   email: string;
   displayName: string;
-  phone: string;
+  phone: string | null;
   status: UserStatus;
   /** Identity-M1: email verified (OTP or trusted OIDC provider). */
   emailVerified: boolean;

@@ -13,7 +13,7 @@ import { useAuthContext } from "@/components/providers/AuthProvider";
 export function useAuth() {
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
-  const { status, login, register, refreshUser, completeLogin, logout } = useAuthContext();
+  const { status, login, register, refreshUser, completeLogin, logout, invalidateSession } = useAuthContext();
 
   return {
     user,
@@ -28,5 +28,6 @@ export function useAuth() {
     /** Review M1-04: unified session completion (OAuth exchange path). */
     completeLogin,
     logout,
+    invalidateSession,
   };
 }

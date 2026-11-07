@@ -12,6 +12,7 @@ import { authApi } from "@/lib/auth";
 import { useActiveView } from "@/lib/view/store";
 import type { NormalizedApiError } from "@/lib/api";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
+import { initialsOf } from "@/lib/utils/initials";
 
 interface HeaderProps {
   isMobileMenuOpen: boolean;
@@ -20,13 +21,6 @@ interface HeaderProps {
   onViewSwitch?: (view: "student" | "teacher") => void;
 }
 
-/** Up to two uppercase initials from a display name (first + last word). */
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
 
 export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSwitch }: HeaderProps) {
   const router = useRouter();
@@ -265,13 +259,16 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
                     </p>
                   </div>
 
-                  {/* Profile — not shipped yet */}
+                  {/* Shared profile is independent of the active role view. */}
                   <button
                     type="button"
                     role="menuitem"
-                    disabled
-                    aria-disabled="true"
-                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-[#64748B] outline-none transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent focus-visible:ring-2 focus-visible:ring-[#0052FF]"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setIsMobileMenuOpen(false);
+                      router.push("/profile");
+                    }}
+                    className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-[#0F172A] outline-none transition-colors duration-200 hover:bg-[#F1F5F9] focus-visible:ring-2 focus-visible:ring-[#0052FF]"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -289,9 +286,6 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
                       />
                     </svg>
                     Profile
-                    <span className="ml-auto rounded-md bg-[#F1F5F9] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[#64748B]">
-                      Coming soon
-                    </span>
                   </button>
 
                   {/* Identity-M2: student-only accounts can self-register as teacher */}

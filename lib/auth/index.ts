@@ -18,21 +18,18 @@ import { installRefreshInterceptor } from "./refresh-interceptor";
  * via the module-level `installed` guard — so a 401 never hits two refresh
  * interceptors (which would otherwise double-refresh on the failure path).
  */
-let installed = false;
+const installed = new WeakSet<AxiosInstance>();
 
 export function initAuth(client: AxiosInstance = httpClient): void {
   // Always (re)register the getter — overwrite is idempotent and cheap, so the
   // guard below never skips it even when it skips the interceptor.
   setAccessTokenGetter(() => useAuthStore.getState().accessToken);
-  if (installed) return;
+  if (installed.has(client)) return;
   installRefreshInterceptor(client, useAuthStore);
-  installed = true;
+  installed.add(client);
 }
 
-/** Clear auth state from anywhere (non-React contexts). */
-export const clearAuth = (): void => {
-  useAuthStore.getState().clearAuth();
-};
+export { invalidateSession, sessionGeneration, isCurrentSession, beginSession, StaleSessionError } from "./store";
 
 export { authApi, useAuthStore };
 export type { AuthStore, AuthState } from "./store";
