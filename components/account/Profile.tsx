@@ -79,7 +79,7 @@ function ProfileForm({ user, refreshUser }: {
       <div>
         <p className="text-xs font-semibold uppercase tracking-widest text-[#0052FF]">Your account</p>
         <h1 className="mt-2 font-display text-3xl text-[#0F172A] sm:text-4xl">Profile</h1>
-        <p className="mt-3 text-sm text-[#64748B]">One profile across all your Quizopia workspaces and roles.</p>
+        <p className="mt-3 text-sm text-[#64748B]">One profile across all your Quizopia roles.</p>
       </div>
       <Card className="space-y-6 p-5 sm:p-8" aria-labelledby="account-heading">
         <div className="flex items-center gap-4">

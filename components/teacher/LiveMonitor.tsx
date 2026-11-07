@@ -223,7 +223,7 @@ function EventFeed({
 }
 
 /**
- * "STU00000001 · Nguyen Van A" for school learners; public profile-less
+ * "STU00000001 · Nguyen Van A" for learners with a student code; public
  * learners render their display name only.
  */
 function formatParticipant(p: ParticipantDisplay): string {

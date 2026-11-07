@@ -135,7 +135,6 @@ function BanksTable({
           <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
             <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Name</th>
-            <th scope="col" className="px-3 pb-3 text-center font-semibold">Subject</th>
             <th scope="col" className="px-3 pb-3 text-center font-semibold">Questions</th>
             <th scope="col" className="px-3 pb-3 text-center font-semibold">Created</th>
           </tr>
@@ -161,7 +160,6 @@ function BanksTable({
                   </span>
                 ) : null}
               </td>
-              <td className="px-3 py-3 text-center align-top text-[#64748B]">{bank.subject ? bank.subject.name : "—"}</td>
               <td className="px-3 py-3 text-center align-top font-semibold tabular-nums">
                 {bank.questionCount}
               </td>

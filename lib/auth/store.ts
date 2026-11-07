@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { useWorkspacePreference } from "@/lib/workspace/store";
 import type { CurrentUserResponse } from "./types";
 
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
@@ -34,7 +33,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   })),
   invalidateSession: () => {
     set((state) => ({ generation: state.generation + 1, accessToken: null, user: null, status: "unauthenticated" }));
-    useWorkspacePreference.getState().reset();
     for (const cleanup of sessionCleanups) cleanup();
   },
 }));

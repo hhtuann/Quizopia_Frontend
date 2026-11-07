@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider, useAuthContext, type AuthContextValue } from "./AuthProvider";
 import { authApi } from "@/lib/auth/api";
 import { beginSession, invalidateSession, StaleSessionError, useAuthStore } from "@/lib/auth/store";
-import { useWorkspacePreference } from "@/lib/workspace/store";
 import type { CurrentUserResponse, TokenResponse } from "@/lib/auth/types";
 vi.mock("@/lib/auth/api", () => ({ authApi: { refresh: vi.fn(), me: vi.fn(), login: vi.fn(), logout: vi.fn(), register: vi.fn() } }));
 function deferred<T>() {
@@ -75,19 +74,16 @@ describe("shared auth generation", () => {
     expect(authApi.me).not.toHaveBeenCalled();
     expect(useAuthStore.getState().accessToken).toBeNull();
   });
-  it("clears provider, cache and persisted workspace synchronously before logout settles", async () => {
+  it("clears provider and query cache synchronously before logout settles", async () => {
     const qc = mount();
     const pending = deferred<void>();
     vi.mocked(authApi.logout).mockReturnValue(pending.promise);
     act(() => { useAuthStore.getState().setSession({ accessToken: "old", user }); });
     qc.setQueryData(["private"], user);
-    useWorkspacePreference.getState().setActiveWorkspace(42);
     let request!: Promise<void>;
     act(() => { request = auth.logout(); });
     expect(auth.status).toBe("unauthenticated");
     expect(qc.getQueryData(["private"])).toBeUndefined();
-    expect(useWorkspacePreference.getState().activeWorkspaceId).toBeNull();
-    expect(localStorage.getItem("quizopia.activeWorkspaceId")).toBeNull();
     act(() => { useAuthStore.getState().setSession({ accessToken: "new", user }); });
     await act(async () => { pending.resolve(); await request; });
     expect(useAuthStore.getState().accessToken).toBe("new");

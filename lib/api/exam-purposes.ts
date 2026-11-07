@@ -1,7 +1,7 @@
 import { http } from "./http-client";
 
 /**
- * Exam-purposes API + types (school-scoped). Mirrors
+ * Exam-purposes API + types (global seeded catalog). Mirrors
  * com.hhtuann.backend.exam.dto.ExamPurposeResponse. The controller returns
  * `Map.of("items", list)` → shape `{ items: [...] }`.
  */
@@ -18,7 +18,7 @@ export interface ExamPurposeListResponse {
   items: ExamPurposeResponse[];
 }
 
-/** `GET /api/exam-purposes` — school-scoped list for the exam-create dropdown. */
+/** `GET /api/exam-purposes` — global purpose list for the exam-create dropdown. */
 export function listPurposes(): Promise<ExamPurposeListResponse> {
   return http.get<ExamPurposeListResponse>("/api/exam-purposes");
 }

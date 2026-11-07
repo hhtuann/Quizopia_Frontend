@@ -30,7 +30,7 @@ export const createSessionSchema = z
       .number({ message: "Duration is required." })
       .int("Duration must be a whole number.")
       .min(0, "Duration must be 0 or more (0 = unlimited)."),
-    // PUBLIC = all same-school students; CLASS_RESTRICTED = assigned classes only (default).
+    // PUBLIC = all Quizopia students; CLASS_RESTRICTED = assigned classes only (default).
     visibility: z.enum(["PUBLIC", "CLASS_RESTRICTED"]),
     // Classrooms assigned when CLASS_RESTRICTED. Required-meaningful only then; the
     // create form validates "≥1 class when restricted" in onSubmit (component logic).

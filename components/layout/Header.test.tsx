@@ -10,7 +10,6 @@ vi.mock("@/hooks/useAuth", () => ({ useAuth: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ authApi: { providers: vi.fn().mockResolvedValue({ googleEnabled: false }) } }));
 vi.mock("@/lib/view/store", () => ({ useActiveView: () => ({ view: "student", canStudent: true, canTeacher: true }) }));
 vi.mock("./NotificationBell", () => ({ NotificationBell: () => null }));
-vi.mock("./WorkspaceSwitcher", () => ({ WorkspaceSwitcher: () => null }));
 vi.mock("@/components/teacher/exam-editor/ConfirmDialog", () => ({ ConfirmDialog: () => null }));
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });

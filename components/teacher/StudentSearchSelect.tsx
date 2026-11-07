@@ -10,9 +10,9 @@ import { cn } from "@/lib/utils/cn";
 
 /**
  * Reusable student search + multi-select (FE-ONBOARD-2). Replaces the old
- * textarea-ID-entry pattern with a debounced search (by student_code / name /
+ * textarea-ID-entry pattern with a debounced search (by display name /
  * username), a results dropdown, selected-student chips, and an "Add" button
- * that POSTs to the classroom members endpoint.
+ * that POSTs user ids to the classroom members endpoint.
  */
 export function StudentSearchSelect({
   classId,
@@ -48,8 +48,8 @@ export function StudentSearchSelect({
   const excludedSet = new Set(excludeIds);
   const results = (searchData?.items ?? []).filter(
     (r) =>
-      !excludedSet.has(r.studentProfileId) &&
-      !selected.some((s) => s.studentProfileId === r.studentProfileId)
+      !excludedSet.has(r.userId) &&
+      !selected.some((s) => s.userId === r.userId)
   );
 
   const addStudent = (s: StudentSearchResult) => {
@@ -60,14 +60,14 @@ export function StudentSearchSelect({
   };
 
   const removeStudent = (id: number) =>
-    setSelected((prev) => prev.filter((s) => s.studentProfileId !== id));
+    setSelected((prev) => prev.filter((s) => s.userId !== id));
 
   const onAdd = async () => {
     setError(null);
     setResult(null);
     try {
       const res = await addMut.mutateAsync({
-        studentProfileIds: selected.map((s) => s.studentProfileId),
+        userIds: selected.map((s) => s.userId),
       });
       setResult(res);
       setSelected([]);
@@ -96,7 +96,7 @@ export function StudentSearchSelect({
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by student code, name, or username…"
+            placeholder="Search by name or username…"
             className="h-11 w-full rounded-lg border border-[#E2E8F0] bg-transparent px-4 text-sm text-[#0F172A] placeholder:text-[#64748B]/50 outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2"
             aria-label="Search students"
           />
@@ -111,14 +111,11 @@ export function StudentSearchSelect({
             )}
             {results.map((s) => (
             <button
-              key={s.studentProfileId}
+              key={s.userId}
               type="button"
               onClick={() => addStudent(s)}
               className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm outline-none transition-colors hover:bg-[#F1F5F9] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
             >
-              <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-1.5 py-0.5 font-mono text-xs text-[#64748B]">
-                {s.studentCode}
-              </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium text-[#0F172A]">{s.displayName}</span>
                 <span className="block truncate text-xs text-[#64748B]">{s.username} · {s.email}</span>
@@ -147,14 +144,13 @@ export function StudentSearchSelect({
         <div className="mt-3 flex flex-wrap gap-2">
           {selected.map((s) => (
             <span
-              key={s.studentProfileId}
+              key={s.userId}
               className="inline-flex items-center gap-2 rounded-lg border border-[#0052FF]/30 bg-[#0052FF]/5 px-3 py-1.5 text-sm"
             >
-              <span className="font-mono text-xs text-[#0052FF]">{s.studentCode}</span>
               <span className="font-medium text-[#0F172A]">{s.displayName}</span>
               <button
                 type="button"
-                onClick={() => removeStudent(s.studentProfileId)}
+                onClick={() => removeStudent(s.userId)}
                 aria-label={`Remove ${s.displayName}`}
                 className="ml-1 text-[#64748B] hover:text-[#EF4444]"
               >

@@ -16,7 +16,7 @@ import { http } from "./http-client";
  * AvailableSessionsResponse.
  */
 
-/** Backend nested record `ExamInfo(Long examId, String title, String subjectName)`. `subjectName` may be null (personal-workspace exams carry no subject). */
+/** Backend nested record `ExamInfo(Long examId, String title, String subjectName)`. `subjectName` may be null (exams without a subject). */
 export interface ExamInfo {
   examId: number;
   title: string;

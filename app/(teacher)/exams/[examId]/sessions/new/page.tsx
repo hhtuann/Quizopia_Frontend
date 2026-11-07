@@ -212,7 +212,7 @@ export default function NewExamSessionPage() {
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {([
                     { value: "CLASS_RESTRICTED" as const, label: "Class-restricted", hint: "Only students in selected classes" },
-                    { value: "PUBLIC" as const, label: "Public", hint: "All students in your school" },
+                    { value: "PUBLIC" as const, label: "Public", hint: "All Quizopia students" },
                   ]).map((opt) => {
                     const selected = visibility === opt.value;
                     return (

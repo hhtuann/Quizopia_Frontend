@@ -2,12 +2,10 @@ import { z } from "zod";
 
 /**
  * Zod schema mirroring backend `CreateQuestionBankRequest` and its Jakarta
- * Validation constraints (Phase 1, Task A):
+ * Validation constraints:
  *   - name: @NotBlank, @Size(max = 255)
  *   - description: @Size(max = 2000), nullable (no @NotBlank)
- *   - subjectId: @Positive, nullable — optional for PERSONAL workspaces,
- *     required and school-matched for ORGANIZATION ones (enforced by the
- *     page + backend, not the schema)
+ *   - subjectId: @Positive, nullable — optional for every bank
  *
  * Client-side validation only; the backend remains the source of truth.
  */

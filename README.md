@@ -51,7 +51,7 @@ Focused coverage is in `app/forgot-password/forgot-password.test.tsx` and `app/r
 
 ## Auth session generation (Identity M5)
 
-The in-memory auth store owns status, token, user, and one monotonic `generation`. `invalidateSession()` synchronously advances it and clears identity, provider status, registered QueryClient caches, and the persisted active workspace. Use this action after server-side credential revocation; do not issue a redundant logout request. Ordinary logout dispatches its request before invalidating locally and never clears a newer session when its response settles.
+The in-memory auth store owns status, token, user, and one monotonic `generation`. `invalidateSession()` synchronously advances it and clears identity, provider status, and registered QueryClient caches. Use this action after server-side credential revocation; do not issue a redundant logout request. Ordinary logout dispatches its request before invalidating locally and never clears a newer session when its response settles.
 
 Capture `sessionGeneration()` before authenticated asynchronous work and check `isCurrentSession(generation)` before applying results or failures. Login and OAuth acquisition call `beginSession()` **before** requesting tokens; `completeLogin(token, generation)` requires that captured generation. Boot, login, identity fetches, and OAuth reject superseded completions rather than resurrecting a session. Profile writes likewise bind their post-save refresh to the initiating generation.
 

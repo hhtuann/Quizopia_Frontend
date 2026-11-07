@@ -153,9 +153,6 @@ function ErrorState({ error }: { error: NormalizedApiError | undefined }) {
       case "ATTEMPT_ACCESS_DENIED":
         message = "You don't have access to attempt history.";
         break;
-      case "ATTEMPT_STUDENT_PROFILE_NOT_FOUND":
-        message = "Your student profile wasn't found. Please contact your school.";
-        break;
       case "AUTH_ACCESS_TOKEN_INVALID":
         message = "Your session has expired â€” please sign in again.";
         break;

@@ -25,7 +25,7 @@ export type ExamSessionStatus =
   | "CLOSED"
   | "CANCELLED";
 
-/** Backend `SessionVisibility`. PUBLIC = all same-school students; CLASS_RESTRICTED = assigned classes only. */
+/** Backend `SessionVisibility`. PUBLIC = all Quizopia students; CLASS_RESTRICTED = assigned classes only. */
 export type SessionVisibility = "PUBLIC" | "CLASS_RESTRICTED";
 
 /** Backend record `ExamSessionListItem` (no examVersionNumber anymore). */
@@ -84,7 +84,7 @@ export interface CreateExamSessionRequest {
   endsAt: string;
   maxAttempts: number;
   durationMinutes?: number | null;
-  /** PUBLIC = all same-school students; CLASS_RESTRICTED (default) = assigned classes only. */
+  /** PUBLIC = all Quizopia students; CLASS_RESTRICTED (default) = assigned classes only. */
   visibility?: SessionVisibility;
   /** Classrooms assigned when CLASS_RESTRICTED. Ignored when PUBLIC. */
   classroomIds?: number[];

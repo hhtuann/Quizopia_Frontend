@@ -8,7 +8,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useCreateExamMutation } from "@/hooks/queries/use-exams";
 import { useExamPurposesQuery } from "@/hooks/queries/use-exams";
 import { useGradeLevelsQuery, useSubjectsQuery } from "@/hooks/queries/use-subjects";
-import { useActiveWorkspace } from "@/hooks/queries/use-workspaces";
 import { createExamSchema, type CreateExamValues } from "@/lib/validation/exam-schemas";
 import { Button, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
@@ -33,18 +32,10 @@ function describeCreateError(
         return { message: "This code is already in use. Please retry — codes are auto-generated." };
       case "EXAM_SUBJECT_NOT_FOUND":
         return { field: "subjectId", message: "Subject not found." };
-      case "EXAM_SUBJECT_SCHOOL_MISMATCH":
-        return { message: "The selected subject is not in your school." };
       case "EXAM_PURPOSE_NOT_FOUND":
         return { field: "purposeId", message: "Exam purpose not found." };
-      case "EXAM_PURPOSE_SCHOOL_MISMATCH":
-        return { message: "The selected exam purpose is not in your school." };
-      case "EXAM_SCHOOL_WORKSPACE_NOT_FOUND":
-        return { message: "The selected workspace could not be resolved. Please retry." };
       case "EXAM_ACCESS_DENIED":
         return { message: "You don't have permission to create an exam." };
-      case "EXAM_TEACHER_PROFILE_NOT_FOUND":
-        return { message: "Teacher profile not found for your account." };
       case "EXAM_VALIDATION_ERROR":
         return { message: norm.message || "Please check the highlighted fields." };
       default:
@@ -59,7 +50,6 @@ function describeCreateError(
 
 export default function NewExamPage() {
   const router = useRouter();
-  const { activeWorkspace, isPersonal } = useActiveWorkspace();
 
   const { data: subjectsData, isPending: subjectsPending, isError: subjectsError } =
     useSubjectsQuery();
@@ -91,15 +81,7 @@ export default function NewExamPage() {
 
   const onSubmit = async (values: CreateExamValues) => {
     setFormError(null);
-    // Subject is required only for ORGANIZATION workspaces (legacy academic rule);
-    // personal-workspace exams carry no subject.
-    const subjectRequired = !isPersonal;
-    if (subjectRequired && (values.subjectId == null || !Number.isFinite(values.subjectId))) {
-      setError("subjectId", { message: "Subject is required for organization exams." });
-      return;
-    }
     const req: CreateExamRequest = {
-      ...(activeWorkspace ? { workspaceId: activeWorkspace.workspaceId } : {}),
       ...(values.subjectId != null && Number.isFinite(values.subjectId)
         ? { subjectId: values.subjectId }
         : {}),
@@ -143,13 +125,6 @@ export default function NewExamPage() {
         <h1 className="mt-3 font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
           Create exam
         </h1>
-        {activeWorkspace && (
-          <p className="mt-2 text-sm font-medium text-[#64748B]">
-            Creating in{" "}
-            <span className="font-semibold text-[#0052FF]">{activeWorkspace.name}</span>
-            {isPersonal ? " — personal workspace" : ""}
-          </p>
-        )}
       </div>
 
       <div className={cn(cardVariants({ variant: "elevated" }), "max-w-2xl p-8 sm:p-10")}>
@@ -178,93 +153,89 @@ export default function NewExamPage() {
         )}
 
         <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-          {!isPersonal && (
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              <div>
-                <label htmlFor="exam-grade" className={labelClass}>
-                  Grade level
-                </label>
-                <select
-                  id="exam-grade"
-                  disabled={gradesPending}
-                  className={cn(selectClass, "disabled:opacity-70")}
-                  value={gradeId}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setGradeId(v === "" ? "" : Number(v));
-                    setValue("subjectId", NaN);
-                  }}
-                >
-                  <option value="">{gradesPending ? "Loading grades…" : "Select a grade…"}</option>
-                  {grades.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="exam-purpose" className={labelClass}>
-                  Purpose <span className="font-normal normal-case text-[#64748B]/60">(optional)</span>
-                </label>
-                <select
-                  id="exam-purpose"
-                  disabled={purposesPending}
-                  aria-invalid={!!errors.purposeId}
-                  aria-describedby={errors.purposeId ? "exam-purpose-error" : undefined}
-                  className={cn(selectClass, errors.purposeId && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]", "disabled:opacity-70")}
-                  {...register("purposeId")}
-                >
-                  <option value="">
-                    {purposesPending ? "Loading purposes…" : "None"}
-                  </option>
-                  {purposes.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.code} — {p.title}
-                    </option>
-                  ))}
-                </select>
-                {purposesError && (
-                  <p className="mt-1.5 pl-1 text-xs font-medium text-[#EF4444]">
-                    Couldn&apos;t load purposes.
-                  </p>
-                )}
-                <FieldError id="exam-purpose-error" message={errors.purposeId?.message} />
-              </div>
-            </div>
-          )}
-
-          {!isPersonal && (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
-              <label htmlFor="exam-subject" className={labelClass}>
-                Subject
+              <label htmlFor="exam-grade" className={labelClass}>
+                Grade level <span className="font-normal normal-case text-[#64748B]/60">(optional)</span>
               </label>
               <select
-                id="exam-subject"
-                disabled={!gradeSelected || subjectsPending}
-                aria-invalid={!!errors.subjectId}
-                aria-describedby={errors.subjectId ? "exam-subject-error" : undefined}
-                className={cn(selectClass, errors.subjectId && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]", "disabled:opacity-70")}
-                {...register("subjectId", { valueAsNumber: true })}
+                id="exam-grade"
+                disabled={gradesPending}
+                className={cn(selectClass, "disabled:opacity-70")}
+                value={gradeId}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setGradeId(v === "" ? "" : Number(v));
+                  setValue("subjectId", NaN);
+                }}
               >
-                <option value="">
-                  {!gradeSelected ? "Select a grade first" : subjectsPending ? "Loading subjects…" : "Select a subject…"}
-                </option>
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
+                <option value="">{gradesPending ? "Loading grades…" : "Select a grade…"}</option>
+                {grades.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
                   </option>
                 ))}
               </select>
-              {subjectsError && (
+            </div>
+
+            <div>
+              <label htmlFor="exam-purpose" className={labelClass}>
+                Purpose <span className="font-normal normal-case text-[#64748B]/60">(optional)</span>
+              </label>
+              <select
+                id="exam-purpose"
+                disabled={purposesPending}
+                aria-invalid={!!errors.purposeId}
+                aria-describedby={errors.purposeId ? "exam-purpose-error" : undefined}
+                className={cn(selectClass, errors.purposeId && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]", "disabled:opacity-70")}
+                {...register("purposeId")}
+              >
+                <option value="">
+                  {purposesPending ? "Loading purposes…" : "None"}
+                </option>
+                {purposes.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.code} — {p.title}
+                  </option>
+                ))}
+              </select>
+              {purposesError && (
                 <p className="mt-1.5 pl-1 text-xs font-medium text-[#EF4444]">
-                  Couldn&apos;t load subjects.
+                  Couldn&apos;t load purposes.
                 </p>
               )}
-              <FieldError id="exam-subject-error" message={errors.subjectId?.message} />
+              <FieldError id="exam-purpose-error" message={errors.purposeId?.message} />
             </div>
-          )}
+          </div>
+
+          <div>
+            <label htmlFor="exam-subject" className={labelClass}>
+              Subject <span className="font-normal normal-case text-[#64748B]/60">(optional)</span>
+            </label>
+            <select
+              id="exam-subject"
+              disabled={!gradeSelected || subjectsPending}
+              aria-invalid={!!errors.subjectId}
+              aria-describedby={errors.subjectId ? "exam-subject-error" : undefined}
+              className={cn(selectClass, errors.subjectId && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]", "disabled:opacity-70")}
+              {...register("subjectId", { valueAsNumber: true })}
+            >
+              <option value="">
+                {!gradeSelected ? "Select a grade first" : subjectsPending ? "Loading subjects…" : "Select a subject…"}
+              </option>
+              {subjects.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            {subjectsError && (
+              <p className="mt-1.5 pl-1 text-xs font-medium text-[#EF4444]">
+                Couldn&apos;t load subjects.
+              </p>
+            )}
+            <FieldError id="exam-subject-error" message={errors.subjectId?.message} />
+          </div>
 
           <div>
             <label htmlFor="exam-title" className={labelClass}>

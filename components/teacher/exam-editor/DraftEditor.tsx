@@ -305,7 +305,6 @@ export function DraftEditor({
             <div className="mb-4">
               <QuestionPicker
                 excludeSourceIds={allSourceIds}
-                subjectId={exam.subject?.id ?? null}
                 onAdd={(qs) => addQuestions(section.uid, qs)}
                 onClose={() => setPickerFor(null)}
               />

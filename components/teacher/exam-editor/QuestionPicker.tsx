@@ -26,13 +26,10 @@ const TYPE_LABEL: Record<string, string> = {
 export function QuestionPicker({
   onAdd,
   excludeSourceIds,
-  subjectId,
   onClose,
 }: {
   onAdd: (questions: LocalQuestion[]) => void;
   excludeSourceIds: number[];
-  /** Only banks whose subject matches the exam's subject are selectable. Null (personal workspace) → all banks. */
-  subjectId: number | null;
   onClose: () => void;
 }) {
   const [bankId, setBankId] = useState<number | "">("");
@@ -40,12 +37,10 @@ export function QuestionPicker({
   const excluded = useMemo(() => new Set(excludeSourceIds), [excludeSourceIds]);
 
   const { data: banksData, isPending: banksPending } = useQuestionBanksQuery({ size: 100 });
-  // When the exam has a subject, only banks with the SAME subject are
-  // selectable (the backend enforces a strict subject-match on save). A
-  // subject-less exam (personal workspace) may draw from every bank.
-  const banks = (banksData?.items ?? []).filter(
-    (b) => subjectId == null || b.subject?.id === subjectId
-  );
+  // Mirrors the backend contract: any of the teacher's OWN banks may be staged
+  // (the backend enforces bank ownership only — no subject match). The bank's
+  // subject stays visible in the picker so teachers can still see it.
+  const banks = banksData?.items ?? [];
 
   const enabled = bankId !== "";
   const { data: questionsData, isPending: questionsPending } = useBankQuestionsQuery(
@@ -109,7 +104,7 @@ export function QuestionPicker({
         <option value="">{banksPending ? "Loading banks…" : "Select a bank…"}</option>
         {banks.map((b) => (
           <option key={b.id} value={b.id}>
-            {b.name}
+            {b.name} · {b.subject?.name ?? "No subject"}
           </option>
         ))}
       </select>

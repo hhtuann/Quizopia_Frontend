@@ -133,7 +133,7 @@ function DetailView({ classroom }: { classroom: ClassroomDetailView }) {
 
       <AddStudentsPanel
         classId={classroom.id}
-        excludeIds={classroom.members.map((m) => m.studentProfileId)}
+        excludeIds={classroom.members.map((m) => m.userId)}
         onSearchResult={(r) =>
           setNotice({ kind: "success", message: `Added ${r.added} student${r.added === 1 ? "" : "s"}.${r.duplicated.length > 0 ? ` ${r.duplicated.length} already members.` : ""}${r.invalid.length > 0 ? ` ${r.invalid.length} invalid.` : ""}` })
         }
@@ -159,7 +159,7 @@ function DetailView({ classroom }: { classroom: ClassroomDetailView }) {
 }
 
 type RowAction =
-  | { kind: "member"; profileId: number; code: string; name: string }
+  | { kind: "member"; userId: number; name: string }
   | { kind: "invite"; entryId: number; name: string };
 
 function MembersTable({
@@ -187,7 +187,7 @@ function MembersTable({
     setAction(null);
     const mut =
       target.kind === "member"
-        ? removeMut.mutateAsync(target.profileId)
+        ? removeMut.mutateAsync(target.userId)
         : revokeMut.mutateAsync(target.entryId);
     await mut.catch(() => {
       /* error surfaces via the refetched detail; keep simple for MVP */
@@ -211,7 +211,6 @@ function MembersTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
-              <th scope="col" className="px-3 pb-3 font-semibold">Student</th>
               <th scope="col" className="px-3 pb-3 font-semibold">Name</th>
               <th scope="col" className="px-3 pb-3 text-center font-semibold">Email</th>
               <th scope="col" className="px-3 pb-3 text-center font-semibold">Username</th>
@@ -223,11 +222,6 @@ function MembersTable({
           <tbody>
             {pending.map((e) => (
               <tr key={`invite-${e.id}`} className="border-b border-[#E2E8F0] text-[#0F172A] transition-colors last:border-0 group hover:bg-[#F1F5F9]">
-                <td className="px-3 py-3 align-top">
-                  <span className="rounded-md border border-dashed border-[#CBD5E1] px-2 py-1 font-mono text-xs whitespace-nowrap text-[#94A3B8]">
-                    PENDING
-                  </span>
-                </td>
                 <td className="px-3 py-3 align-top font-medium">{e.fullName}</td>
                 <td className="px-3 py-3 text-center align-top text-[#64748B]">{e.email ?? "—"}</td>
                 <td className="px-3 py-3 text-center align-top font-mono text-xs text-[#64748B]">—</td>
@@ -248,12 +242,7 @@ function MembersTable({
               </tr>
             ))}
             {members.map((m) => (
-              <tr key={m.studentProfileId} className="border-b border-[#E2E8F0] text-[#0F172A] transition-colors last:border-0 group hover:bg-[#F1F5F9]">
-                <td className="px-3 py-3 align-top">
-                  <span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-1 font-mono text-xs text-[#64748B] whitespace-nowrap transition-colors group-hover:text-[#0052FF]">
-                    {m.studentCode}
-                  </span>
-                </td>
+              <tr key={m.userId} className="border-b border-[#E2E8F0] text-[#0F172A] transition-colors last:border-0 group hover:bg-[#F1F5F9]">
                 <td className="px-3 py-3 align-top font-medium">{m.displayName}</td>
                 <td className="px-3 py-3 text-center align-top text-[#64748B]">{m.email ?? "—"}</td>
                 <td className="px-3 py-3 text-center align-top font-mono text-xs text-[#64748B]">{m.username ?? "—"}</td>
@@ -264,7 +253,7 @@ function MembersTable({
                 <td className="px-3 py-3 text-center align-top">
                   <button
                     type="button"
-                    onClick={() => setAction({ kind: "member", profileId: m.studentProfileId, code: m.studentCode, name: m.displayName })}
+                    onClick={() => setAction({ kind: "member", userId: m.userId, name: m.displayName })}
                     disabled={removeMut.isPending}
                     className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 text-[#EF4444] hover:bg-[#EF4444]/5 hover:text-[#EF4444]")}
                   >
