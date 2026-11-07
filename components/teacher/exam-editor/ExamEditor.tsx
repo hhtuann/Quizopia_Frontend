@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils/cn";
 import type { PublishedExamSummary, TeacherExamEditorResponse } from "@/lib/api/exams";
 import type { NormalizedApiError } from "@/lib/api";
 import { DraftEditor } from "./DraftEditor";
+import { PublishToCommunityDialog } from "@/components/community/PublishToCommunityDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ExamDetailSectionHeader } from "./ExamDetailSectionHeader";
 
@@ -144,6 +145,7 @@ export function ExamEditor({
   const [confirmPublish, setConfirmPublish] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [communityPublishOpen, setCommunityPublishOpen] = useState(false);
 
   const questionCount = data.composition.reduce((n, s) => n + s.questions.length, 0);
   // Publish needs at least one saved question in the composition.
@@ -302,6 +304,11 @@ export function ExamEditor({
             setNotice(null);
             setConfirmArchive(true);
           }}
+          onOpenCommunityPublish={() => {
+            setNotice(null);
+            setCommunityPublishOpen(true);
+          }}
+
         />
       )}
       {tab === "questions" && (
@@ -336,6 +343,19 @@ export function ExamEditor({
         onConfirm={onConfirmArchive}
         onCancel={() => setConfirmArchive(false)}
       />
+      {/* Community publish — PUBLISHED exams only (ADR-006 §4 create+publish). */}
+      <PublishToCommunityDialog
+        open={communityPublishOpen}
+        exam={{ id: data.id, title: data.title }}
+        onCancel={() => setCommunityPublishOpen(false)}
+        onSuccess={(publicationId) => {
+          setCommunityPublishOpen(false);
+          setNotice({
+            kind: "success",
+            message: `Published to the community catalog (publication #${publicationId}). Manage it under My community publications.`,
+          });
+        }}
+      />
     </div>
   );
 }
@@ -350,6 +370,7 @@ function OverviewTab({
   onOpenPublish,
   onDuplicate,
   onOpenArchive,
+  onOpenCommunityPublish,
 }: {
   data: TeacherExamEditorResponse;
   questionCount: number;
@@ -358,6 +379,7 @@ function OverviewTab({
   duplicatePending: boolean;
   archivePending: boolean;
   onOpenPublish: () => void;
+  onOpenCommunityPublish: () => void;
   onDuplicate: () => void;
   onOpenArchive: () => void;
 }) {
@@ -404,6 +426,26 @@ function OverviewTab({
                   </span>
                 )}
               </>
+            )}
+            {data.status === "PUBLISHED" && (
+              <Button type="button" variant="outline" onClick={onOpenCommunityPublish}>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2.5}
+                  stroke="currentColor"
+                  className="h-4 w-4"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 21a9 9 0 1 1 0-18c2.52 0 4.85.99 6.36 2.64L21 12h-5.5v5.5L12 21Zm-6.5-8a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm4-4a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"
+                  />
+                </svg>
+                Publish to Community
+              </Button>
             )}
             {data.status !== "DRAFT" && (
               <Button type="button" variant="primary" onClick={onDuplicate} disabled={duplicatePending}>
