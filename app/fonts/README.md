@@ -17,6 +17,9 @@ non-deterministically (Next 16 Turbopack `next/font/google` download).
 | `jetbrains-mono-latin-400-normal.woff2` | JetBrains Mono | 400 | SIL OFL 1.1 | `14425ba9c695763c1547f48a206b7aa60350a33ae23de09f0407877f3fcd89eb` |
 | `jetbrains-mono-latin-500-normal.woff2` | JetBrains Mono | 500 | SIL OFL 1.1 | `cb182feeed4d798ff6961d3c79f7026279448fca0676438aaecb21f3fc39553a` |
 
+License text: `OFL.txt` (SIL Open Font License 1.1, Calistoga project copy — identical
+text applies to all three families). |
+
 All three families are SIL Open Font License 1.1 (redistribution and
 modification permitted); licenses: fonts.google.com/specimen/Calistoga,
 /Inter, /JetBrains+Mono.
