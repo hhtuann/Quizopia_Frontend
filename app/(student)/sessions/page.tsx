@@ -162,7 +162,7 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
         <div>
           <dt className="font-mono uppercase tracking-[0.1em] text-[#64748B]">Window</dt>
           <dd className="mt-0.5 text-[#0F172A]">
-            {formatDateTime(item.startsAt)} â†’ {formatDateTime(item.endsAt)}
+            {formatDateTime(item.startsAt)} → {formatDateTime(item.endsAt)}
           </dd>
         </div>
         <div>
@@ -175,11 +175,11 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
           <dt className="font-mono uppercase tracking-[0.1em] text-[#64748B]">Attempts</dt>
           <dd className="mt-0.5 text-[#0F172A]">
             {item.maxAttempts === 0 ? (
-              <span>{item.attemptsUsed} used Â· <span className="font-semibold text-[#0052FF]">Unlimited</span></span>
+              <span>{item.attemptsUsed} used · <span className="font-semibold text-[#0052FF]">Unlimited</span></span>
             ) : (
               <span>
                 {item.attemptsUsed}
-                {item.maxAttempts != null ? ` / ${item.maxAttempts}` : ""} used Â·{" "}
+                {item.maxAttempts != null ? ` / ${item.maxAttempts}` : ""} used ·{" "}
                 <span className="font-semibold">{item.remainingAttempts} left</span>
               </span>
             )}
@@ -363,7 +363,7 @@ function AttemptTimeRemaining({ deadlineAt, onZero }: { deadlineAt: string; onZe
   }, [expired]);
 
   // Once expired, poll onZero every 10s until the backend finalizes the attempt
-  // and the parent drops the Resume button â†’ this pill unmounts (cleanup stops
+  // and the parent drops the Resume button → this pill unmounts (cleanup stops
   // the poll). Bridges the up-to-30s sweeper lag so Resume disappears on its own.
   useEffect(() => {
     if (!expired) return;
