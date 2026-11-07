@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui";
 import { NotificationBell } from "./NotificationBell";
-import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { QuizopiaLogo } from "./QuizopiaLogo";
 import { useAuth } from "@/hooks/useAuth";
 import { authApi } from "@/lib/auth";
@@ -159,7 +158,6 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
 
   const displayName = user?.displayName || user?.username || "Account";
   const initials = initialsOf(displayName);
-  const isTeacher = user?.roles?.includes("TEACHER") ?? false;
 
   return (
     <header className="app-topbar relative w-full border-b border-[#E2E8F0] bg-white/95">
@@ -205,9 +203,6 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
 
           {/* Header Actions - Profile / Mobile Menu Toggle */}
           <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-
-            {/* Workspace switcher (TEACHER, Desktop) — UI preference only */}
-            {isTeacher && <WorkspaceSwitcher />}
 
             {/* Notification Bell (Desktop) */}
             <NotificationBell />
@@ -466,7 +461,7 @@ export default function Header({ isMobileMenuOpen, setIsMobileMenuOpen, onViewSw
           <>
             Your account will be granted the Teacher role immediately after you
             confirm (your Student role is kept). You can create question banks,
-            exams and classes in your personal workspace.
+            exams and classes right away.
           </>
         }
         confirmLabel="Confirm registration"
