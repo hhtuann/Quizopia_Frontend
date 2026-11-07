@@ -28,7 +28,7 @@ const FIXTURE_PATH = new URL(
   import.meta.url,
 );
 const CANONICAL_FIXTURE_SHA256 =
-  "3baa1a74674b7b4b2448d6910bafd299eaa1710b60c7f0d90a2c183b8be7be03";
+  "2616b851854e41ca6ca5dad97c039c80fa38c4a43bb8d975e11a6bdee6cee3a9";
 
 interface FixtureOption {
   readonly content: string;

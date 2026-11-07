@@ -209,18 +209,20 @@ function highlightedLine(
     return <span className="text-[#F59E0B]">{line}</span>;
   }
 
+  // The full structural marker (prefix word + number + [TYPE]:) is bolded
+  // as one unit; option letters and answer/explanation markers match.
   const header =
-    /^(Câu )([0-9]+)( \[)(SINGLE_CHOICE|MULTIPLE_CHOICE|TRUE_FALSE_MATRIX|NUMERIC_FILL)(\]:)(.*)$/.exec(
+    /^((?:Câu|Question) )([0-9]+)( \[)(SINGLE_CHOICE|MULTIPLE_CHOICE|TRUE_FALSE_MATRIX|NUMERIC_FILL)(\]:)(.*)$/.exec(
       line,
     );
   if (header) {
     return (
       <>
-        <span className="text-[#0052FF]">{header[1]}</span>
+        <span className="font-semibold text-[#0052FF]">{header[1]}</span>
         <span className="font-semibold text-[#4D7CFF]">{header[2]}</span>
-        <span className="text-[#0052FF]">{header[3]}</span>
+        <span className="font-semibold text-[#0052FF]">{header[3]}</span>
         <span className="font-semibold text-[#4D7CFF]">{header[4]}</span>
-        <span className="text-[#0052FF]">{header[5]}</span>
+        <span className="font-semibold text-[#0052FF]">{header[5]}</span>
         <span className="text-[#0F172A]">{header[6]}</span>
       </>
     );
@@ -231,14 +233,14 @@ function highlightedLine(
     return (
       <>
         {option[1] ? <span className="font-semibold text-[#10B981]">*</span> : null}
-        <span className="text-[#0052FF]">{option[2]}</span>
-        <span className="text-[#0052FF]">{option[3]}</span>
+        <span className="font-semibold text-[#0052FF]">{option[2]}</span>
+        <span className="font-semibold text-[#0052FF]">{option[3]}</span>
         <span className="text-[#0F172A]">{option[4]}</span>
       </>
     );
   }
 
-  const answer = /^(Đáp án:)(.*)$/.exec(line);
+  const answer = /^(Đáp án:|Expected answer:)(.*)$/.exec(line);
   if (answer) {
     return (
       <>
@@ -248,11 +250,11 @@ function highlightedLine(
     );
   }
 
-  const explanation = /^(Lời giải:)(.*)$/.exec(line);
+  const explanation = /^(Lời giải:|Explanation:)(.*)$/.exec(line);
   if (explanation) {
     return (
       <>
-        <span className="text-[#0052FF]">{explanation[1]}</span>
+        <span className="font-semibold text-[#0052FF]">{explanation[1]}</span>
         <span className="text-[#0F172A]">{explanation[2]}</span>
       </>
     );
@@ -741,7 +743,7 @@ export const QuizMarkdownCodeEditor = forwardRef<
           : ""}
       </p>
       <p className="sr-only" id={helpId}>
-        Start questions with Câu and a type marker. Use arrow keys to browse
+        Start questions with Question (or Câu) and a type marker. Use arrow keys to browse
         suggestions, Tab or Enter to accept, Escape to dismiss.
       </p>
     </div>

@@ -60,7 +60,7 @@ describe("bank question page import modes", () => {
   it("Excel Import panel is the default and Markdown is hidden", () => {
     renderPage();
 
-    expect(screen.queryByLabelText("Choose an .xlsx workbook to import")).not.toBeNull();
+    expect(screen.getByText("Choose file")).not.toBeNull();
     const markdownTextarea = screen.getByLabelText("Quiz Markdown source");
     expect(markdownTextarea.closest("div.hidden")).not.toBeNull();
   });
@@ -73,6 +73,8 @@ describe("bank question page import modes", () => {
       screen.getByRole("button", { name: "Markdown Authoring" }).getAttribute("aria-pressed")
     ).toBe("true");
 
+    // The authoring pane starts folded; expand it before editing.
+    fireEvent.click(screen.getByRole("button", { name: "Write questions" }));
     const textarea = screen.getByLabelText("Quiz Markdown source") as HTMLTextAreaElement;
     expect(textarea.closest("div.hidden")).toBeNull();
     fireEvent.change(textarea, {

@@ -68,14 +68,14 @@ export function StatisticsPanel({ sessionId }: { sessionId: number }) {
             <thead>
               <tr className="border-b border-[#E2E8F0] text-left font-mono uppercase tracking-[0.1em] text-[#64748B]">
                 <th scope="col" className="px-2 pb-2 font-semibold">Range</th>
-                <th scope="col" className="px-2 pb-2 text-right font-semibold">Count</th>
+                <th scope="col" className="px-2 pb-2 text-center font-semibold">Count</th>
               </tr>
             </thead>
             <tbody>
               {data.distribution.map((b, i) => (
                 <tr key={i} className="border-b border-[#E2E8F0] text-[#0F172A] last:border-0">
                   <td className="px-2 py-1 tabular-nums">{b.lowerBound}–{b.upperBound}{b.upperInclusive ? "]" : ")"}</td>
-                  <td className="px-2 py-1 text-right tabular-nums font-semibold">{b.count}</td>
+                  <td className="px-2 py-1 text-center tabular-nums font-semibold">{b.count}</td>
                 </tr>
               ))}
             </tbody>
@@ -92,12 +92,12 @@ export function StatisticsPanel({ sessionId }: { sessionId: number }) {
               <tr className="border-b border-[#E2E8F0] text-left font-mono uppercase tracking-[0.1em] text-[#64748B]">
                 <th scope="col" className="px-2 pb-2 font-semibold">Q#</th>
                 <th scope="col" className="px-2 pb-2 font-semibold">Type</th>
-                <th scope="col" className="px-2 pb-2 text-right font-semibold">Ans</th>
-                <th scope="col" className="px-2 pb-2 text-right font-semibold">Correct</th>
-                <th scope="col" className="px-2 pb-2 text-right font-semibold">Wrong</th>
-                <th scope="col" className="px-2 pb-2 text-right font-semibold">Skip</th>
-                <th scope="col" className="px-2 pb-2 text-right font-semibold">Rate</th>
-                <th scope="col" className="px-2 pb-2 text-right font-semibold">Avg score</th>
+                <th scope="col" className="px-2 pb-2 text-center font-semibold">Ans</th>
+                <th scope="col" className="px-2 pb-2 text-center font-semibold">Correct</th>
+                <th scope="col" className="px-2 pb-2 text-center font-semibold">Wrong</th>
+                <th scope="col" className="px-2 pb-2 text-center font-semibold">Skip</th>
+                <th scope="col" className="px-2 pb-2 text-center font-semibold">Rate</th>
+                <th scope="col" className="px-2 pb-2 text-center font-semibold">Avg score</th>
               </tr>
             </thead>
             <tbody>
@@ -105,12 +105,12 @@ export function StatisticsPanel({ sessionId }: { sessionId: number }) {
                 <tr key={q.examQuestionId} className="border-b border-[#E2E8F0] text-[#0F172A] last:border-0">
                   <td className="px-2 py-1 tabular-nums">{q.examQuestionId}</td>
                   <td className="px-2 py-1">{TYPE_LABEL[q.questionType] ?? q.questionType}</td>
-                  <td className="px-2 py-1 text-right tabular-nums">{q.answeredCount}</td>
-                  <td className="px-2 py-1 text-right tabular-nums text-[#10B981]">{q.correctCount}</td>
-                  <td className="px-2 py-1 text-right tabular-nums text-[#64748B]">{q.incorrectCount}</td>
-                  <td className="px-2 py-1 text-right tabular-nums text-[#94A3B8]">{q.unansweredCount}</td>
-                  <td className="px-2 py-1 text-right tabular-nums font-semibold">{q.correctRate != null ? `${q.correctRate}%` : "—"}</td>
-                  <td className="px-2 py-1 text-right tabular-nums">{q.averageAwardedScore != null ? String(q.averageAwardedScore) : "—"}</td>
+                  <td className="px-2 py-1 text-center tabular-nums">{q.answeredCount}</td>
+                  <td className="px-2 py-1 text-center tabular-nums text-[#10B981]">{q.correctCount}</td>
+                  <td className="px-2 py-1 text-center tabular-nums text-[#64748B]">{q.incorrectCount}</td>
+                  <td className="px-2 py-1 text-center tabular-nums text-[#94A3B8]">{q.unansweredCount}</td>
+                  <td className="px-2 py-1 text-center tabular-nums font-semibold">{q.correctRate != null ? `${q.correctRate}%` : "—"}</td>
+                  <td className="px-2 py-1 text-center tabular-nums">{q.averageAwardedScore != null ? String(q.averageAwardedScore) : "—"}</td>
                 </tr>
               ))}
             </tbody>

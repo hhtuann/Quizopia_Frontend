@@ -189,7 +189,7 @@ export default function NewExamSessionPage() {
 
               <div>
                 <label htmlFor="session-title" className={labelClass}>Title</label>
-                <Input id="session-title" type="text" placeholder="Ca thi giữa kỳ" aria-invalid={!!errors.title} aria-describedby={errors.title ? "session-title-error" : undefined} className={cn(errors.title && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")} {...register("title")} />
+                <Input id="session-title" type="text" placeholder="Midterm session" aria-invalid={!!errors.title} aria-describedby={errors.title ? "session-title-error" : undefined} className={cn(errors.title && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")} {...register("title")} />
                 <FieldError id="session-title-error" message={errors.title?.message} />
               </div>
 

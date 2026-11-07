@@ -173,7 +173,7 @@ export default function NewQuestionBankPage() {
             <Input
               id="bank-name"
               type="text"
-              placeholder="Bộ đề giữa kỳ"
+              placeholder="Midterm question bank"
               aria-invalid={!!errors.name}
               aria-describedby={errors.name ? "bank-name-error" : undefined}
               className={cn(errors.name && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")}

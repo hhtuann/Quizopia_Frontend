@@ -73,12 +73,17 @@ describe("QuestionMarkdownImport", () => {
     fireEvent.click(confirm);
     await waitFor(() => expect(importMock).toHaveBeenCalledWith(7, VALID_DOC));
 
+    // Success keeps the panel mounted, clears the editor, folds the pane and
+    // shows the banner inline (no result view / "Write another" round-trip).
     const banner = await waitFor(() => {
-      const el = document.querySelector('section[aria-label="Markdown import result"] [role="status"]');
+      const el = document.querySelector('section[aria-label="Markdown import"] [role="status"]');
       expect(el?.textContent).toContain("Added all 1 questions to this bank.");
       return el;
     });
     expect(banner).not.toBeNull();
+    await waitFor(() => expect((screen.getByLabelText("Quiz Markdown source") as HTMLTextAreaElement).value).toBe(""));
+    expect(screen.getByRole("button", { name: "Write questions" })).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Write another" })).toBeNull();
   });
 
   it("disables confirm and shows the violation for a single-correct MULTIPLE_CHOICE", () => {

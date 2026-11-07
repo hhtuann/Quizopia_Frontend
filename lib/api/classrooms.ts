@@ -27,6 +27,8 @@ export interface ClassroomMemberView {
   studentProfileId: number;
   studentCode: string;
   displayName: string;
+  username: string | null;
+  email: string | null;
   addedAt: string;
 }
 

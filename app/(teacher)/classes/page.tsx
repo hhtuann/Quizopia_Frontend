@@ -217,7 +217,7 @@ function CreateClassroomModal({
           <Input
             id="class-name"
             type="text"
-            placeholder="Lớp 10A1"
+            placeholder="Grade 10A1"
             aria-invalid={!!errors.name}
             aria-describedby={errors.name ? "class-name-error" : undefined}
             className={cn(errors.name && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")}

@@ -202,7 +202,7 @@ function PendingTable({
           <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
             <th scope="col" className="px-3 pb-3 font-semibold">Username</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Name</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Email</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Email</th>
             <th scope="col" className="px-3 pb-3 text-center font-semibold">Registered</th>
             <th scope="col" className="px-3 pb-3 text-center font-semibold">Action</th>
           </tr>

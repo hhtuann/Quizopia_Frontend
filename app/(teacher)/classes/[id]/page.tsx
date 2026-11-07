@@ -7,13 +7,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   useClassroomQuery,
+  useClassroomRosterQuery,
   useRemoveMemberMutation,
+  useRevokeRosterEntryMutation,
   useUpdateClassroomMutation,
 } from "@/hooks/queries/use-classrooms";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
-import { StudentSearchSelect } from "@/components/teacher/StudentSearchSelect";
-import { ClassRosterPanel } from "@/components/teacher/ClassRosterPanel";
-import { RosterImportPanel } from "@/components/teacher/RosterImportPanel";
+import { AddStudentsPanel } from "@/components/teacher/AddStudentsPanel";
 import { Badge, Button, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { updateClassroomSchema, type UpdateClassroomValues } from "@/lib/validation/classroom-schemas";
@@ -131,24 +131,16 @@ function DetailView({ classroom }: { classroom: ClassroomDetailView }) {
         </div>
       )}
 
-      <StudentSearchSelect
+      <AddStudentsPanel
         classId={classroom.id}
         excludeIds={classroom.members.map((m) => m.studentProfileId)}
-        onResult={(r) =>
+        onSearchResult={(r) =>
           setNotice({ kind: "success", message: `Added ${r.added} student${r.added === 1 ? "" : "s"}.${r.duplicated.length > 0 ? ` ${r.duplicated.length} already members.` : ""}${r.invalid.length > 0 ? ` ${r.invalid.length} invalid.` : ""}` })
         }
       />
 
-      <ClassRosterPanel classId={classroom.id} />
-
-      <RosterImportPanel classId={classroom.id} />
-
       <div className={cn(cardVariants(), "mt-6 p-4 sm:p-6")}>
-        {classroom.members.length === 0 ? (
-          <MembersEmpty />
-        ) : (
-          <MembersTable classId={classroom.id} members={classroom.members} />
-        )}
+        <MembersTable classId={classroom.id} members={classroom.members} />
       </div>
 
       {editOpen && (
@@ -166,6 +158,10 @@ function DetailView({ classroom }: { classroom: ClassroomDetailView }) {
   );
 }
 
+type RowAction =
+  | { kind: "member"; profileId: number; code: string; name: string }
+  | { kind: "invite"; entryId: number; name: string };
+
 function MembersTable({
   classId,
   members,
@@ -174,16 +170,40 @@ function MembersTable({
   members: ClassroomMemberView[];
 }) {
   const removeMut = useRemoveMemberMutation(classId);
-  const [removeTarget, setRemoveTarget] = useState<{ profileId: number; code: string } | null>(null);
+  const revokeMut = useRevokeRosterEntryMutation(classId);
+  const { data: roster } = useClassroomRosterQuery(classId);
+  const [action, setAction] = useState<RowAction | null>(null);
 
-  const onConfirmRemove = async () => {
-    if (!removeTarget) return;
-    const target = removeTarget;
-    setRemoveTarget(null);
-    await removeMut.mutateAsync(target.profileId).catch(() => {
+  // Pending invitations surface in this official list; LINKED rows already
+  // exist as members, REVOKED/DECLINED are history and stay hidden.
+  const pending = (roster?.items ?? [])
+    .filter((e) => e.status === "PENDING")
+    .slice()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  const onConfirm = async () => {
+    if (!action) return;
+    const target = action;
+    setAction(null);
+    const mut =
+      target.kind === "member"
+        ? removeMut.mutateAsync(target.profileId)
+        : revokeMut.mutateAsync(target.entryId);
+    await mut.catch(() => {
       /* error surfaces via the refetched detail; keep simple for MVP */
     });
   };
+
+  if (pending.length === 0 && members.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+        <p className="font-display text-base font-bold text-[#0F172A]">No students yet</p>
+        <p className="mt-1 text-sm text-[#64748B]">
+          Add students by search, Excel import, or email invitation above.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -193,11 +213,40 @@ function MembersTable({
             <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
               <th scope="col" className="px-3 pb-3 font-semibold">Student</th>
               <th scope="col" className="px-3 pb-3 font-semibold">Name</th>
-              <th scope="col" className="px-3 pb-3 font-semibold">Added</th>
-              <th scope="col" className="px-3 pb-3 text-right font-semibold">Actions</th>
+              <th scope="col" className="px-3 pb-3 text-center font-semibold">Email</th>
+              <th scope="col" className="px-3 pb-3 text-center font-semibold">Username</th>
+              <th scope="col" className="px-3 pb-3 text-center font-semibold">Added</th>
+              <th scope="col" className="px-3 pb-3 text-center font-semibold">Status</th>
+              <th scope="col" className="px-3 pb-3 text-center font-semibold">Actions</th>
             </tr>
           </thead>
           <tbody>
+            {pending.map((e) => (
+              <tr key={`invite-${e.id}`} className="border-b border-[#E2E8F0] text-[#0F172A] transition-colors last:border-0 group hover:bg-[#F1F5F9]">
+                <td className="px-3 py-3 align-top">
+                  <span className="rounded-md border border-dashed border-[#CBD5E1] px-2 py-1 font-mono text-xs whitespace-nowrap text-[#94A3B8]">
+                    PENDING
+                  </span>
+                </td>
+                <td className="px-3 py-3 align-top font-medium">{e.fullName}</td>
+                <td className="px-3 py-3 text-center align-top text-[#64748B]">{e.email ?? "—"}</td>
+                <td className="px-3 py-3 text-center align-top font-mono text-xs text-[#64748B]">—</td>
+                <td className="px-3 py-3 text-center align-top text-[#64748B]">{formatDate(e.createdAt)}</td>
+                <td className="px-3 py-3 text-center align-top">
+                  <Badge variant="warn" className="uppercase">Pending</Badge>
+                </td>
+                <td className="px-3 py-3 text-center align-top">
+                  <button
+                    type="button"
+                    onClick={() => setAction({ kind: "invite", entryId: e.id, name: e.fullName })}
+                    disabled={revokeMut.isPending}
+                    className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 text-[#EF4444] hover:bg-[#EF4444]/5 hover:text-[#EF4444]")}
+                  >
+                    Revoke
+                  </button>
+                </td>
+              </tr>
+            ))}
             {members.map((m) => (
               <tr key={m.studentProfileId} className="border-b border-[#E2E8F0] text-[#0F172A] transition-colors last:border-0 group hover:bg-[#F1F5F9]">
                 <td className="px-3 py-3 align-top">
@@ -206,11 +255,16 @@ function MembersTable({
                   </span>
                 </td>
                 <td className="px-3 py-3 align-top font-medium">{m.displayName}</td>
-                <td className="px-3 py-3 align-top text-[#64748B]">{formatDate(m.addedAt)}</td>
-                <td className="px-3 py-3 text-right align-top">
+                <td className="px-3 py-3 text-center align-top text-[#64748B]">{m.email ?? "—"}</td>
+                <td className="px-3 py-3 text-center align-top font-mono text-xs text-[#64748B]">{m.username ?? "—"}</td>
+                <td className="px-3 py-3 text-center align-top text-[#64748B]">{formatDate(m.addedAt)}</td>
+                <td className="px-3 py-3 text-center align-top">
+                  <Badge variant="success">MEMBER</Badge>
+                </td>
+                <td className="px-3 py-3 text-center align-top">
                   <button
                     type="button"
-                    onClick={() => setRemoveTarget({ profileId: m.studentProfileId, code: m.studentCode })}
+                    onClick={() => setAction({ kind: "member", profileId: m.studentProfileId, code: m.studentCode, name: m.displayName })}
                     disabled={removeMut.isPending}
                     className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 text-[#EF4444] hover:bg-[#EF4444]/5 hover:text-[#EF4444]")}
                   >
@@ -224,16 +278,20 @@ function MembersTable({
       </div>
 
       <ConfirmDialog
-        open={removeTarget !== null}
+        open={action !== null}
         titleId="remove-member-title"
-        title={`Remove ${removeTarget?.code ?? ""}?`}
-        description="The student will no longer be a member of this class. They can be re-added later."
-        confirmLabel="Remove"
+        title={action?.kind === "invite" ? `Revoke invitation for ${action.name}?` : `Remove ${action?.name ?? ""}?`}
+        description={
+          action?.kind === "invite"
+            ? "The pending invitation will be withdrawn. You can invite them again later."
+            : "The student will no longer be a member of this class. They can be re-added later."
+        }
+        confirmLabel={action?.kind === "invite" ? "Revoke" : "Remove"}
         cancelLabel="Keep"
-        busyLabel="Removing…"
-        busy={removeMut.isPending}
-        onConfirm={onConfirmRemove}
-        onCancel={() => setRemoveTarget(null)}
+        busyLabel={action?.kind === "invite" ? "Revoking…" : "Removing…"}
+        busy={removeMut.isPending || revokeMut.isPending}
+        onConfirm={onConfirm}
+        onCancel={() => setAction(null)}
       />
     </>
   );
@@ -339,15 +397,6 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
         </div>
         {children}
       </div>
-    </div>
-  );
-}
-
-function MembersEmpty() {
-  return (
-    <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
-      <p className="font-display text-base font-bold text-[#0F172A]">No students yet</p>
-      <p className="mt-1 text-sm text-[#64748B]">Add students by their profile IDs above.</p>
     </div>
   );
 }

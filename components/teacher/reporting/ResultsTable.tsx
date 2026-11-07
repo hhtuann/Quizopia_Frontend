@@ -167,10 +167,10 @@ function ResultRow({ item }: { item: SessionResultItem }) {
     <tr className="border-b border-[#E2E8F0] align-top text-[#0F172A] transition-colors last:border-0 group hover:bg-[#F1F5F9]">
       <td className="px-3 py-2.5"><span className="rounded-md border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 font-mono text-xs text-[#64748B] transition-colors group-hover:text-[#0052FF]">{item.studentCode ?? "—"}</span></td>
       <td className="px-3 py-2.5 font-medium transition-colors group-hover:text-[#0052FF]">{item.displayName ?? "—"}</td>
-      <td className="px-3 py-2.5"><span className={cn("font-bold tabular-nums", pctTone(item.percentage))}>{item.percentage != null ? `${item.percentage}%` : "—"}</span></td>
-      <td className="px-3 py-2.5 tabular-nums text-[#64748B]">{item.score != null ? `${item.score}/${item.maxScore ?? "—"}` : "—"}</td>
+      <td className="px-3 py-2.5 text-center"><span className={cn("font-bold tabular-nums", pctTone(item.percentage))}>{item.percentage != null ? `${item.percentage}%` : "—"}</span></td>
+      <td className="px-3 py-2.5 text-center tabular-nums text-[#64748B]">{item.score != null ? `${item.score}/${item.maxScore ?? "—"}` : "—"}</td>
       <td className="px-3 py-2.5 text-center tabular-nums text-[#64748B]">{item.attemptCount}</td>
-      <td className="px-3 py-2.5 text-[#64748B]">{fmtDate(item.submittedAt)}</td>
+      <td className="px-3 py-2.5 text-center text-[#64748B]">{fmtDate(item.submittedAt)}</td>
     </tr>
   );
 }

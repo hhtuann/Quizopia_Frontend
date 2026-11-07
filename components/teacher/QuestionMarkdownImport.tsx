@@ -13,17 +13,6 @@ import type { NormalizedApiError } from "@/lib/api";
 /** Mirrors the backend MarkdownQuestionImportService.MAX_MARKDOWN_CHARS. */
 const MAX_MARKDOWN_CHARS = 262_144;
 
-const SAMPLE = `Câu 1 [SINGLE_CHOICE]: 2 + 2 bằng bao nhiêu?
-*A. 4
-B. 3
-C. 5
-D. 6
-Lời giải: 2 + 2 = 4
-
-Câu 2 [NUMERIC_FILL]: 10 / 4 (viết hai chữ số thập phân)?
-Đáp án: 2.50
-`;
-
 function describeError(err: unknown): string {
   const norm = err as NormalizedApiError | undefined;
   if (norm?.kind === "api") {
@@ -66,7 +55,8 @@ function describeError(err: unknown): string {
 export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
   const mutation = useImportMarkdownQuestionsMutation(bankId);
 
-  const [source, setSource] = useState(SAMPLE);
+  const [source, setSource] = useState("");
+  const [collapsed, setCollapsed] = useState(true);
   const [result, setResult] = useState<ImportResponse | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
 
@@ -75,6 +65,8 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
   const questionCount = analysis.questions.length;
   const parseErrors = analysis.diagnostics.length;
   const tooLong = source.length > MAX_MARKDOWN_CHARS;
+  // Bank-contract findings surface in the preview's Editor diagnostics, so a
+  // clean diagnostics list means the document is addable as-is.
   const importable =
     source.trim().length > 0 &&
     !tooLong &&
@@ -82,83 +74,63 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
     violations.length === 0 &&
     questionCount > 0;
 
-  const reset = () => {
-    setResult(null);
-    setClientError(null);
-  };
-
   const handleConfirm = () => {
     setClientError(null);
     setResult(null);
     mutation.mutate(source, {
-      onSuccess: (data) => setResult(data),
+      onSuccess: (data) => {
+        setResult(data);
+        if (data.importedRows === data.totalRows && data.errors.length === 0) {
+          // Success clears the editor for the next document (no separate
+          // result view / "Write another" round-trip) and folds the pane.
+          setSource("");
+          setCollapsed(true);
+        }
+      },
       onError: (err) => setClientError(describeError(err)),
     });
   };
 
   const importing = mutation.isPending;
 
-  if (result) {
-    const allImported = result.importedRows === result.totalRows && result.errors.length === 0;
-    return (
-      <section className={cn(cardVariants(), "p-6")} aria-label="Markdown import result">
-        <div
-          role="status"
-          className={cn(
-            "mb-4 rounded-lg border p-4 text-sm font-medium",
-            allImported
-              ? "border-[#10B981]/30 bg-[#10B981]/5 text-[#10B981]"
-              : "border-[#F59E0B]/30 bg-[#F59E0B]/5 text-[#0F172A]"
-          )}
-        >
-          {allImported ? (
-            <span>Added all {result.totalRows} questions to this bank.</span>
-          ) : result.invalidRows > 0 ? (
-            <span>
-              Nothing was imported — {result.invalidRows} question
-              {result.invalidRows === 1 ? "" : "s"} rejected (all-or-nothing).
-            </span>
-          ) : (
-            <span>
-              Nothing was imported — the document was rejected (all-or-nothing).
-            </span>
-          )}
-        </div>
-        {result.errors.length > 0 && <RowErrorsTable errors={result.errors} />}
-        <Button type="button" variant="outline" onClick={reset} disabled={importing}>
-          Write another
-        </Button>
-      </section>
-    );
-  }
-
   return (
     <section className={cn(cardVariants(), "p-6")} aria-label="Markdown import">
-      <div className="mb-4">
-        <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
-          Author questions in Quiz Markdown
-        </h2>
-        <p className="mt-1 text-xs font-medium text-[#64748B]">
-          Live preview with diagnostics. Review, then explicitly confirm adding the
-          questions to this bank — the whole document imports atomically or not at all.
-        </p>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
+            Quiz Markdown authoring
+          </h2>
+          <p className="mt-1 text-xs font-medium text-[#64748B]">
+            Live editor with diagnostics and preview — confirm to add the questions
+            to this bank (all-or-nothing).
+          </p>
+        </div>
+        <button
+          type="button"
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? "Write questions" : "Collapse"}
+          onClick={() => setCollapsed((value) => !value)}
+          title={collapsed ? "Write questions" : "Collapse"}
+          className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-[#64748B] outline-none transition-colors hover:bg-[#0052FF]/5 hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 motion-reduce:transition-none"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2.5}
+            stroke="currentColor"
+            className={cn("h-4 w-4 transition-transform", collapsed ? "" : "rotate-180")}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
       </div>
 
-      <QuizMarkdownAuthoringPane value={source} onChange={setSource} />
+      {result && <ResultBanner result={result} />}
 
-      {/* Preflight summary (mirror of the backend checks; server decides). */}
-      <div
-        role="status"
-        className={cn(
-          "mt-4 rounded-lg border p-4 text-sm font-medium",
-          importable
-            ? "border-[#10B981]/30 bg-[#10B981]/5 text-[#10B981]"
-            : "border-[#E2E8F0] bg-[#F1F5F9] text-[#0F172A]"
-        )}
-      >
-        {questionCount} question{questionCount === 1 ? "" : "s"} parsed · {parseErrors} grammar
-        diagnostic{parseErrors === 1 ? "" : "s"} · {violations.length} bank-contract issue
-        {violations.length === 1 ? "" : "s"}
+      <div className={collapsed ? "hidden" : "flex h-[70vh] min-h-[32rem] flex-col"}>
+        <QuizMarkdownAuthoringPane title={null} value={source} onChange={setSource} />
       </div>
 
       {tooLong && (
@@ -168,23 +140,7 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
         </p>
       )}
 
-      {violations.length > 0 && (
-        <div className="mt-3 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-4">
-          <p className="text-sm font-semibold text-[#0F172A]">
-            Fix these before importing — the Question Bank rejects them at edit/publish time:
-          </p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[#0F172A]">
-            {violations.map((v) => (
-              <li key={`${v.questionNumber}-${v.code}`} data-testid="bank-contract-violation">
-                <span className="rounded-md border border-[#E2E8F0] bg-white px-2 py-0.5 font-mono text-xs text-[#64748B]">
-                  {v.code}
-                </span>{" "}
-                {v.message}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {result && result.errors.length > 0 && <RowErrorsTable errors={result.errors} />}
 
       {clientError && (
         <p role="alert" className="mt-3 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-3 text-sm font-medium text-[#EF4444]">
@@ -211,16 +167,42 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
   );
 }
 
+function ResultBanner({ result }: { result: ImportResponse }) {
+  const allImported = result.importedRows === result.totalRows && result.errors.length === 0;
+  return (
+    <div
+      role="status"
+      className={cn(
+        "mb-4 rounded-lg border p-4 text-sm font-medium",
+        allImported
+          ? "border-[#10B981]/30 bg-[#10B981]/5 text-[#10B981]"
+          : "border-[#F59E0B]/30 bg-[#F59E0B]/5 text-[#0F172A]"
+      )}
+    >
+      {allImported ? (
+        <span>Added all {result.totalRows} questions to this bank.</span>
+      ) : result.invalidRows > 0 ? (
+        <span>
+          Nothing was imported — {result.invalidRows} question
+          {result.invalidRows === 1 ? "" : "s"} rejected (all-or-nothing).
+        </span>
+      ) : (
+        <span>Nothing was imported — the document was rejected (all-or-nothing).</span>
+      )}
+    </div>
+  );
+}
+
 function RowErrorsTable({ errors }: { errors: RowError[] }) {
   return (
     <div className="mb-4 overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-[#E2E8F0] text-left font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
-            <th scope="col" className="px-3 pb-3 font-semibold">Question</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Source</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Field</th>
-            <th scope="col" className="px-3 pb-3 font-semibold">Code</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Question</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Source</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Field</th>
+            <th scope="col" className="px-3 pb-3 text-center font-semibold">Code</th>
             <th scope="col" className="px-3 pb-3 font-semibold">Detail</th>
           </tr>
         </thead>

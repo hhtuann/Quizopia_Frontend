@@ -349,8 +349,10 @@ describe("QuizMarkdownCodeEditor NUMERIC_FILL answer marker autocomplete", () =>
     caretToEnd(editor, source);
 
     const options = screen.getAllByRole("option");
-    expect(options).toHaveLength(1);
-    expect(options[0]?.textContent).toBe("Đáp án:");
+    // Bilingual assistance: English default first, Vietnamese alias second.
+    expect(options).toHaveLength(2);
+    expect(options[0]?.textContent).toBe("Expected answer:");
+    expect(options[1]?.textContent).toBe("Đáp án:");
   });
 
   it("inserts the byte-exact marker with Enter and places the caret after it", async () => {
@@ -360,7 +362,7 @@ describe("QuizMarkdownCodeEditor NUMERIC_FILL answer marker autocomplete", () =>
     caretToEnd(editor, source);
     fireEvent.keyDown(editor, { key: "Enter" });
 
-    const expected = `${source}Đáp án: `;
+    const expected = `${source}Expected answer: `;
     expect(screen.getByTestId("exact-editor-value").textContent).toBe(expected);
     await waitFor(() => expect(editor.selectionStart).toBe(expected.length));
     expect(editor.selectionEnd).toBe(expected.length);
@@ -371,7 +373,7 @@ describe("QuizMarkdownCodeEditor NUMERIC_FILL answer marker autocomplete", () =>
     render(<EditorHarness initial={source} />);
     const editor = editorElement();
     caretToEnd(editor, source);
-    expect(screen.getAllByRole("option")).toHaveLength(1);
+    expect(screen.getAllByRole("option")).toHaveLength(2);
     fireEvent.keyDown(editor, { key: "Escape" });
     expect(screen.queryAllByRole("option")).toHaveLength(0);
     expect(screen.getByTestId("exact-editor-value").textContent).toBe(source);

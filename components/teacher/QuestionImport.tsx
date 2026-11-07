@@ -2,19 +2,18 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import { useImportQuestionsMutation } from "@/hooks/queries/use-question-import";
-import { Button, cardVariants } from "@/components/ui";
+import { Badge, Button, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import {
   downloadImportTemplate,
+  previewQuestions,
+  type ExcelImportPreview,
   type ImportResponse,
   type RowError,
 } from "@/lib/api/question-import";
 import type { NormalizedApiError } from "@/lib/api";
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MiB (backend is the source of truth).
-
-const fileInputClass =
-  "block w-full rounded-lg border border-[#E2E8F0] bg-white p-2 text-sm text-[#64748B] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2 file:mr-3 file:inline-flex file:h-11 file:cursor-pointer file:items-center file:rounded-lg file:border-0 file:bg-gradient-to-r file:from-[#0052FF] file:to-[#4D7CFF] file:px-5 file:font-semibold file:text-white file:outline-none file:transition-all file:duration-200 hover:file:brightness-110 disabled:opacity-60";
 
 /**
  * Maps a file-level error (NormalizedApiError) to a friendly message.
@@ -67,6 +66,9 @@ export function QuestionImport({ bankId }: { bankId: number }) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportResponse | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<ExcelImportPreview | null>(null);
 
   const handleDownload = async () => {
     setDownloadError(null);
@@ -90,12 +92,25 @@ export function QuestionImport({ bankId }: { bankId: number }) {
 
   const reset = () => {
     setResult(null);
+    setFileName(null);
+    setFile(null);
+    setPreview(null);
     setClientError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    setFileName(file?.name ?? null);
+    setFile(file ?? null);
+    setPreview(null);
+    setResult(null);
+    if (file != null) {
+      // Read-only preview immediately; the explicit Import button uploads.
+      previewQuestions(bankId, file)
+        .then(setPreview)
+        .catch((err) => setClientError(describeError(err)));
+    }
     if (!file) return;
     setClientError(null);
     setResult(null);
@@ -112,6 +127,11 @@ export function QuestionImport({ bankId }: { bankId: number }) {
       return;
     }
 
+  };
+
+  const onImport = () => {
+    if (file == null) return;
+    setClientError(null);
     mutation.mutate(file, {
       onSuccess: (data) => setResult(data),
       onError: (err) => setClientError(describeError(err)),
@@ -132,14 +152,54 @@ export function QuestionImport({ bankId }: { bankId: number }) {
             Upload an .xlsx workbook (max 5 MB). Validation happens server-side.
           </p>
         </div>
-        <Button
+        <button
           type="button"
-          variant="outline"
           onClick={handleDownload}
           disabled={busy}
-        >
-          {downloading ? "Preparing…" : "Download template"}
-        </Button>
+          aria-label="Download template"
+          title="Download template"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-[#64748B] outline-none transition-colors hover:bg-[#0052FF]/5 hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
+          {downloading ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              className="h-4 w-4 animate-spin"
+              aria-hidden="true"
+            >
+              <circle
+                cx="12"
+                cy="12"
+                r="9"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                className="opacity-25"
+              />
+              <path
+                d="M21 12a9 9 0 0 0-9-9"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          ) : (
+            <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+            className="h-4 w-4"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+            />
+          </svg>
+          )}
+        </button>
       </div>
 
       {downloadError && <Alert role="alert">{downloadError}</Alert>}
@@ -151,27 +211,89 @@ export function QuestionImport({ bankId }: { bankId: number }) {
           className={uploading ? "animate-pulse" : undefined}
           aria-busy={uploading || undefined}
         >
-          <label htmlFor="q-import-file" className="sr-only">
-            Choose an .xlsx workbook to import
-          </label>
-          <input
-            id="q-import-file"
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx"
-            onChange={handleFileChange}
-            disabled={busy}
-            className={fileInputClass}
-          />
-          {uploading && (
-            <p role="status" className="mt-3 pl-1 text-xs font-medium text-[#64748B]">
-              Importing…
-            </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <label
+              htmlFor="q-import-file"
+              className="flex h-12 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-lg border border-[#E2E8F0] bg-white p-2 transition-all duration-200 focus-within:border-[#0052FF] focus-within:ring-2 focus-within:ring-[#0052FF] focus-within:ring-offset-2 aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
+              aria-disabled={busy || undefined}
+            >
+              <span className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] px-5 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110">
+                Choose file
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm text-[#64748B]" aria-live="polite">
+                {uploading ? "Importing…" : (fileName ?? "No file chosen")}
+              </span>
+              <input
+                id="q-import-file"
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx"
+                onChange={handleFileChange}
+                disabled={busy}
+                className="sr-only"
+              />
+            </label>
+            <Button
+              type="button"
+              className="shrink-0"
+              disabled={file == null || preview == null || preview.readyRows === 0 || busy}
+              onClick={onImport}
+            >
+              {uploading
+                ? "Importing…"
+                : preview
+                  ? `Import ${preview.readyRows} question${preview.readyRows === 1 ? "" : "s"}`
+                  : "Import"}
+            </Button>
+          </div>
+
+          {preview && (
+            <PreviewTable preview={preview} />
           )}
           {clientError && <Alert role="alert">{clientError}</Alert>}
         </div>
       )}
     </section>
+  );
+}
+
+function PreviewTable({ preview }: { preview: ExcelImportPreview }) {
+  return (
+    <div className="mt-4 overflow-x-auto">
+      <p className="mb-2 text-sm text-[#64748B]">
+        {preview.readyRows} of {preview.totalRows} rows ready. Hover a non-READY status for its
+        details; rows with problems are skipped on import.
+      </p>
+      <table className="w-full min-w-[640px] text-left text-sm">
+        <thead>
+          <tr className="border-b border-[#E2E8F0] text-xs uppercase tracking-wide text-[#64748B]">
+            <th className="py-2 pr-4">Row</th>
+            <th className="py-2 pr-4">Question</th>
+            <th className="py-2 pr-4 text-center">Correct answers</th>
+            <th className="py-2 pr-4 text-center">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {preview.rows.map((row) => (
+            <tr key={row.rowNumber} className="border-b border-[#E2E8F0]/60">
+              <td className="py-2 pr-4 tabular-nums">{row.rowNumber}</td>
+              <td className="max-w-md truncate py-2 pr-4">{row.content ?? "—"}</td>
+              <td className="py-2 pr-4 text-center font-mono text-xs text-[#64748B]">
+                {row.correctAnswers.length > 0 ? row.correctAnswers.join(", ") : "—"}
+              </td>
+              <td className="py-2 pr-4 text-center">
+                <Badge
+                  variant={row.status === "READY" ? "success" : "destructive"}
+                  title={row.issues.length > 0 ? row.issues.join("; ") : undefined}
+                >
+                  {row.status}
+                </Badge>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

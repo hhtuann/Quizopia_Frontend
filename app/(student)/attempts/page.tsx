@@ -118,7 +118,7 @@ export default function StudentHistoryPage() {
         {!isPending && !isError && items.length > 0 && (
           <div className="mt-4 flex items-center justify-between px-1 pt-4">
             <p className="text-xs font-medium text-[#64748B]" aria-live="polite">
-              {totalElements} attempt{totalElements === 1 ? "" : "s"} Â· Page {page + 1} of {Math.max(totalPages, 1)}
+              {totalElements} attempt{totalElements === 1 ? "" : "s"} · Page {page + 1} of {Math.max(totalPages, 1)}
             </p>
             <div className="flex gap-2">
               <button type="button" onClick={() => setPage((p) => p - 1)} disabled={page <= 0} aria-label="Previous page" className={pageBtnClass}>

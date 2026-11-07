@@ -14,7 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { participantBackHref, participantHistoryHref } from "@/lib/auth/participant-links";
 import { Button, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
-import { useAutosaveAnswers } from "@/lib/attempt/use-autosave";
+import { useAutosaveAnswers, type AutosaveStatus } from "@/lib/attempt/use-autosave";
 import { useAnswerStore } from "@/lib/attempt/answer-store";
 import { saveAnswer, type SaveAnswerRequest } from "@/lib/api/student-attempt";
 import { useStompConnection } from "@/lib/realtime/use-stomp-connection";
@@ -111,13 +111,15 @@ function InProgressShell({
     autosaveStatus !== "blocked" &&
     !anyDirty;
 
-  const submitHint = !canSubmit
-    ? autosaveStatus === "saving" || anyDirty
-      ? "Saving answers…"
-      : autosaveStatus === "blocked"
-      ? "Time over — saving stopped"
-      : null
-    : null;
+  // The debounced autosave (1.5s) only flips to "saving" when the request
+  // fires, but answers are pending from the moment they change — exactly
+  // when the Submit button dims. Derive the shown status from anyDirty so
+  // the indicator switches to Saving… in the same instant; error/blocked
+  // keep priority.
+  const displayAutosaveStatus: AutosaveStatus =
+    anyDirty && (autosaveStatus === "idle" || autosaveStatus === "saving" || autosaveStatus === "saved")
+      ? "saving"
+      : autosaveStatus;
 
   // Auto-submit when the timer hits 0 (bypasses canSubmit gating — the latest
   // saved answers are graded; time is up regardless).
@@ -230,7 +232,6 @@ function InProgressShell({
     <div className="flex flex-col items-center gap-3">
       <Button
         type="button"
-        size="lg"
         disabled={!canSubmit || submitMut.isPending}
         onClick={() => setConfirmOpen(true)}
         className="gap-2"
@@ -240,9 +241,6 @@ function InProgressShell({
         </svg>
         {submitMut.isPending ? "Submitting…" : "Submit attempt"}
       </Button>
-      {submitHint && (
-        <p className="text-xs font-medium text-[#64748B]">{submitHint}</p>
-      )}
       {submitError && (
         <div role="alert" className="flex flex-col items-center gap-2 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-4 text-sm font-medium text-[#EF4444]">
           <span>{submitError}</span>
@@ -266,7 +264,7 @@ function InProgressShell({
       <AttemptShell
         detail={detail}
         studentName={studentName}
-        autosaveStatus={autosaveStatus}
+        autosaveStatus={displayAutosaveStatus}
         submitSlot={autoSubmitted ? (
           <div className={cn(cardVariants({ variant: "elevated" }), "p-6 text-center")}>
             <p className="font-display text-lg font-bold text-[#EF4444]">Time&apos;s up!</p>

@@ -15,7 +15,14 @@ import { cn } from "@/lib/utils/cn";
  * upload for a read-only preview (row/column errors + duplicates), then
  * confirm the idempotent batch import.
  */
-export function RosterImportPanel({ classId }: { classId: number }) {
+export function RosterImportPanel({
+  classId,
+  unboxed = false,
+}: {
+  classId: number;
+  /** Render inside AddStudentsPanel without the section heading (card provided by the host). */
+  unboxed?: boolean;
+}) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<RosterPreviewResult | null>(null);
   const [result, setResult] = useState<RosterConfirmResult | null>(null);
@@ -24,8 +31,10 @@ export function RosterImportPanel({ classId }: { classId: number }) {
   const previewMutation = useRosterPreviewMutation(classId);
   const confirmMutation = useRosterConfirmMutation(classId);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [downloading, setDownloading] = useState(false);
 
   async function onDownloadTemplate() {
+    setDownloading(true);
     try {
       const blob = await downloadRosterTemplate(classId);
       const url = URL.createObjectURL(blob);
@@ -36,6 +45,8 @@ export function RosterImportPanel({ classId }: { classId: number }) {
       URL.revokeObjectURL(url);
     } catch {
       setNotice({ kind: "error", message: "Could not download the template." });
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -43,11 +54,16 @@ export function RosterImportPanel({ classId }: { classId: number }) {
     setFile(f);
     setPreview(null);
     setResult(null);
+    setNotice(null);
+    if (f !== null) {
+      // Auto-preview as soon as a workbook is picked (owner request): rows or
+      // a read error appear immediately; the Import button sits on this row.
+      void runPreview(f);
+    }
   }
 
-  function onPreview() {
-    if (!file) return;
-    previewMutation.mutate(file, {
+  function runPreview(f: File) {
+    previewMutation.mutate(f, {
       onSuccess: (data) => {
         setPreview(data);
         setNotice(null);
@@ -73,42 +89,83 @@ export function RosterImportPanel({ classId }: { classId: number }) {
     });
   }
 
-  return (
-    <section className="mt-8" aria-label="Import students from Excel">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-lg font-semibold">Import học sinh (Excel)</h2>
-        <Button variant="ghost" size="sm" onClick={onDownloadTemplate}>
-          Download template (.xlsx)
-        </Button>
-      </div>
-      <p className="mt-1 text-sm text-[#64748B]">
-        Upload the filled template to preview the rows, then confirm the import. Duplicates and
-        invalid rows are reported per row — nothing is imported silently.
-      </p>
+  // Same file-input styling as the question Excel import (QuestionImport).
 
-      <div className={cn(cardVariants(), "mt-4 p-4")}>
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".xlsx"
-          className="block w-full text-sm text-[#64748B]"
-          onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
-        />
-        <div className="mt-3 flex gap-3">
-          <Button variant="outline" disabled={!file || previewMutation.isPending} onClick={onPreview}>
-            {previewMutation.isPending ? "Reading…" : "Preview"}
-          </Button>
-          <Button
-            disabled={!file || !preview || preview.ready === 0 || confirmMutation.isPending}
-            onClick={onConfirm}
-          >
-            {confirmMutation.isPending
-              ? "Importing…"
-              : preview
-                ? `Import ${preview.ready} row${preview.ready === 1 ? "" : "s"}`
-                : "Import"}
-          </Button>
+  return (
+    <section
+      className={unboxed ? "" : "mt-8"}
+      aria-label="Import students from Excel"
+    >
+      {!unboxed && (
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-lg font-semibold">Import students (Excel)</h2>
+          <button
+              type="button"
+              onClick={onDownloadTemplate}
+              disabled={downloading}
+              aria-label="Download template"
+              title="Download template"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-[#64748B] outline-none transition-colors hover:bg-[#0052FF]/5 hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
+              {downloading ? (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="h-4 w-4 animate-spin" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" className="opacity-25" />
+                  <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              className="h-4 w-4"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+              />
+            </svg>
+              )}
+            </button>
         </div>
+      )}
+      {!unboxed && (
+        <p className="mt-1 text-sm text-[#64748B]">
+          Upload the filled template to preview the rows, then confirm the import. Duplicates and
+          invalid rows are reported per row — nothing is imported silently.
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex h-12 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-lg border border-[#E2E8F0] bg-white p-2 transition-all duration-200 focus-within:border-[#0052FF] focus-within:ring-2 focus-within:ring-[#0052FF] focus-within:ring-offset-2">
+          <span className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] px-5 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110">
+            Choose file
+          </span>
+          <span className="min-w-0 flex-1 truncate text-sm text-[#64748B]" aria-live="polite">
+            {file ? file.name : "No file chosen"}
+          </span>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".xlsx"
+            className="sr-only"
+            onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+          />
+        </label>
+        <Button
+          type="button"
+          className="shrink-0"
+          disabled={!file || !preview || preview.ready === 0 || confirmMutation.isPending}
+          onClick={onConfirm}
+        >
+          {confirmMutation.isPending
+            ? "Importing…"
+            : preview
+              ? `Import ${preview.ready} row${preview.ready === 1 ? "" : "s"}`
+              : "Import"}
+        </Button>
       </div>
 
       {notice && (
@@ -123,17 +180,16 @@ export function RosterImportPanel({ classId }: { classId: number }) {
       {preview && (
         <div className="mt-4 overflow-x-auto">
           <p className="mb-2 text-sm text-[#64748B]">
-            {preview.ready} of {preview.totalRows} rows ready. Rows with issues are skipped on
-            import. One preview row per sheet row — a row may list several column issues.
+            {preview.ready} of {preview.totalRows} rows ready. Hover a non-READY status for its
+            details; rows with problems are skipped on import.
           </p>
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead>
               <tr className="border-b border-[#E2E8F0] text-xs uppercase tracking-wide text-[#64748B]">
-                <th className="py-2 pr-4">Row</th>
+                <th className="py-2 pr-4 text-center">Row</th>
                 <th className="py-2 pr-4">Name</th>
-                <th className="py-2 pr-4">Email</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Issues</th>
+                <th className="py-2 pr-4 text-center">Email</th>
+                <th className="py-2 pr-4 text-center">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -141,12 +197,14 @@ export function RosterImportPanel({ classId }: { classId: number }) {
                 <tr key={row.sheetRow} className="border-b border-[#E2E8F0]/60">
                   <td className="py-2 pr-4">{row.sheetRow}</td>
                   <td className="py-2 pr-4">{row.fullName ?? "—"}</td>
-                  <td className="py-2 pr-4">{row.email ?? "—"}</td>
-                  <td className="py-2 pr-4">
-                    <Badge variant={rowStatusVariant(row.status)}>{row.status}</Badge>
-                  </td>
-                  <td className="py-2 pr-4 text-xs text-[#64748B]">
-                    {row.issues.length > 0 ? row.issues.join("; ") : "—"}
+                  <td className="py-2 pr-4 text-center">{row.email ?? "—"}</td>
+                  <td className="py-2 pr-4 text-center">
+                    <Badge
+                      variant={rowStatusVariant(row.status)}
+                      title={row.issues.length > 0 ? row.issues.join("; ") : undefined}
+                    >
+                      {row.status === "DUPLICATE_IN_CLASS" ? "DUPLICATE" : row.status}
+                    </Badge>
                   </td>
                 </tr>
               ))}

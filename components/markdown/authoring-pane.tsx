@@ -54,7 +54,8 @@ export interface QuizMarkdownAuthoringPaneProps {
   readonly onChange: (value: string) => void;
   /** Authoring mode shows answers/explanations in the preview. */
   readonly readOnly?: boolean;
-  readonly title?: string;
+  /** Internal heading; pass null to render none (host supplies its own). */
+  readonly title?: string | null;
   readonly value: string;
 }
 
@@ -66,6 +67,24 @@ export function QuizMarkdownAuthoringPane({
 }: QuizMarkdownAuthoringPaneProps) {
   const editorRef = useRef<QuizMarkdownCodeEditorHandle>(null);
   const [activePane, setActivePane] = useState<Pane>("editor");
+  // Desktop splitter: percentage width of the EDITOR column (25–75%).
+  const [editorRatio, setEditorRatio] = useState(50);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef(false);
+  const [dragging, setDragging] = useState(false);
+
+  const applyRatioFromClientX = (clientX: number) => {
+    const grid = gridRef.current;
+    if (grid === null) {
+      return;
+    }
+    const bounds = grid.getBoundingClientRect();
+    if (bounds.width <= 0) {
+      return;
+    }
+    const percent = ((clientX - bounds.left) / bounds.width) * 100;
+    setEditorRatio(Math.min(75, Math.max(25, percent)));
+  };
   // Navigation requested while the editor pane is CSS-hidden (mobile preview
   // mode): applied after the pane becomes visible, because focusing a hidden
   // textarea is a no-op in real browsers.
@@ -102,18 +121,37 @@ export function QuizMarkdownAuthoringPane({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
-          {title ?? "Quiz Markdown authoring"}
-        </h2>
+        {title !== null ? (
+          <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
+            {title ?? "Quiz Markdown authoring"}
+          </h2>
+        ) : (
+          <span aria-hidden="true" />
+        )}
         <div className="lg:hidden">
           <PaneSwitch active={activePane} onChange={setActivePane} />
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-2">
+      <div
+        className={`grid min-h-0 flex-1 gap-0 lg:[grid-template-columns:var(--split-grid)] ${
+          dragging ? "select-none" : ""
+        }`}
+        onPointerMove={(event) => {
+          if (draggingRef.current) {
+            applyRatioFromClientX(event.clientX);
+          }
+        }}
+        onPointerUp={() => {
+          draggingRef.current = false;
+          setDragging(false);
+        }}
+        ref={gridRef}
+        style={{ "--split-grid": `${editorRatio}% 0.375rem 1fr` } as React.CSSProperties}
+      >
         <div
-          className={`flex min-h-[24rem] flex-col lg:min-h-0 ${
-            activePane === "editor" ? "" : "hidden lg:flex"
+          className={`min-h-[24rem] lg:min-h-0 ${
+            activePane === "editor" ? "" : "hidden lg:block"
           }`}
         >
           <QuizMarkdownCodeEditor
@@ -123,12 +161,39 @@ export function QuizMarkdownAuthoringPane({
             value={value}
           />
         </div>
+
+        {/* Desktop splitter between editor and preview (drag or arrow keys). */}
         <div
-          className={`min-h-0 lg:overflow-y-auto lg:pr-1 ${
-            activePane === "preview" ? "" : "hidden lg:block"
+          aria-label="Resize editor and preview"
+          aria-orientation="vertical"
+          aria-valuenow={Math.round(editorRatio)}
+          role="separator"
+          tabIndex={0}
+          className={`hidden w-1.5 shrink-0 cursor-col-resize touch-none rounded-full transition-colors lg:block ${
+            dragging ? "bg-[#0052FF]" : "bg-transparent hover:bg-[#0052FF]/30"
           }`}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") {
+              event.preventDefault();
+              setEditorRatio((ratio) => Math.max(25, ratio - 5));
+            }
+            if (event.key === "ArrowRight") {
+              event.preventDefault();
+              setEditorRatio((ratio) => Math.min(75, ratio + 5));
+            }
+          }}
+          onPointerDown={(event) => {
+            draggingRef.current = true;
+            setDragging(true);
+            (event.target as HTMLElement).setPointerCapture(event.pointerId);
+          }}
+        />
+
+        <div
+          className={`min-h-0 ${activePane === "preview" ? "" : "hidden lg:block"}`}
         >
           <QuizMarkdownPreview
+            boxed
             onChange={onChange}
             onDiagnosticSelect={(line, column) =>
               navigateEditor((editor) =>

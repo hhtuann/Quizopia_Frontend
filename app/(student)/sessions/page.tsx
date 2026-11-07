@@ -11,7 +11,7 @@ import type { NormalizedApiError } from "@/lib/api";
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "â€”";
+  if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
@@ -21,7 +21,7 @@ type Tone = "accent" | "active" | "muted";
 function sessionFlag(item: AvailableSessionItem): { label: string; tone: Tone } {
   if (item.canStartNow) return { label: "Available to start", tone: "accent" };
   if (item.canResume) return { label: "Resume active attempt", tone: "active" };
-  // Active attempt that expired (now > deadline) â€” Day 7 doesn't finalize; pending.
+  // Active attempt that expired (now > deadline) — Day 7 doesn't finalize; pending.
   if (item.activeAttemptId !== null && !item.canResume && !item.canStartNow)
     return { label: "Expired attempt", tone: "muted" };
   if (item.remainingAttempts === 0) return { label: "No attempts remaining", tone: "muted" };
@@ -48,8 +48,8 @@ function effectiveDeadline(item: AvailableSessionItem): number {
 
 /**
  * Sort sessions by action priority then by deadline.
- *   1. Actionable now (canStartNow OR canResume) â€” soonest deadline first.
- *   2. Everything else (upcoming / ended) â€” soonest deadline first.
+ *   1. Actionable now (canStartNow OR canResume) — soonest deadline first.
+ *   2. Everything else (upcoming / ended) — soonest deadline first.
  */
 function sortByPriority(items: AvailableSessionItem[]): AvailableSessionItem[] {
   return [...items].sort((a, b) => {
@@ -66,7 +66,7 @@ function describeStartError(err: unknown): string {
   if (norm?.kind === "api") {
     switch (norm.code) {
       case "ATTEMPT_DEADLINE_EXCEEDED":
-        return "The active attempt has expired â€” it will be finalized later.";
+        return "The active attempt has expired — it will be finalized later.";
       case "ATTEMPT_SESSION_NOT_OPEN":
         return "The session is not open yet.";
       case "ATTEMPT_OUTSIDE_WINDOW":
@@ -81,7 +81,7 @@ function describeStartError(err: unknown): string {
         return norm.message || "Could not start the attempt.";
     }
   }
-  if (norm?.kind === "network") return "Network error â€” check your connection.";
+  if (norm?.kind === "network") return "Network error — check your connection.";
   return "Something went wrong. Please try again.";
 }
 
@@ -125,7 +125,7 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
   const startMut = useStartAttemptMutation();
   const [startError, setStartError] = useState<string | null>(null);
 
-  // Ticking "now" so window buttons flip on their own (interval callback â€”
+  // Ticking "now" so window buttons flip on their own (interval callback —
   // never a direct impure call during render).
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -136,7 +136,7 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
   const startsFuture = new Date(item.startsAt).getTime() > now;
   const windowEnded = new Date(item.endsAt).getTime() <= now;
   // Label for the no-action fallback button (cards with no Start/Resume/Countdown/
-  // Ended button) â€” keeps the action row visually consistent instead of a gap.
+  // Ended button) — keeps the action row visually consistent instead of a gap.
   const fallbackLabel = item.activeAttemptId !== null
     ? "Finalizing attemptâ€¦"
     : item.remainingAttempts === 0
@@ -162,7 +162,7 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
         <div>
           <dt className="font-mono uppercase tracking-[0.1em] text-[#64748B]">Window</dt>
           <dd className="mt-0.5 text-[#0F172A]">
-            {formatDateTime(item.startsAt)} â†’ {formatDateTime(item.endsAt)}
+            {formatDateTime(item.startsAt)} → {formatDateTime(item.endsAt)}
           </dd>
         </div>
         <div>
@@ -175,11 +175,11 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
           <dt className="font-mono uppercase tracking-[0.1em] text-[#64748B]">Attempts</dt>
           <dd className="mt-0.5 text-[#0F172A]">
             {item.maxAttempts === 0 ? (
-              <span>{item.attemptsUsed} used Â· <span className="font-semibold text-[#0052FF]">Unlimited</span></span>
+              <span>{item.attemptsUsed} used · <span className="font-semibold text-[#0052FF]">Unlimited</span></span>
             ) : (
               <span>
                 {item.attemptsUsed}
-                {item.maxAttempts != null ? ` / ${item.maxAttempts}` : ""} used Â·{" "}
+                {item.maxAttempts != null ? ` / ${item.maxAttempts}` : ""} used ·{" "}
                 <span className="font-semibold">{item.remainingAttempts} left</span>
               </span>
             )}
@@ -269,7 +269,7 @@ function Skeleton() {
   );
 }
 
-/** Countdown button â€” shows time remaining until the session opens.
+/** Countdown button — shows time remaining until the session opens.
  *  Blue-tinted (not a plain outline) so it reads as an active state. When the
  *  countdown reaches 0, fires `onZero` once so the page can refetch and the
  *  real "Start attempt" button appears in place of the countdown. */
@@ -325,7 +325,7 @@ function CountdownButton({ startsAt, onZero }: { startsAt: string; onZero?: () =
  *  When the timer hits 0, fires `onZero` (a refetch) and keeps polling it every
  *  10s. The backend timeout sweeper finalizes the attempt within ~30s of the
  *  deadline; once it does, the parent re-renders without Resume and this pill
- *  unmounts â€” stopping the poll. So the Resume button disappears on its own
+ *  unmounts — stopping the poll. So the Resume button disappears on its own
  *  without a manual reload. */
 function AttemptTimeRemaining({ deadlineAt, onZero }: { deadlineAt: string; onZero?: () => void }) {
   const onZeroRef = useRef(onZero);
@@ -363,7 +363,7 @@ function AttemptTimeRemaining({ deadlineAt, onZero }: { deadlineAt: string; onZe
   }, [expired]);
 
   // Once expired, poll onZero every 10s until the backend finalizes the attempt
-  // and the parent drops the Resume button â†’ this pill unmounts (cleanup stops
+  // and the parent drops the Resume button → this pill unmounts (cleanup stops
   // the poll). Bridges the up-to-30s sweeper lag so Resume disappears on its own.
   useEffect(() => {
     if (!expired) return;
@@ -410,13 +410,13 @@ function ErrorState({ error }: { error: NormalizedApiError | undefined }) {
         message = "Your student profile wasn't found. Please contact your school.";
         break;
       case "AUTH_ACCESS_TOKEN_INVALID":
-        message = "Your session has expired â€” please sign in again.";
+        message = "Your session has expired — please sign in again.";
         break;
       default:
         message = error.message || "Couldn't load available sessions.";
     }
   } else if (error?.kind === "network") {
-    message = "Network error â€” check your connection.";
+    message = "Network error — check your connection.";
   } else {
     message = "Something went wrong. Please try again.";
   }
