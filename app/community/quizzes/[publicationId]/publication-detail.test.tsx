@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,13 +8,25 @@ import {
   getPublicPublication,
   type PublicPublicationDetail,
 } from "@/lib/api/community";
+import {
+  deleteBookmark,
+  listMyBookmarks,
+  putBookmark,
+  type BookmarkPage,
+} from "@/lib/api/community-bookmarks";
+import type * as BookmarksApi from "@/lib/api/community-bookmarks";
+import { useAuth } from "@/hooks/useAuth";
 import { sanitizeReturnTo } from "@/lib/auth/redirect";
+import type { CurrentUserResponse } from "@/lib/auth/types";
 
 /**
- * P3-A-FE1 (#43) — public quiz detail. Anonymous (no AuthProvider in the
- * tree), safe-DOM assertions for the §7 allowlist, 404 anti-enumeration state
- * and the guest "Sign in to save" CTA carrying `returnTo` (issue #46 replaces
- * the CTA with the real bookmark mutation).
+ * P3-A-FE1 (#43) + P3-B1-FE (#46) — public quiz detail. Anonymous
+ * (AuthProvider-less tree), safe-DOM assertions for the §7 allowlist, 404
+ * anti-enumeration state, the guest "Sign in to save" CTA carrying
+ * `returnTo` with ZERO bookmark API traffic, and the authenticated
+ * explicit-loading Save/Remove toggle: idempotent double-click (disabled
+ * while in flight), invalidation refetch of the shared bookmark keys
+ * (cross-page/cross-tab consistency), 404-on-save and 429 copy.
  */
 
 const { state } = vi.hoisted(() => ({ state: { id: "7" } }));
@@ -32,6 +44,20 @@ vi.mock("@/lib/api/community", () => ({
   listPublicTags: vi.fn(),
   getPublicPublication: vi.fn(),
 }));
+
+// Real constants/classifier, mocked transport only (the hooks stay real so
+// keying + invalidation are exercised).
+vi.mock("@/lib/api/community-bookmarks", async (importOriginal) => {
+  const actual = await importOriginal<typeof BookmarksApi>();
+  return {
+    ...actual,
+    listMyBookmarks: vi.fn(),
+    putBookmark: vi.fn(),
+    deleteBookmark: vi.fn(),
+  };
+});
+
+vi.mock("@/hooks/useAuth", () => ({ useAuth: vi.fn() }));
 
 function detail(
   overrides: Partial<PublicPublicationDetail> = {}
@@ -54,6 +80,63 @@ function detail(
   };
 }
 
+/** A `GET /me/bookmarks` page whose items save the given publication ids. */
+function savedPage(ids: number[] = []): BookmarkPage {
+  return {
+    items: ids.map((publicationId) => ({
+      publicationId,
+      title: "Algebra fundamentals",
+      summary: null,
+      authorName: "MathWhiz",
+      categoryCode: "TOAN",
+      categoryTitle: "Mathematics",
+      tags: [],
+      questionCount: 12,
+      sectionCount: 3,
+      durationMinutes: 30,
+      publishedAt: "2026-11-01T10:00:00Z",
+      allowFork: false,
+      savedAt: "2026-11-05T10:00:00Z",
+      unavailable: false,
+    })),
+    page: 0,
+    size: 50,
+    totalElements: ids.length,
+    totalPages: 1,
+  };
+}
+
+const authedUser = (roles: string[]): CurrentUserResponse => ({
+  id: 1,
+  username: "ada",
+  displayName: "Ada Lovelace",
+  email: "ada@example.com",
+  phone: null,
+  status: "ACTIVE",
+  emailVerified: true,
+  googleLinked: false,
+  roles,
+  permissions: [],
+});
+
+function asGuest() {
+  vi.mocked(useAuth).mockReturnValue({
+    user: null,
+    status: "unauthenticated",
+    isAuthenticated: false,
+    isLoading: false,
+  } as never);
+}
+
+function asUser(roles: string[] = ["STUDENT"]) {
+  vi.mocked(useAuth).mockReturnValue({
+    user: authedUser(roles),
+    status: "authenticated",
+    isAuthenticated: true,
+    isLoading: false,
+  } as never);
+}
+
 function mount() {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -70,10 +153,11 @@ function mount() {
 beforeEach(() => {
   vi.resetAllMocks();
   state.id = "7";
+  asGuest();
 });
 afterEach(cleanup);
 
-describe("community publication detail page", () => {
+describe("community publication detail page — guests (#43)", () => {
   it("renders the safe detail fields for a guest", async () => {
     vi.mocked(getPublicPublication).mockResolvedValue(detail());
     mount();
@@ -93,7 +177,7 @@ describe("community publication detail page", () => {
     expect(getPublicPublication).toHaveBeenCalledWith(7);
   });
 
-  it("keeps the login CTA's returnTo pointing back at this page", async () => {
+  it("keeps the login CTA's returnTo pointing back at this page and fires NO bookmark calls", async () => {
     vi.mocked(getPublicPublication).mockResolvedValue(detail());
     mount();
 
@@ -104,6 +188,11 @@ describe("community publication detail page", () => {
       new URLSearchParams(href.slice("/login".length)).get("returnTo")
     );
     expect(returnTo).toBe("/community/quizzes/7");
+    // #46: guests never touch the authenticated bookmark routes.
+    expect(listMyBookmarks).not.toHaveBeenCalled();
+    expect(putBookmark).not.toHaveBeenCalled();
+    expect(deleteBookmark).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /Save to my collection/ })).toBeNull();
   });
 
   it("renders only the §7 allowlist — no answer/option/exam-id/PII keys in the DOM", async () => {
@@ -167,6 +256,7 @@ describe("community publication detail page", () => {
     mount();
     expect(screen.getByText("This quiz isn't available")).toBeTruthy();
     expect(getPublicPublication).not.toHaveBeenCalled();
+    expect(listMyBookmarks).not.toHaveBeenCalled();
   });
 
   it("shows a busy skeleton while the detail loads", async () => {
@@ -183,6 +273,177 @@ describe("community publication detail page", () => {
       raw: {},
     });
     mount();
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Network error");
+  });
+});
+
+describe("community publication detail page — save/unsave toggle (#46)", () => {
+  it("derives the save-state from the newest-first probe (same key family as the collection page)", async () => {
+    asUser();
+    vi.mocked(getPublicPublication).mockResolvedValue(detail());
+    vi.mocked(listMyBookmarks).mockResolvedValue(savedPage([7]));
+    mount();
+
+    expect(
+      await screen.findByRole("button", { name: "Remove from saved" })
+    ).toBeTruthy();
+    expect(listMyBookmarks).toHaveBeenCalledWith({ page: 0, size: 50 });
+  });
+
+  it("serves STUDENT and TEACHER identically (one shared collection)", async () => {
+    for (const roles of [["STUDENT"], ["TEACHER"], ["STUDENT", "TEACHER"]]) {
+      cleanup();
+      asUser(roles);
+      vi.mocked(getPublicPublication).mockResolvedValue(detail());
+      vi.mocked(listMyBookmarks).mockResolvedValue(savedPage([7]));
+      mount();
+      expect(
+        await screen.findByRole("button", { name: "Remove from saved" })
+      ).toBeTruthy();
+    }
+  });
+
+  it("disables the toggle with a Checking state while the probe loads", async () => {
+    asUser();
+    vi.mocked(getPublicPublication).mockResolvedValue(detail());
+    vi.mocked(listMyBookmarks).mockReturnValue(new Promise(() => {}));
+    mount();
+
+    const button = (await screen.findByRole("button", {
+      name: /Checking…/,
+    })) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    fireEvent.click(button);
+    expect(putBookmark).not.toHaveBeenCalled();
+  });
+
+  it("saves via PUT with explicit loading, single call under double-click, and invalidation refetch", async () => {
+    asUser();
+    vi.mocked(getPublicPublication).mockResolvedValue(detail());
+    vi.mocked(listMyBookmarks).mockResolvedValue(savedPage([]));
+    const { promise: putPending, resolve: resolvePut } =
+      Promise.withResolvers<void>();
+    vi.mocked(putBookmark).mockReturnValue(putPending);
+    mount();
+
+    const save = await screen.findByRole("button", {
+      name: "Save to my collection",
+    });
+    fireEvent.click(save);
+
+    // In-flight: disabled + labelled, so the second click is a no-op (and the
+    // backend PUT is idempotent even if a stray request slipped through).
+    const busy = (await screen.findByRole("button", {
+      name: /Saving…/,
+    })) as HTMLButtonElement;
+    expect(busy.disabled).toBe(true);
+    expect(busy.getAttribute("aria-busy")).toBe("true");
+    fireEvent.click(busy);
+    // TanStack defers mutationFn to a microtask — await the single call
+    // (the disabled second click above must not add a second one).
+    await waitFor(() => expect(putBookmark).toHaveBeenCalledTimes(1));
+    expect(putBookmark).toHaveBeenCalledWith(7);
+
+    vi.mocked(listMyBookmarks).mockResolvedValue(savedPage([7]));
+    resolvePut();
+
+    expect(await screen.findByText("Saved to your collection.")).toBeTruthy();
+    // Shared-key invalidation after settle — the probe (and any other tab or
+    // surface holding the same query) refetches the fresh state.
+    await waitFor(() =>
+      expect(vi.mocked(listMyBookmarks).mock.calls.length).toBeGreaterThan(1)
+    );
+  });
+
+  it("removes via DELETE with explicit loading and success notice", async () => {
+    asUser();
+    vi.mocked(getPublicPublication).mockResolvedValue(detail());
+    vi.mocked(listMyBookmarks).mockResolvedValue(savedPage([7]));
+    const { promise: deletePending, resolve: resolveDelete } =
+      Promise.withResolvers<void>();
+    vi.mocked(deleteBookmark).mockReturnValue(deletePending);
+    mount();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Remove from saved" })
+    );
+
+    const busy = (await screen.findByRole("button", {
+      name: /Removing…/,
+    })) as HTMLButtonElement;
+    expect(busy.disabled).toBe(true);
+    fireEvent.click(busy);
+    await waitFor(() => expect(deleteBookmark).toHaveBeenCalledTimes(1));
+    expect(deleteBookmark).toHaveBeenCalledWith(7);
+
+    vi.mocked(listMyBookmarks).mockResolvedValue(savedPage([]));
+    resolveDelete();
+
+    expect(await screen.findByText("Removed from your collection.")).toBeTruthy();
+    await waitFor(() =>
+      expect(vi.mocked(listMyBookmarks).mock.calls.length).toBeGreaterThan(1)
+    );
+  });
+
+  it("surfaces 'no longer available' when the save hits a 404 (§4 predicate)", async () => {
+    asUser();
+    vi.mocked(getPublicPublication).mockResolvedValue(detail());
+    vi.mocked(listMyBookmarks).mockResolvedValue(savedPage([]));
+    vi.mocked(putBookmark).mockRejectedValue({
+      kind: "api",
+      status: 404,
+      code: "COMMUNITY_NOT_FOUND",
+      message: "Not found",
+      raw: {},
+    });
+    mount();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Save to my collection" })
+    );
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("no longer available");
+  });
+
+  it("surfaces the §9 rate-limit copy on 429", async () => {
+    asUser();
+    vi.mocked(getPublicPublication).mockResolvedValue(detail());
+    vi.mocked(listMyBookmarks).mockResolvedValue(savedPage([]));
+    vi.mocked(putBookmark).mockRejectedValue({
+      kind: "api",
+      status: 429,
+      code: "COMMUNITY_RATE_LIMITED",
+      message: "Too many requests",
+      raw: {},
+    });
+    mount();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Save to my collection" })
+    );
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Too many requests");
+  });
+
+  it("surfaces the network copy when offline", async () => {
+    asUser();
+    vi.mocked(getPublicPublication).mockResolvedValue(detail());
+    vi.mocked(listMyBookmarks).mockResolvedValue(savedPage([]));
+    vi.mocked(putBookmark).mockRejectedValue({
+      kind: "network",
+      message: "offline",
+      raw: {},
+    });
+    mount();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Save to my collection" })
+    );
+
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Network error");
   });

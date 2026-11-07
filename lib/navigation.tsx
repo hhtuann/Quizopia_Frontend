@@ -73,9 +73,16 @@ const CommunityIcon = (
   </svg>
 );
 
+const BookmarkIcon = (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={ICON}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+  </svg>
+);
+
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: DashboardIcon, roles: ["STUDENT", "TEACHER"], exact: true, view: "shared" },
   { href: "/community", label: "Community", icon: CommunityIcon, roles: ["STUDENT", "TEACHER"], view: "shared", description: "Browse and save quizzes teachers published publicly." },
+  { href: "/community/bookmarks", label: "Saved quizzes", icon: BookmarkIcon, roles: ["STUDENT", "TEACHER"], view: "shared", description: "Community quizzes you saved — revisit or remove them anytime." },
   { href: "/sessions", label: "Available sessions", icon: ExamIcon, roles: ["STUDENT"], view: "student", description: "Browse open exam sessions and join one when you’re ready." },
   { href: "/attempts", label: "My attempts", icon: ClockIcon, roles: ["STUDENT"], view: "student", description: "Review your past attempts and their detailed results." },
   { href: "/my-classes", label: "My classes", icon: UsersIcon, roles: ["STUDENT"], view: "student", description: "Classes you joined via email invitation — leave anytime." },

@@ -2,8 +2,16 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useState } from "react";
 import { useCommunityPublicationQuery } from "@/hooks/queries/use-community";
-import { Badge, Card, buttonVariants } from "@/components/ui";
+import {
+  usePublicationSavedQuery,
+  useRemoveBookmarkMutation,
+  useSaveBookmarkMutation,
+} from "@/hooks/queries/use-community-bookmarks";
+import { useAuth } from "@/hooks/useAuth";
+import { Badge, Button, Card, buttonVariants } from "@/components/ui";
+import { describeBookmarkError } from "@/components/community/community-errors";
 import { cn } from "@/lib/utils/cn";
 import { buildLoginRedirect } from "@/lib/auth/redirect";
 import type { NormalizedApiError } from "@/lib/api";
@@ -19,9 +27,13 @@ import type { NormalizedApiError } from "@/lib/api";
  * A 404 (absent, unpublished, hidden or archived source) renders a neutral
  * not-available state — the §7 anti-enumeration posture gives no reason why.
  *
- * The "Sign in to save" CTA (guests only see it — there is no authenticated
- * branch yet) carries `returnTo` so login lands back here; issue #46 replaces
- * it with the real bookmark mutation for signed-in users.
+ * Save CTA (#46): guests get the "Sign in to save" link carrying `returnTo`
+ * (also what SSR/first paint renders while auth status resolves — no wrong
+ * state flash); signed-in STUDENT/TEACHER users get the explicit-loading
+ * Save/Remove toggle backed by the idempotent PUT/DELETE (no optimistic
+ * updates). A 404 mid-save surfaces "no longer available" copy and the
+ * mutation invalidates the whole community tree so this page refetches into
+ * the neutral not-available state.
  */
 
 function formatDate(iso: string): string {
@@ -38,6 +50,40 @@ export default function PublicationDetailPage() {
   const { publicationId } = useParams<{ publicationId: string }>();
   const id = Number(publicationId);
   const validId = Number.isInteger(id) && id > 0;
+  const { status } = useAuth();
+  const authenticated = status === "authenticated";
+  const { saved, isPending: savedPending } = usePublicationSavedQuery(
+    id,
+    authenticated && validId
+  );
+  const saveMut = useSaveBookmarkMutation();
+  const removeMut = useRemoveBookmarkMutation();
+  const [notice, setNotice] = useState<{
+    kind: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  const busy = saveMut.isPending || removeMut.isPending;
+
+  const onSave = async () => {
+    setNotice(null);
+    try {
+      await saveMut.mutateAsync(id);
+      setNotice({ kind: "success", message: "Saved to your collection." });
+    } catch (err) {
+      setNotice({ kind: "error", message: describeBookmarkError(err) });
+    }
+  };
+
+  const onRemove = async () => {
+    setNotice(null);
+    try {
+      await removeMut.mutateAsync(id);
+      setNotice({ kind: "success", message: "Removed from your collection." });
+    } catch (err) {
+      setNotice({ kind: "error", message: describeBookmarkError(err) });
+    }
+  }
 
   const { data, isPending, isError, error } = useCommunityPublicationQuery(
     id,
@@ -179,18 +225,57 @@ export default function PublicationDetailPage() {
           </div>
         )}
 
-        {/* Guest CTA — #46 swaps this for the real bookmark mutation. */}
-        <div className="mt-8 flex flex-col gap-3 rounded-xl border border-[#0052FF]/20 bg-[#0052FF]/5 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm font-medium text-[#0F172A]">
-            Save this quiz to your personal collection to find it later.
-          </p>
-          <Link
-            href={loginHref}
-            data-testid="sign-in-to-save"
-            className={cn(buttonVariants({ variant: "primary", size: "sm" }), "h-11 shrink-0")}
-          >
-            Sign in to save
-          </Link>
+        {/* Save panel (#46): guests → login CTA with returnTo; signed-in
+            users → explicit-loading idempotent Save/Remove toggle. */}
+        <div className="mt-8 flex flex-col gap-3 rounded-xl border border-[#0052FF]/20 bg-[#0052FF]/5 p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-medium text-[#0F172A]">
+              Save this quiz to your personal collection to find it later.
+            </p>
+            {authenticated ? (
+              <Button
+                type="button"
+                variant={saved ? "outline" : "primary"}
+                size="sm"
+                className="h-11 shrink-0"
+                disabled={busy || savedPending}
+                aria-busy={busy || savedPending}
+                onClick={saved ? onRemove : onSave}
+              >
+                {busy || savedPending ? <Spinner /> : null}
+                {savedPending
+                  ? "Checking…"
+                  : saveMut.isPending
+                    ? "Saving…"
+                    : removeMut.isPending
+                      ? "Removing…"
+                      : saved
+                        ? "Remove from saved"
+                        : "Save to my collection"}
+              </Button>
+            ) : (
+              <Link
+                href={loginHref}
+                data-testid="sign-in-to-save"
+                className={cn(buttonVariants({ variant: "primary", size: "sm" }), "h-11 shrink-0")}
+              >
+                Sign in to save
+              </Link>
+            )}
+          </div>
+          {notice && (
+            <p
+              role={notice.kind === "success" ? "status" : "alert"}
+              className={cn(
+                "rounded-lg border px-3 py-2 text-sm font-medium",
+                notice.kind === "success"
+                  ? "border-[#10B981]/30 bg-[#10B981]/5 text-[#0F172A]"
+                  : "border-[#EF4444]/30 bg-[#EF4444]/5 text-[#EF4444]"
+              )}
+            >
+              {notice.message}
+            </p>
+          )}
         </div>
       </Card>
     </div>
@@ -214,5 +299,15 @@ function NotAvailable() {
         Browse the community
       </Link>
     </div>
+  );
+}
+
+/** Accent inline spinner — same ring geometry as the auth loader, button-sized. */
+function Spinner() {
+  return (
+    <span
+      aria-hidden="true"
+      className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current"
+    />
   );
 }

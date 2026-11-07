@@ -1,4 +1,5 @@
 import type { NormalizedApiError } from "@/lib/api";
+import { classifyBookmarkError } from "@/lib/api/community-bookmarks";
 
 /**
  * Map §4/§7 Community error codes to actionable copy. Shared by the publish
@@ -77,4 +78,28 @@ export function describeCommunityError(err: unknown): CommunityActionError {
     return { message: "Network error — check your connection and try again." };
   }
   return { message: "Something went wrong. Please try again." };
+}
+
+/**
+ * Bookmark-specific copy (#46, ADR-006 §7). Distinct from
+ * {@link describeCommunityError} because the failure classes differ: a 404
+ * here means the PUBLICATION no longer passes the §4 visibility predicate
+ * (never a foreign-owner resource), 401 means the session expired mid-action
+ * (the axios refresh layer already retried once), and 429 is the §9 window.
+ * Classification lives in `lib/api/community-bookmarks` (single source).
+ */
+export function describeBookmarkError(err: unknown): string {
+  const kind = classifyBookmarkError(err);
+  switch (kind) {
+    case "gone":
+      return "This quiz is no longer available.";
+    case "unauthenticated":
+      return "Your session has expired — please sign in again.";
+    case "rateLimited":
+      return "Too many requests — please wait a moment and try again.";
+    case "network":
+      return "Network error — check your connection and try again.";
+    default:
+      return "Couldn't update your saved quizzes. Please try again.";
+  }
 }
