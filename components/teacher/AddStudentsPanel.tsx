@@ -4,7 +4,7 @@ import { useState } from "react";
 import { StudentSearchSelect } from "@/components/teacher/StudentSearchSelect";
 import { RosterImportPanel } from "@/components/teacher/RosterImportPanel";
 import { ClassRosterPanel } from "@/components/teacher/ClassRosterPanel";
-import { Button, SegmentedControl, cardVariants } from "@/components/ui";
+import { SegmentedControl, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { downloadRosterTemplate } from "@/hooks/queries/use-classrooms";
 import type { AddMembersResponse } from "@/lib/api/classrooms";
@@ -18,7 +18,7 @@ const MODE_OPTIONS = [
 ];
 
 const MODE_DESCRIPTION: Record<AddStudentsMode, string> = {
-  search: "Find existing students by code, name, or username and add them to this class.",
+  search: "Find existing students by name or username and add them to this class.",
   excel: "Upload an .xlsx workbook (max 5 MB). Rows are previewed and validated server-side.",
   email:
     "Add learners by email before they register — they join automatically once they verify it.",

@@ -1,7 +1,7 @@
 import { http } from "./http-client";
 
 /**
- * Classrooms API + types (school/teacher-scoped, CLASSROOM_* + CLASSROOM_MEMBER_*
+ * Classrooms API + types (user-owned, CLASSROOM_* + CLASSROOM_MEMBER_*
  * permissions). Mirrors the backend records in `com.hhtuann.backend.classroom.dto`.
  */
 
@@ -24,8 +24,7 @@ export interface ClassroomResponse {
 
 /** Embedded roster row in {@link ClassroomDetailView}. */
 export interface ClassroomMemberView {
-  studentProfileId: number;
-  studentCode: string;
+  userId: number;
   displayName: string;
   username: string | null;
   email: string | null;
@@ -42,8 +41,6 @@ export interface ClassroomDetailView {
   ownerTeacherId: number | null;
   /** Identity-M3: user-based owner. */
   ownerUserId: number;
-  /** True when the class belongs to an independent teacher (no school). */
-  independent: boolean;
   createdAt: string;
   memberCount: number;
   members: ClassroomMemberView[];
@@ -57,8 +54,7 @@ export interface MyClassroomsResponse {
 /** Backend record `ClassroomMemberResponse` (paginated members endpoint). */
 export interface ClassroomMemberResponse {
   id: number;
-  studentProfileId: number;
-  studentCode: string;
+  userId: number;
   displayName: string;
   addedAt: string;
 }
@@ -88,7 +84,7 @@ export interface UpdateClassroomRequest {
 
 /** Body for `POST /api/classrooms/{id}/members`. */
 export interface AddMembersRequest {
-  studentProfileIds: number[];
+  userIds: number[];
 }
 
 /** Partial-success result of `POST /api/classrooms/{id}/members`. */
@@ -129,9 +125,9 @@ export function addMembers(id: number, req: AddMembersRequest): Promise<AddMembe
   return http.post<AddMembersResponse>(`/api/classrooms/${id}/members`, req);
 }
 
-/** `DELETE /api/classrooms/{id}/members/{studentProfileId}` → 200 (no body). */
-export function removeMember(id: number, studentProfileId: number): Promise<void> {
-  return http.delete<void>(`/api/classrooms/${id}/members/${studentProfileId}`);
+/** `DELETE /api/classrooms/{id}/members/{userId}` → 200 (no body). */
+export function removeMember(id: number, userId: number): Promise<void> {
+  return http.delete<void>(`/api/classrooms/${id}/members/${userId}`);
 }
 
 /** `GET /api/classrooms/{id}/members?page=&size=&sort=` (paginated). */

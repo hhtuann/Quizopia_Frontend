@@ -10,7 +10,7 @@ import type { SessionVisibility } from "@/lib/api/exam-sessions";
 /**
  * Session visibility + class assignment (FE-CLASSES-2). Replaces the old
  * per-participant ParticipantsManager with class-based access:
- *  - PUBLIC → a static "all school students" badge (no management).
+ *  - PUBLIC → a static "all Quizopia students" badge (no management).
  *  - CLASS_RESTRICTED → the assigned classes (GET .../classes) + a "Manage
  *    classes" modal that PUTs the full new set (replace semantics).
  */
@@ -32,7 +32,7 @@ export function ClassAssignment({
         <div className="flex flex-wrap items-center gap-3">
           <Badge variant="accent">Public</Badge>
           <p className="text-sm font-medium text-[#64748B]">
-            All students in your school can see and attempt this session.
+            All Quizopia students can see and attempt this session.
           </p>
         </div>
       </div>

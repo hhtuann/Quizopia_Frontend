@@ -85,7 +85,7 @@ export function useAddMembersMutation(id: number) {
 export function useRemoveMemberMutation(id: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (studentProfileId: number) => removeMember(id, studentProfileId),
+    mutationFn: (userId: number) => removeMember(id, userId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["classrooms"] }),
   });
 }

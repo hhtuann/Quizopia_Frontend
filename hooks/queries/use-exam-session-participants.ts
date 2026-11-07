@@ -2,11 +2,9 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  addParticipants,
   blockParticipant,
   listParticipants,
   unblockParticipant,
-  type AddParticipantsRequest,
   type ParticipantListParams,
 } from "@/lib/api/exam-session-participants";
 
@@ -22,26 +20,6 @@ export function useParticipantsQuery(
     queryFn: () => listParticipants(sessionId, params),
     enabled: Number.isFinite(sessionId),
     placeholderData: keepPreviousData,
-  });
-}
-
-/**
- * Bulk add. **Always** invalidates on success — `addParticipants` returns 200
- * even on full partial-failure (`added=0`), and the participant list + the
- * session detail (`participantCount`) must refresh regardless.
- */
-export function useAddParticipantsMutation(sessionId: number) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (req: AddParticipantsRequest) => addParticipants(sessionId, req),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["exam-sessions", sessionId, "participants"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["exam-sessions", sessionId, "detail"],
-      });
-    },
   });
 }
 
