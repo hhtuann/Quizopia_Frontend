@@ -8,8 +8,14 @@ import { cn } from "@/lib/utils/cn";
  * Shared modal shell for the Community dialogs (issue #44). Same a11y
  * baseline as the exam-editor `ConfirmDialog`: `role=dialog`/`aria-modal`,
  * labelled by the title, Esc + click-outside cancel (suppressed while busy),
- * focus lands on `[data-autofocus]` (or the panel) when the dialog opens.
+ * focus lands on `[data-autofocus]` (or the panel) when the dialog opens, and
+ * Tab/Shift+Tab cycle inside the panel (modal focus trap).
  */
+
+/** Keyboard-focusable descendants inside a dialog panel (Tab trap targets). */
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export function CommunityDialog({
   open,
   titleId,
@@ -39,6 +45,32 @@ export function CommunityDialog({
     target?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !busy) onCancel();
+      if (e.key === "Tab") {
+        // Focus trap: an aria-modal dialog must not leak Tab to the page
+        // behind it — cycle within the panel (itself the fallback target).
+        const panel = panelRef.current;
+        if (!panel) return;
+        const focusables = Array.from(
+          panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+        );
+        if (focusables.length === 0) {
+          e.preventDefault();
+          panel.focus();
+          return;
+        }
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (e.shiftKey) {
+          if (!panel.contains(active) || active === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else if (!panel.contains(active) || active === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

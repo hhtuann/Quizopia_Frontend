@@ -10,8 +10,9 @@ import {
   useSaveBookmarkMutation,
 } from "@/hooks/queries/use-community-bookmarks";
 import { useAuth } from "@/hooks/useAuth";
-import { Badge, Button, Card, buttonVariants } from "@/components/ui";
+import { ForkPublicationDialog } from "@/components/community/ForkPublicationDialog";
 import { describeBookmarkError } from "@/components/community/community-errors";
+import { Badge, Button, Card, buttonVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { buildLoginRedirect } from "@/lib/auth/redirect";
 import type { NormalizedApiError } from "@/lib/api";
@@ -34,6 +35,14 @@ import type { NormalizedApiError } from "@/lib/api";
  * updates). A 404 mid-save surfaces "no longer available" copy and the
  * mutation invalidates the whole community tree so this page refetches into
  * the neutral not-available state.
+ *
+ * Fork CTA (#48, ADR-006 §7/§10): rendered ONLY when `allowFork` is true
+ * (NO_FORK publications ship no fork UI at all). Guests get the login CTA
+ * carrying the same `returnTo`; STUDENT gets an explanatory
+ * "requires a teacher account" state (non-actionable); TEACHER opens the
+ * consent dialog in ForkPublicationDialog, which owns the per-action
+ * `Idempotency-Key` lifecycle, the 200/201/403/409/429/404 handling and the
+ * `/exams/{targetExamId}` navigation.
  */
 
 function formatDate(iso: string): string {
@@ -50,8 +59,11 @@ export default function PublicationDetailPage() {
   const { publicationId } = useParams<{ publicationId: string }>();
   const id = Number(publicationId);
   const validId = Number.isInteger(id) && id > 0;
-  const { status } = useAuth();
+  const { status, user } = useAuth();
   const authenticated = status === "authenticated";
+  // §7 auth matrix: only TEACHER-role callers may fork (dual-role users
+  // qualify); STUDENT sees the explanatory non-actionable state.
+  const isTeacher = (user?.roles ?? []).includes("TEACHER");
   const { saved, isPending: savedPending } = usePublicationSavedQuery(
     id,
     authenticated && validId
@@ -62,6 +74,10 @@ export default function PublicationDetailPage() {
     kind: "success" | "error";
     message: string;
   } | null>(null);
+  // Fork dialog (#48) — one session from button click to dialog close; it
+  // stays mounted while open even if a refetch flips `allowFork`, so a 403
+  // explanation is never yanked away mid-read.
+  const [forkOpen, setForkOpen] = useState(false);
 
   const busy = saveMut.isPending || removeMut.isPending;
 
@@ -277,7 +293,82 @@ export default function PublicationDetailPage() {
             </p>
           )}
         </div>
+
+        {/* Fork panel (#48): rendered ONLY while `allowFork` is true — a
+            NO_FORK publication ships no fork UI at all. Guests get the
+            login CTA (same `returnTo` continuation as save); STUDENT gets
+            the explanatory non-actionable state; TEACHER opens the consent
+            dialog. */}
+        {data.allowFork && (
+          <div className="mt-4 flex flex-col gap-3 rounded-xl border border-[#10B981]/25 bg-[#10B981]/5 p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-medium text-[#0F172A]">
+                Make it yours — fork an independent, editable draft with every
+                question and its correct answers.
+              </p>
+              {authenticated ? (
+                isTeacher ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-11 shrink-0"
+                    onClick={() => setForkOpen(true)}
+                  >
+                    Fork this quiz
+                  </Button>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#64748B]">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={2}
+                      stroke="currentColor"
+                      className="h-4 w-4 shrink-0"
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
+                      />
+                    </svg>
+                    Requires a teacher account
+                  </span>
+                )
+              ) : (
+                <Link
+                  href={loginHref}
+                  data-testid="sign-in-to-fork"
+                  className={cn(buttonVariants({ variant: "primary", size: "sm" }), "h-11 shrink-0")}
+                >
+                  Sign in to fork
+                </Link>
+              )}
+            </div>
+            {authenticated && !isTeacher && (
+              <p className="text-xs leading-relaxed text-[#64748B]">
+                Only teacher accounts can fork quizzes into their own drafts.
+                You can still save this quiz to your collection above.
+              </p>
+            )}
+          </div>
+        )}
       </Card>
+
+      {/* Mounted for the whole dialog session (see `forkOpen`) — the source
+          data may refetch underneath it after a 403/404 (#48). */}
+      {forkOpen && data && (
+        <ForkPublicationDialog
+          open
+          publication={{
+            publicationId: data.publicationId,
+            title: data.title,
+            authorName: data.authorName,
+          }}
+          onClose={() => setForkOpen(false)}
+        />
+      )}
     </div>
   );
 }
