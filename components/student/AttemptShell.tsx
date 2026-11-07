@@ -159,7 +159,7 @@ export function AttemptShell({
     >
       {/* Outside the exam scroller: stays visible even when actions wrap. */}
       <div className="z-10 shrink-0 border-b border-[#E2E8F0] bg-white/95 backdrop-blur-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-[var(--page-gutter)] py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-[var(--page-gutter)] py-2">
           {/* Left: exam title + student name */}
           <div className="min-w-0 flex-1 basis-48">
             <h1 className="truncate font-display text-base font-bold tracking-tight text-[#0F172A] sm:text-lg">
@@ -171,14 +171,13 @@ export function AttemptShell({
           </div>
           {/* Right: timer + indicators + submit */}
           <div className="flex min-w-0 flex-wrap items-center gap-3">
-            {/* Timer */}
+            {/* Timer — no label: the countdown itself plus the Saved/Live
+                indicators below it carry the state (Saved flips to Saving…
+                while an answer change is in flight). */}
             <div className="text-right">
-              <p className="font-mono text-[9px] font-bold uppercase tracking-wider text-[#64748B]">
-                Time remaining
-              </p>
               <p
                 className={cn(
-                  "font-mono text-lg font-bold tabular-nums leading-tight sm:text-xl",
+                  "font-mono text-base font-bold tabular-nums leading-tight sm:text-lg",
                   expired
                     ? "text-[#94A3B8]"
                     : remainingMs < 300000

@@ -111,14 +111,6 @@ function InProgressShell({
     autosaveStatus !== "blocked" &&
     !anyDirty;
 
-  const submitHint = !canSubmit
-    ? autosaveStatus === "saving" || anyDirty
-      ? "Saving answers…"
-      : autosaveStatus === "blocked"
-      ? "Time over — saving stopped"
-      : null
-    : null;
-
   // Auto-submit when the timer hits 0 (bypasses canSubmit gating — the latest
   // saved answers are graded; time is up regardless).
   const [autoSubmitted, setAutoSubmitted] = useState(false);
@@ -230,7 +222,6 @@ function InProgressShell({
     <div className="flex flex-col items-center gap-3">
       <Button
         type="button"
-        size="lg"
         disabled={!canSubmit || submitMut.isPending}
         onClick={() => setConfirmOpen(true)}
         className="gap-2"
@@ -240,9 +231,6 @@ function InProgressShell({
         </svg>
         {submitMut.isPending ? "Submitting…" : "Submit attempt"}
       </Button>
-      {submitHint && (
-        <p className="text-xs font-medium text-[#64748B]">{submitHint}</p>
-      )}
       {submitError && (
         <div role="alert" className="flex flex-col items-center gap-2 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-4 text-sm font-medium text-[#EF4444]">
           <span>{submitError}</span>
