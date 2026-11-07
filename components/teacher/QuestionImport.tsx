@@ -38,7 +38,6 @@ function describeError(err: unknown): string {
       case "QUESTION_BANK_NOT_FOUND":
         return "This question bank could not be found.";
       case "QUESTION_BANK_ACCESS_DENIED":
-      case "QUESTION_SUBJECT_SCHOOL_MISMATCH":
         return "You don't have permission to import questions into this bank.";
       case "AUTH_ACCESS_TOKEN_INVALID":
         return "Your session has expired — please sign in again.";

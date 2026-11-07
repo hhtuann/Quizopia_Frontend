@@ -40,7 +40,7 @@ export interface SubjectSummary {
  * `description` and `status` (the FE5 task spec omitted them); both are mirrored
  * here. `status` is a backend String — its enum values are not enumerated
  * client-side, so it is typed as `string`. `subject` is null for banks created
- * in a personal workspace (subject optional there).
+ * without a subject (subject is optional for every bank).
  */
 export interface QuestionBankListItem {
   id: number;
@@ -81,7 +81,6 @@ export interface BankListParams {
   size?: number;
   sort?: string;
   search?: string;
-  subjectId?: number;
 }
 
 export interface BankQuestionListParams {
@@ -118,21 +117,17 @@ export function listBankQuestions(
 // ============================================================
 
 /**
- * Backend record `CreateQuestionBankRequest` (Phase 1, Task A). The client
- * never sends `schoolId`/`ownerTeacherId` — the backend resolves ownership
- * from the authenticated user and workspace. `workspaceId` is optional
- * (defaults to the caller's organization workspace when they hold a teacher
- * profile, else their personal workspace). `subjectId` is OPTIONAL for
- * PERSONAL workspaces; required and school-matched for ORGANIZATION ones.
+ * Backend record `CreateQuestionBankRequest`. The client never sends ownership
+ * fields — the backend resolves the owner from the authenticated user.
+ * `subjectId` is OPTIONAL for every bank.
  */
 export interface CreateQuestionBankRequest {
   name: string;
   description: string | null;
   subjectId?: number | null;
-  workspaceId?: number;
 }
 
-/** Backend record `QuestionBankResponse` (201 Created). `subject` may be null (personal workspace). */
+/** Backend record `QuestionBankResponse` (201 Created). `subject` may be null (no subject selected). */
 export interface QuestionBankResponse {
   id: number;
   code: string;

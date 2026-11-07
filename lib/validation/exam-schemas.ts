@@ -2,10 +2,8 @@ import { z } from "zod";
 
 /**
  * Zod schema mirroring backend `CreateExamRequest` and its Jakarta Validation
- * constraints (Phase 1, Task A):
- *   - workspaceId: optional (defaults to the caller's org workspace, else personal)
- *   - subjectId: @Positive, nullable — required for ORGANIZATION workspaces,
- *     unsupported for PERSONAL ones (enforced by the page, not the schema)
+ * constraints:
+ *   - subjectId: @Positive, nullable — optional for every teacher
  *   - purposeId: @Positive, nullable  (optional — "" maps to null on submit)
  *   - title: @NotBlank, @Size(max = 255)
  *   - description: @Size(max = 2000), nullable

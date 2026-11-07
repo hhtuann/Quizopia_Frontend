@@ -80,7 +80,7 @@ export function useUpdateCompositionMutation(examId: number) {
 }
 
 /**
- * Create an exam (workspace-aware). On success invalidates the exams list.
+ * Create an exam. On success invalidates the exams list.
  */
 export function useCreateExamMutation() {
   const queryClient = useQueryClient();

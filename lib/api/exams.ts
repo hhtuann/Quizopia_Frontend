@@ -24,7 +24,7 @@ import type { PageResponse, QuestionType } from "./question-banks";
  * change content after publishing, DUPLICATE the exam and edit the copy.
  */
 
-/** Embedded subject — same shape as `SubjectSummary`; null for personal-workspace exams. */
+/** Embedded subject — same shape as `SubjectSummary`; null when the exam carries no subject. */
 export interface ExamSubjectRef {
   id: number;
   code: string;
@@ -64,13 +64,10 @@ export interface ExamListParams {
 }
 
 /**
- * Backend record `CreateExamRequest`. `workspaceId` is optional — defaults to
- * the caller's organization workspace when they hold a teacher profile, else
- * their personal workspace. `subjectId` is required for ORGANIZATION
- * workspaces and unsupported for PERSONAL ones.
+ * Backend record `CreateExamRequest`. `subjectId` and `purposeId` are
+ * optional for every teacher — exams are owned by their creator.
  */
 export interface CreateExamRequest {
-  workspaceId?: number;
   subjectId?: number | null;
   purposeId?: number | null;
   title: string;

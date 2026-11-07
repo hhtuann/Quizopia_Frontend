@@ -8,7 +8,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createBank, type CreateQuestionBankRequest } from "@/lib/api/question-banks";
 import { useGradeLevelsQuery, useSubjectsQuery } from "@/hooks/queries/use-subjects";
-import { useActiveWorkspace } from "@/hooks/queries/use-workspaces";
 import { createBankSchema, type CreateBankValues } from "@/lib/validation/question-bank-schemas";
 import { Button, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
@@ -20,7 +19,7 @@ const textareaClass =
   "w-full min-h-[96px] rounded-lg border border-[#E2E8F0] bg-transparent px-4 py-3 text-sm text-[#0F172A] placeholder:text-[#64748B]/50 outline-none transition-all duration-200 resize-y focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
 
 const selectClass =
-  "h-12 w-full rounded-lg border border-[#E2E8F0] bg-transparent px-4 pr-9 text-sm text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2";
+  "h-12 w-full rounded-lg border border-[#E2E8F0] bg-transparent px-4 pr-9 text-sm text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-[#0052FF] focus:ring-offset-2";
 
 /** Map a create-bank error (NormalizedApiError) to a field or form-level message. */
 function describeCreateError(err: unknown): { field?: "subjectId"; message: string } {
@@ -31,8 +30,6 @@ function describeCreateError(err: unknown): { field?: "subjectId"; message: stri
         return { message: "This code is already in use. Please retry — codes are auto-generated." };
       case "QUESTION_SUBJECT_NOT_FOUND":
         return { field: "subjectId", message: "Subject not found." };
-      case "QUESTION_SUBJECT_SCHOOL_MISMATCH":
-        return { message: "The selected subject is not in your school." };
       case "QUESTION_BANK_ACCESS_DENIED":
         return { message: "You don't have permission to create a question bank." };
       case "QUESTION_VALIDATION_ERROR":
@@ -50,10 +47,6 @@ function describeCreateError(err: unknown): { field?: "subjectId"; message: stri
 export default function NewQuestionBankPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { activeWorkspace, isPersonal } = useActiveWorkspace();
-  // Subject is required only for ORGANIZATION workspaces (legacy academic
-  // rule) — hidden entirely for the personal workspace.
-  const subjectRequired = !isPersonal;
   const { data: subjectsData, isPending: subjectsPending, isError: subjectsError } =
     useSubjectsQuery();
   const allSubjects = subjectsData?.items ?? [];
@@ -81,17 +74,12 @@ export default function NewQuestionBankPage() {
 
   const onSubmit = async (values: CreateBankValues) => {
     setFormError(null);
-    if (subjectRequired && (values.subjectId == null || !Number.isFinite(values.subjectId))) {
-      setError("subjectId", { message: "Subject is required for organization banks." });
-      return;
-    }
     const req: CreateQuestionBankRequest = {
       name: values.name.trim(),
       description: values.description?.trim() ? values.description.trim() : null,
       ...(values.subjectId != null && Number.isFinite(values.subjectId)
         ? { subjectId: values.subjectId }
         : {}),
-      ...(activeWorkspace ? { workspaceId: activeWorkspace.workspaceId } : {}),
     };
     try {
       await mutation.mutateAsync(req);
@@ -131,13 +119,6 @@ export default function NewQuestionBankPage() {
         <h1 className="mt-3 font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
           Create question bank
         </h1>
-        {activeWorkspace && (
-          <p className="mt-2 text-sm font-medium text-[#64748B]">
-            Creating in{" "}
-            <span className="font-semibold text-[#0052FF]">{activeWorkspace.name}</span>
-            {isPersonal ? " — personal bank, no subject needed" : ""}
-          </p>
-        )}
       </div>
 
       <div className={cn(cardVariants({ variant: "elevated" }), "max-w-2xl p-8 sm:p-10")}>
@@ -197,69 +178,65 @@ export default function NewQuestionBankPage() {
             <FieldError id="bank-description-error" message={errors.description?.message} />
           </div>
 
-          {!isPersonal && (
-            <>
-              <div>
-                <label htmlFor="bank-grade" className={labelClass}>
-                  Grade level
-                </label>
-                <select
-                  id="bank-grade"
-                  disabled={gradesPending}
-                  className={cn(selectClass, "disabled:opacity-70")}
-                  value={gradeId}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setGradeId(v === "" ? "" : Number(v));
-                    setValue("subjectId", NaN);
-                  }}
-                >
-                  <option value="">{gradesPending ? "Loading grades…" : "Select a grade…"}</option>
-                  {grades.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+          <div>
+            <label htmlFor="bank-grade" className={labelClass}>
+              Grade level <span className="font-normal normal-case text-[#64748B]/60">(optional)</span>
+            </label>
+            <select
+              id="bank-grade"
+              disabled={gradesPending}
+              className={cn(selectClass, "disabled:opacity-70")}
+              value={gradeId}
+              onChange={(e) => {
+                const v = e.target.value;
+                setGradeId(v === "" ? "" : Number(v));
+                setValue("subjectId", NaN);
+              }}
+            >
+              <option value="">{gradesPending ? "Loading grades…" : "Select a grade…"}</option>
+              {grades.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-              <div>
-                <label htmlFor="bank-subject" className={labelClass}>
-                  Subject
-                </label>
-                {subjectsError ? (
-                  <p role="alert" className="pl-1 text-sm font-medium text-[#EF4444]">
-                    Couldn&apos;t load subjects.{" "}
-                    <Link
-                      href="/question-banks/new"
-                      className="rounded font-semibold text-[#0052FF] outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
-                    >
-                      Retry
-                    </Link>
-                  </p>
-                ) : (
-                  <select
-                    id="bank-subject"
-                    disabled={!gradeSelected || subjectsPending}
-                    aria-invalid={!!errors.subjectId}
-                    aria-describedby={errors.subjectId ? "bank-subject-error" : undefined}
-                    className={cn(selectClass, errors.subjectId && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]", "disabled:opacity-70")}
-                    {...register("subjectId", { valueAsNumber: true })}
-                  >
-                    <option value="">
-                      {!gradeSelected ? "Select a grade first" : subjectsPending ? "Loading subjects…" : "Select a subject…"}
-                    </option>
-                    {subjects.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <FieldError id="bank-subject-error" message={errors.subjectId?.message} />
-              </div>
-            </>
-          )}
+          <div>
+            <label htmlFor="bank-subject" className={labelClass}>
+              Subject <span className="font-normal normal-case text-[#64748B]/60">(optional)</span>
+            </label>
+            {subjectsError ? (
+              <p role="alert" className="pl-1 text-sm font-medium text-[#EF4444]">
+                Couldn&apos;t load subjects.{" "}
+                <Link
+                  href="/question-banks/new"
+                  className="rounded font-semibold text-[#0052FF] outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
+                >
+                  Retry
+                </Link>
+              </p>
+            ) : (
+              <select
+                id="bank-subject"
+                disabled={!gradeSelected || subjectsPending}
+                aria-invalid={!!errors.subjectId}
+                aria-describedby={errors.subjectId ? "bank-subject-error" : undefined}
+                className={cn(selectClass, errors.subjectId && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]", "disabled:opacity-70")}
+                {...register("subjectId", { valueAsNumber: true })}
+              >
+                <option value="">
+                  {!gradeSelected ? "Select a grade first" : subjectsPending ? "Loading subjects…" : "Select a subject…"}
+                </option>
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <FieldError id="bank-subject-error" message={errors.subjectId?.message} />
+          </div>
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button type="submit" disabled={isSubmitting}>

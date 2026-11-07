@@ -31,7 +31,7 @@ export function QuestionPicker({
 }: {
   onAdd: (questions: LocalQuestion[]) => void;
   excludeSourceIds: number[];
-  /** Only banks whose subject matches the exam's subject are selectable. Null (personal workspace) → all banks. */
+  /** Only banks whose subject matches the exam's subject are selectable. Null (no subject) → all banks. */
   subjectId: number | null;
   onClose: () => void;
 }) {
@@ -42,7 +42,7 @@ export function QuestionPicker({
   const { data: banksData, isPending: banksPending } = useQuestionBanksQuery({ size: 100 });
   // When the exam has a subject, only banks with the SAME subject are
   // selectable (the backend enforces a strict subject-match on save). A
-  // subject-less exam (personal workspace) may draw from every bank.
+  // subject-less exam may draw from every bank.
   const banks = (banksData?.items ?? []).filter(
     (b) => subjectId == null || b.subject?.id === subjectId
   );
