@@ -24,9 +24,9 @@ describe("Header profile menu", () => {
     stubUser();
     const closeMobile = vi.fn();
     render(<Header isMobileMenuOpen={false} setIsMobileMenuOpen={closeMobile} />);
-    const trigger = screen.getByRole("button", { name: "Tài khoản" });
+    const trigger = screen.getByRole("button", { name: "Account" });
     fireEvent.click(trigger);
-    const profile = screen.getByRole("menuitem", { name: "Hồ sơ" });
+    const profile = screen.getByRole("menuitem", { name: "Profile" });
     await waitFor(() => expect(document.activeElement).toBe(profile));
     const items = screen.getAllByRole("menuitem");
     fireEvent.keyDown(profile, { key: "End" });
@@ -41,7 +41,7 @@ describe("Header profile menu", () => {
     expect(screen.queryByRole("menu")).toBeNull();
     expect(document.activeElement).toBe(trigger);
     fireEvent.click(trigger);
-    fireEvent.click(screen.getByRole("menuitem", { name: "Hồ sơ" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Profile" }));
     expect(push).toHaveBeenCalledWith("/profile");
     expect(closeMobile).toHaveBeenCalledWith(false);
     expect(screen.queryByRole("menu")).toBeNull();
