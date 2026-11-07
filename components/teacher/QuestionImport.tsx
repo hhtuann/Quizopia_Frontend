@@ -152,14 +152,13 @@ export function QuestionImport({ bankId }: { bankId: number }) {
             Upload an .xlsx workbook (max 5 MB). Validation happens server-side.
           </p>
         </div>
-        <Button
+        <button
           type="button"
           onClick={handleDownload}
           disabled={busy}
           aria-label="Download template"
           title="Download template"
-          className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-[#64748B] outline-none transition-colors hover:bg-[#0052FF]/5 hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-        >
+          className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-[#64748B] outline-none transition-colors hover:bg-[#0052FF]/5 hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
           {downloading ? (
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -200,7 +199,7 @@ export function QuestionImport({ bankId }: { bankId: number }) {
             />
           </svg>
           )}
-        </Button>
+        </button>
       </div>
 
       {downloadError && <Alert role="alert">{downloadError}</Alert>}

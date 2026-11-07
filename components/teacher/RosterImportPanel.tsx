@@ -99,14 +99,13 @@ export function RosterImportPanel({
       {!unboxed && (
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-lg font-semibold">Import students (Excel)</h2>
-          <Button
+          <button
               type="button"
               onClick={onDownloadTemplate}
               disabled={downloading}
               aria-label="Download template"
               title="Download template"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-[#64748B] outline-none transition-colors hover:bg-[#0052FF]/5 hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-            >
+              className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-[#64748B] outline-none transition-colors hover:bg-[#0052FF]/5 hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
               {downloading ? (
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="h-4 w-4 animate-spin" aria-hidden="true">
                   <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" className="opacity-25" />
@@ -129,7 +128,7 @@ export function RosterImportPanel({
               />
             </svg>
               )}
-            </Button>
+            </button>
         </div>
       )}
       {!unboxed && (

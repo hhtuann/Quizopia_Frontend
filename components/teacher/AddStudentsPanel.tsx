@@ -71,14 +71,13 @@ export function AddStudentsPanel({
           </p>
         </div>
         {mode === "excel" && (
-          <Button
+          <button
             type="button"
             onClick={onDownloadTemplate}
             disabled={downloading}
             aria-label="Download template"
             title="Download template"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-[#64748B] outline-none transition-colors hover:bg-[#0052FF]/5 hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-          >
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-[#64748B] outline-none transition-colors hover:bg-[#0052FF]/5 hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
             {downloading ? (
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="h-4 w-4 animate-spin" aria-hidden="true">
                 <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" className="opacity-25" />
@@ -89,7 +88,7 @@ export function AddStudentsPanel({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
               </svg>
             )}
-          </Button>
+          </button>
         )}
       </div>
 
