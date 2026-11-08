@@ -1,18 +1,18 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   acceptRosterInvitation,
   addMembers,
   addRosterEntry,
   createClassroom,
-  declineRosterEntry,
   getClassroom,
   getMyRosterInvitations,
   getClassroomMembers,
   getClassroomRoster,
   getMyClassrooms,
-  getMyRosterEntries,
+  getJoinedClassrooms,
+  leaveClassroom,
   removeMember,
   revokeRosterEntry,
   updateClassroom,
@@ -117,24 +117,10 @@ export function useRevokeRosterEntryMutation(id: number) {
   });
 }
 
-/** Learner: my linked roster entries (classes joined via email verification). */
-export function useMyRosterEntriesQuery() {
-  return useQuery({
-    queryKey: ["roster", "my"],
-    queryFn: getMyRosterEntries,
-  });
-}
-
-export function useDeclineRosterEntryMutation() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (entryId: number) => declineRosterEntry(entryId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["roster"] });
-      queryClient.invalidateQueries({ queryKey: ["classrooms"] });
-    },
-  });
-}
+// CLASS-M1: the learner linked-entries query + decline mutation were removed —
+// /joined is the class-list source of truth and Leave (/leave) subsumes
+// decline server-side. The backend /roster/my + decline endpoints stay for
+// API stability.
 
 // ----- Identity-M4 roster import hooks -----
 
@@ -170,5 +156,40 @@ export function useAcceptRosterInvitationMutation() {
       queryClient.invalidateQueries({ queryKey: ["roster"] });
       queryClient.invalidateQueries({ queryKey: ["classrooms"] });
     },
+  });
+}
+
+// ----- CLASS-M1 (issue #50): joined membership + self-leave -----
+
+/** Learner: my JOINED classes (source of truth: classroom_members). */
+export function useJoinedClassroomsQuery(page = 0, size = 20) {
+  return useQuery({
+    queryKey: ["classrooms", "joined", { page, size }],
+    queryFn: () => getJoinedClassrooms({ page, size }),
+    // Keep the previous page visible while the next loads (repo pattern
+    // for every paginated query).
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Learner self-leave. Invalidates the shared `["classrooms"]` prefix
+ * (joined list, rosters) AND the `["roster"]` / `["student"]` caches so
+ * invitation state and CLASS_RESTRICTED session eligibility views
+ * reconcile immediately after leaving. onError ALSO invalidates: the
+ * defined repeat-leave 404 (or a lost race with teacher removal) means
+ * the local list is stale and must refetch.
+ */
+export function useLeaveClassroomMutation() {
+  const queryClient = useQueryClient();
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["classrooms"] });
+    queryClient.invalidateQueries({ queryKey: ["roster"] });
+    queryClient.invalidateQueries({ queryKey: ["student"] });
+  };
+  return useMutation({
+    mutationFn: (classroomId: number) => leaveClassroom(classroomId),
+    onSuccess: invalidate,
+    onError: invalidate,
   });
 }
