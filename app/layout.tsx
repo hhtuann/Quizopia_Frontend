@@ -1,28 +1,38 @@
 import type { Metadata } from "next";
-import { Calistoga, Inter, JetBrains_Mono } from "next/font/google";
+// Local, vendored font files (latin subsets, same faces/weights/display that
+// next/font/google emitted) — build no longer depends on fonts.googleapis.com
+// reachability. That external fetch made CI and Vercel builds fail
+// non-deterministically (Next 16 Turbopack font download). Provenance and
+// checksums: app/fonts/README.md.
+import localFont from "next/font/local";
 import "./globals.css";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 
-const calistoga = Calistoga({
+const calistoga = localFont({
   variable: "--font-calistoga",
-  subsets: ["latin"],
   display: "swap",
-  weight: ["400"],
+  src: [{ path: "./fonts/calistoga-latin-400-normal.woff2", weight: "400", style: "normal" }],
 });
 
-const inter = Inter({
+const inter = localFont({
   variable: "--font-inter",
-  subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500", "600", "700"],
+  src: [
+    { path: "./fonts/inter-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/inter-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/inter-latin-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/inter-latin-700-normal.woff2", weight: "700", style: "normal" },
+  ],
 });
 
-const jetbrainsMono = JetBrains_Mono({
+const jetbrainsMono = localFont({
   variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500"],
+  src: [
+    { path: "./fonts/jetbrains-mono-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/jetbrains-mono-latin-500-normal.woff2", weight: "500", style: "normal" },
+  ],
 });
 
 export const metadata: Metadata = {
