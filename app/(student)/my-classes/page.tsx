@@ -57,8 +57,8 @@ export default function MyClassesPage() {
       <header>
         <h1 className="text-2xl font-semibold">My classes</h1>
         <p className="mt-1 text-sm text-[#64748B]">
-          Classes you are a member of — however you joined. You can leave at any time, and a class
-          you left never adds you back without your explicit accept.
+          Classes you are a member of — however you joined. You can leave at any time; rejoining a
+          class you left always requires your explicit accept.
         </p>
       </header>
 

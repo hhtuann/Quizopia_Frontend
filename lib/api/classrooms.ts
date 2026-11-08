@@ -125,6 +125,10 @@ export interface AddMembersResponse {
   added: number;
   duplicated: number[];
   invalid: number[];
+  /** CLASS-M1 gate F1 (#50 decision 6): users refused because they
+   *  previously left this classroom (standing opt-out) — the teacher must
+   *  send an invitation the learner explicitly accepts. */
+  declined: number[];
 }
 
 export interface ClassroomMembersParams {
