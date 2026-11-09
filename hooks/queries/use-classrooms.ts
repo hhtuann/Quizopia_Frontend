@@ -238,8 +238,10 @@ export function useAssignSessionMutation(classroomId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (sessionId: number) => assignSessionToClassroom(classroomId, sessionId),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["classrooms", classroomId, "sessions"] }),
+    // CLASS-M3 (#54): assignments change the gradebook column catalog/matrix
+    // and the analytics KPIs too — invalidate the whole classroom prefix
+    // (same scope as the member mutations), not just the sessions list.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["classrooms", classroomId] }),
   });
 }
 
@@ -248,8 +250,7 @@ export function useUnassignSessionMutation(classroomId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (sessionId: number) => unassignSessionFromClassroom(classroomId, sessionId),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["classrooms", classroomId, "sessions"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["classrooms", classroomId] }),
   });
 }
 
