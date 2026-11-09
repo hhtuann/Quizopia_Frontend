@@ -26,7 +26,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 const SORT_OPTIONS: readonly { label: string; value: GradebookSortField }[] = [
   { label: "Name", value: "displayName" },
   { label: "Mean %", value: "meanPercentage" },
-  { label: "Completion", value: "completionPercentage" },
+  { label: "Completion", value: "completion" },
 ];
 
 function isAccessDenied(err: unknown): boolean {

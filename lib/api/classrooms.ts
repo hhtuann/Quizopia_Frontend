@@ -512,7 +512,7 @@ export interface GradebookResponse {
 }
 
 /** Sortable gradebook fields (server `sort` param). */
-export type GradebookSortField = "displayName" | "meanPercentage" | "completionPercentage";
+export type GradebookSortField = "displayName" | "meanPercentage" | "completion";
 
 /** Params for `GET /api/classrooms/{id}/gradebook`. */
 export interface GradebookParams {

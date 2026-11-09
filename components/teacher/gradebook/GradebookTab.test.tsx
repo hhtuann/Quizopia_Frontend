@@ -244,6 +244,21 @@ describe("GradebookTab (CLASS-M3)", () => {
         direction: "desc",
       }));
     expect(screen.getByRole("button", { name: "Sort direction: descending" })).toBeTruthy();
+
+    // Security review P2 regression: the Completion option must send the
+    // server allowlist value "completion" — anything else 400s the matrix.
+    fireEvent.change(screen.getByLabelText("Sort students by"), {
+      target: { value: "completion" },
+    });
+    await waitFor(() =>
+      expect(getGradebook).toHaveBeenLastCalledWith(5, {
+        sessionIds: undefined,
+        page: 0,
+        size: 20,
+        search: undefined,
+        sort: "completion",
+        direction: "desc",
+      }));
   });
 
   it("toggles columns into an explicit sessionIds list and resets to the default", async () => {
