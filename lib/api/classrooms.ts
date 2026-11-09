@@ -65,6 +65,43 @@ export interface ClassroomMembersPage {
   sort: string;
 }
 
+// ---------------------------------------------------------------------------
+// CLASS-M1 (issue #50): joined membership projection + self-leave
+// ---------------------------------------------------------------------------
+
+/** Backend record `JoinedClassroomResponse` (GET /api/classrooms/joined). */
+export interface JoinedClassroomResponse {
+  classroomId: number;
+  code: string;
+  name: string;
+  description: string | null;
+  status: ClassroomStatus;
+  teacherDisplayName: string;
+  joinedAt: string;
+}
+
+/** `PageResponse<JoinedClassroomResponse>` shape. */
+export interface JoinedClassroomsPage {
+  items: JoinedClassroomResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  sort: string;
+}
+
+/** `GET /api/classrooms/joined?page=&size=` — the caller's current memberships. */
+export function getJoinedClassrooms(
+  params: { page?: number; size?: number } = {}
+): Promise<JoinedClassroomsPage> {
+  return http.get<JoinedClassroomsPage>("/api/classrooms/joined", { params });
+}
+
+/** `POST /api/classrooms/{id}/leave` → 204 (learner self-exit). */
+export function leaveClassroom(id: number): Promise<void> {
+  return http.post<void>(`/api/classrooms/${id}/leave`, {});
+}
+
 /** Body for `POST /api/classrooms`. */
 export interface CreateClassroomRequest {
   code: string;
@@ -88,6 +125,10 @@ export interface AddMembersResponse {
   added: number;
   duplicated: number[];
   invalid: number[];
+  /** CLASS-M1 gate F1 (#50 decision 6): users refused because they
+   *  previously left this classroom (standing opt-out) — the teacher must
+   *  send an invitation the learner explicitly accepts. */
+  declined: number[];
 }
 
 export interface ClassroomMembersParams {
@@ -153,6 +194,9 @@ export interface RosterEntryResponse {
   email: string | null;
   createdAt: string;
   linkedAt: string | null;
+  /** CLASS-M1 learner-projection enrichment (null on teacher projections). */
+  classroomName: string | null;
+  teacherDisplayName: string | null;
 }
 
 /** Body for `POST /api/classrooms/{id}/roster`. */
@@ -194,15 +238,10 @@ export function revokeRosterEntry(id: number, entryId: number): Promise<void> {
   return http.delete<void>(`/api/classrooms/${id}/roster/${entryId}`);
 }
 
-/** `GET /api/classrooms/roster/my` → linked entries of the caller. */
-export function getMyRosterEntries(): Promise<RosterEntryResponse[]> {
-  return http.get<RosterEntryResponse[]>("/api/classrooms/roster/my");
-}
-
-/** `POST /api/classrooms/roster/{entryId}/decline` → 204 (leave class). */
-export function declineRosterEntry(entryId: number): Promise<void> {
-  return http.post<void>(`/api/classrooms/roster/${entryId}/decline`, {});
-}
+// CLASS-M1 (issue #50): getMyRosterEntries + declineRosterEntry were removed
+// — GET /joined is the class-list source of truth and POST /{id}/leave
+// subsumes decline for learners server-side. The backend endpoints remain
+// for API stability.
 
 // ---------------------------------------------------------------------------
 // Identity-M4 roster XLSX import (template / preview / confirm)

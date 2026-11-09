@@ -135,7 +135,10 @@ function DetailView({ classroom }: { classroom: ClassroomDetailView }) {
         classId={classroom.id}
         excludeIds={classroom.members.map((m) => m.userId)}
         onSearchResult={(r) =>
-          setNotice({ kind: "success", message: `Added ${r.added} student${r.added === 1 ? "" : "s"}.${r.duplicated.length > 0 ? ` ${r.duplicated.length} already members.` : ""}${r.invalid.length > 0 ? ` ${r.invalid.length} invalid.` : ""}` })
+          setNotice({
+            kind: r.declined.length > 0 && r.added === 0 ? "error" : "success",
+            message: `Added ${r.added} student${r.added === 1 ? "" : "s"}.${r.duplicated.length > 0 ? ` ${r.duplicated.length} already members.` : ""}${r.invalid.length > 0 ? ` ${r.invalid.length} invalid.` : ""}${r.declined.length > 0 ? ` ${r.declined.length} declined: they left this class — send them an invitation to rejoin (they must accept).` : ""}`,
+          })
         }
       />
 
