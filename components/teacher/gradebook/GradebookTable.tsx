@@ -30,16 +30,18 @@ function CellContent({ cell }: { cell: GradebookCell | undefined }) {
         </GradebookStatusChip>
       );
     case "NOT_IN_COHORT":
-      // Outside the session cohort — nothing to grade; a bare dash keeps the
-      // column visually quiet for that student.
+      // Outside the session cohort — nothing to grade. Short "n/a" text with
+      // the full meaning in the accessible name (parity with the My Results
+      // chip, which spells it out).
       return (
-        <span className="text-[#CBD5E1]" title="Not in cohort">
-          —
+        <span
+          className="text-xs font-medium text-[#CBD5E1]"
+          title="Not in cohort"
+          aria-label="Not in cohort"
+        >
+          n/a
         </span>
       );
-    case "UPCOMING":
-    case "DRAFT":
-    case "CANCELLED":
     case "NOT_HELD":
       // Window/lifecycle states — muted text, no result yet to color-code.
       return <span className="text-xs font-medium text-[#94A3B8]">{gradebookStatusLabel(cell.status)}</span>;

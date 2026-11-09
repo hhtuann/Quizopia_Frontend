@@ -85,6 +85,12 @@ export function ClassOverviewKpis({ classroomId }: { classroomId: number }) {
           </ul>
         </div>
       )}
+      {data?.historyCoverage === "SINCE_MIGRATION" && (
+        <p className="mt-4 text-xs text-[#94A3B8]">
+          Membership history is complete from the analytics migration onward; earlier departures
+          are not recorded.
+        </p>
+      )}
     </>
   );
 }

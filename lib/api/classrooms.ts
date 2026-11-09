@@ -607,12 +607,18 @@ export interface GradebookExport {
 /**
  * `GET /api/classrooms/{id}/gradebook/export?sessionIds=` — XLSX blob with the
  * filename taken from `Content-Disposition` (falling back to the documented
- * `quizopia-class-{id}-gradebook-{timestamp}.xlsx` pattern).
+ * `quizopia-class-{id}-gradebook-{timestamp}.xlsx` pattern). An optional
+ * `search` mirrors the matrix's active student filter so the export matches
+ * what the teacher sees.
  */
-export async function exportGradebook(id: number, sessionIds: number[]): Promise<GradebookExport> {
+export async function exportGradebook(
+  id: number,
+  sessionIds: number[],
+  search?: string
+): Promise<GradebookExport> {
   const res = await httpClient.get<Blob>(`/api/classrooms/${id}/gradebook/export`, {
     responseType: "blob",
-    params: { sessionIds: sessionIds.join(",") },
+    params: search ? { sessionIds: sessionIds.join(","), search } : { sessionIds: sessionIds.join(",") },
   });
   const disposition = String(res.headers?.["content-disposition"] ?? "");
   const starred = /filename\*=UTF-8''([^;]+)/i.exec(disposition);

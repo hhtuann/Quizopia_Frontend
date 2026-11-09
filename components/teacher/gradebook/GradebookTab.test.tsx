@@ -113,7 +113,7 @@ beforeEach(() => {
     items: COLUMNS,
     page: 0,
     size: 50,
-    totalElements: COLUMNS.length,
+    totalElements: COLUMNS.length + 2, // catalog continues past page 0
     totalPages: 1,
     sort: "startsAt,desc",
   });
@@ -171,6 +171,17 @@ describe("GradebookTab (CLASS-M3)", () => {
     expect(screen.getByText("Not attempted")).toBeTruthy();
     expect(screen.getByText("Upcoming")).toBeTruthy();
     expect(screen.getByText("Not held")).toBeTruthy();
+    // NOT_IN_COHORT renders a readable "n/a" with the full accessible name.
+    const naCell = screen.getByLabelText("Not in cohort");
+    expect(naCell.textContent).toBe("n/a");
+
+    // Subline counts the whole catalog (totalElements), not the page-0 slice.
+    expect(screen.getByText(/5 of 8 session columns/)).toBeTruthy();
+
+    // SINCE_MIGRATION history coverage is disclosed to the teacher.
+    expect(
+      screen.getByText(/Membership history is complete from the analytics migration onward/i)
+    ).toBeTruthy();
 
     // Departed student marker + null row metrics render "—".
     expect(screen.getByText("Bob Tran")).toBeTruthy();
@@ -290,7 +301,7 @@ describe("GradebookTab (CLASS-M3)", () => {
       }));
   });
 
-  it("exports the selected columns as an XLSX blob", async () => {
+  it("exports the selected columns as an XLSX blob, honoring the active search", async () => {
     const createObjectURL = vi.fn(() => "blob:mock");
     const revokeObjectURL = vi.fn();
     Object.assign(URL, { createObjectURL, revokeObjectURL });
@@ -298,9 +309,19 @@ describe("GradebookTab (CLASS-M3)", () => {
     mount();
     expect(await screen.findByText("Alice Nguyen")).toBeTruthy();
 
+    // No filter yet → export carries the default columns without a search.
     fireEvent.click(screen.getByRole("button", { name: "Export XLSX" }));
-    await waitFor(() => expect(exportGradebook).toHaveBeenCalledWith(5, DEFAULT_IDS));
+    await waitFor(() => expect(exportGradebook).toHaveBeenCalledWith(5, DEFAULT_IDS, undefined));
     await waitFor(() => expect(revokeObjectURL).toHaveBeenCalled());
+
+    // Review P3: the export mirrors the matrix's active student filter.
+    fireEvent.change(screen.getByLabelText("Search students"), { target: { value: "alice" } });
+    await waitFor(
+      () => expect(getGradebook).toHaveBeenLastCalledWith(5, expect.objectContaining({ search: "alice" })),
+      { timeout: 2000 }
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Export XLSX" }));
+    await waitFor(() => expect(exportGradebook).toHaveBeenLastCalledWith(5, DEFAULT_IDS, "alice"));
   });
 
   it("shows the no-sessions empty state pointing at the Sessions tab", async () => {
@@ -376,5 +397,15 @@ describe("GradebookTab (CLASS-M3)", () => {
       () => expect(getGradebook).toHaveBeenLastCalledWith(5, expect.objectContaining({ page: 0 })),
       { timeout: 2000 }
     );
+  });
+
+  it("sort options stay within the server allowlist (drift guard)", async () => {
+    mount();
+
+    const select = await screen.findByLabelText("Sort students by");
+    const values = Array.from(select.querySelectorAll("option")).map((o) => o.getAttribute("value"));
+    // Hardcoded copy of the backend sort allowlist — the F1 regression:
+    // any other value 400s the whole matrix (CLASSROOM_GRADEBOOK_INVALID_QUERY).
+    expect(values).toEqual(["displayName", "meanPercentage", "completion"]);
   });
 });

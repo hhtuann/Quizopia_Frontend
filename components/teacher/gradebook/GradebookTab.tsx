@@ -36,11 +36,14 @@ function isAccessDenied(err: unknown): boolean {
 
 function Skeleton() {
   return (
-    <div className="animate-pulse space-y-3" aria-hidden="true">
-      <div className="h-9 w-full rounded-lg bg-[#F1F5F9]" />
-      {Array.from({ length: 6 }, (_, i) => (
-        <div key={i} className="h-8 w-full rounded-lg bg-[#F1F5F9]/70" />
-      ))}
+    <div role="status" aria-live="polite">
+      <span className="sr-only">Loading gradebook…</span>
+      <div className="animate-pulse space-y-3" aria-hidden="true">
+        <div className="h-9 w-full rounded-lg bg-[#F1F5F9]" />
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="h-8 w-full rounded-lg bg-[#F1F5F9]/70" />
+        ))}
+      </div>
     </div>
   );
 }
@@ -111,7 +114,9 @@ export function GradebookTab({ classId }: { classId: number }) {
     setExporting(true);
     setExportError(null);
     try {
-      const { blob, filename } = await exportGradebook(classId, activeIds);
+      // Mirror the matrix's active student filter so the export matches the
+      // rows the teacher is looking at.
+      const { blob, filename } = await exportGradebook(classId, activeIds, search || undefined);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -217,7 +222,7 @@ export function GradebookTab({ classId }: { classId: number }) {
         <div>
           <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">Gradebook</h2>
           <p className="mt-0.5 text-sm text-[#64748B]">
-            {activeIds.length} of {columnItems.length || "…"} session columns ·{" "}
+            {activeIds.length} of {columns.data?.totalElements ?? "…"} session columns ·{" "}
             <span className="tabular-nums">{matrix.data?.totalElements ?? "…"}</span> students
           </p>
         </div>
@@ -234,6 +239,13 @@ export function GradebookTab({ classId }: { classId: number }) {
       {exportError && (
         <p className="mb-4 text-sm text-[#EF4444]" role="alert">
           {exportError}
+        </p>
+      )}
+
+      {matrix.data?.historyCoverage === "SINCE_MIGRATION" && (
+        <p className="mb-4 text-xs text-[#94A3B8]">
+          Membership history is complete from the analytics migration onward; earlier departures
+          are not recorded.
         </p>
       )}
 
