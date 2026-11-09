@@ -277,7 +277,7 @@ export default function CommunityModerationPage() {
           </Card>
         ) : (
           <>
-            <div className="space-y-4">
+            <div className="adaptive-grid adaptive-grid--wide">
               {items.map((report) => (
                 <ReportCard
                   key={report.id}
@@ -587,7 +587,7 @@ function Pagination({
 
 function QueueSkeleton() {
   return (
-    <div role="status" aria-busy="true" aria-label="Loading reports" className="space-y-4">
+    <div role="status" aria-busy="true" aria-label="Loading reports" className="adaptive-grid adaptive-grid--wide">
       {Array.from({ length: 3 }).map((_, i) => (
         <div
           key={i}

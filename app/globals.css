@@ -100,10 +100,26 @@ body {
 .page-form { width: 100%; max-width: 48rem; }
 .page-reading { width: 100%; max-width: 70ch; margin-inline: auto; }
 .page-marketing { width: 100%; max-width: 90rem; margin-inline: auto; }
+/* Independent collection cards stay a predictable size even when there are
+   only one or two items. auto-fill reserves empty tracks; cap child width.
+   Narrow mobile viewports shrink below the desired 18rem minimum safely. */
 .adaptive-grid {
+  --collection-card-min: 18rem;
+  --collection-card-max: 24rem;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--collection-card-min)), 1fr));
   gap: 1.5rem;
+}
+.adaptive-grid > * {
+  width: 100%;
+  min-width: 0;
+  max-width: var(--collection-card-max);
+}
+
+/* Content-rich record cards: Community ownership and moderation workflows. */
+.adaptive-grid--wide {
+  --collection-card-min: 21rem;
+  --collection-card-max: 36rem;
 }
 
 @media (min-width: 640px) {
