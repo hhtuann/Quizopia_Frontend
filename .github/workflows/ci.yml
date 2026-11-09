@@ -30,13 +30,12 @@ jobs:
       - name: ESLint
         run: npm run lint
 
+      - name: Vitest unit and component tests
+        run: npm run test
+
       - name: Production build
         run: npm run build
         env:
           # Browser-reachable API base used at build time; CI has no backend.
           NEXT_PUBLIC_API_URL: http://localhost:8080
 
-      # NOTE (remediation §19): no automated frontend unit/E2E suite exists
-      # yet — vitest/playwright infrastructure is not part of this repo. The
-      # workflow therefore verifies typecheck + lint + production build only;
-      # browser E2E evidence is produced separately on the review branches.

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { ReactNode } from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,7 +7,7 @@ import { CommunityAdaptiveShell } from "./CommunityAdaptiveShell";
 
 vi.mock("@/hooks/useAuth", () => ({ useAuth: vi.fn() }));
 vi.mock("@/components/layout/AppShell", () => ({
-  default: ({ children }: { children: React.ReactNode }) => (
+  default: ({ children }: { children: ReactNode }) => (
     <div data-testid="authenticated-app-shell">{children}</div>
   ),
 }));
