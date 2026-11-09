@@ -306,3 +306,125 @@ export function getMyRosterInvitations(): Promise<RosterEntryResponse[]> {
 export function acceptRosterInvitation(entryId: number): Promise<RosterEntryResponse> {
   return http.post<RosterEntryResponse>(`/api/classrooms/roster/${entryId}/accept`, {});
 }
+
+// ---------------------------------------------------------------------------
+// CLASS-M2 (issue #52): classroom sessions (teacher + learner)
+// ---------------------------------------------------------------------------
+
+/** Backend `ExamSessionStatus` (re-exported for convenience here). */
+export type ClassroomSessionStatus = "DRAFT" | "SCHEDULED" | "OPEN" | "CLOSED" | "CANCELLED";
+
+/** Backend record `ClassroomSessionItem` (GET /api/classrooms/{id}/sessions). */
+export interface ClassroomSessionItem {
+  sessionId: number;
+  code: string;
+  title: string;
+  status: ClassroomSessionStatus;
+  visibility: "PUBLIC" | "CLASS_RESTRICTED";
+  startsAt: string;
+  endsAt: string;
+  examId: number;
+  examTitle: string;
+}
+
+/** Backend record `AssignableSessionItem` (GET .../sessions/assignable). */
+export interface AssignableSessionItem {
+  sessionId: number;
+  code: string;
+  title: string;
+  status: "DRAFT" | "SCHEDULED";
+  startsAt: string;
+  endsAt: string;
+  examId: number;
+  examTitle: string;
+}
+
+/** Backend record `LearnerClassroomSessionItem` (GET /joined/{id}/sessions). */
+export interface LearnerClassroomSessionItem {
+  sessionId: number;
+  code: string;
+  title: string;
+  status: Exclude<ClassroomSessionStatus, "DRAFT">;
+  startsAt: string;
+  endsAt: string;
+  examTitle: string;
+}
+
+/** Backend record `JoinedClassroomDetail` (GET /api/classrooms/joined/{id}). */
+export interface JoinedClassroomDetail {
+  classroomId: number;
+  code: string;
+  name: string;
+  description: string | null;
+  status: ClassroomStatus;
+  teacherDisplayName: string;
+  joinedAt: string;
+  assignedSessionCount: number;
+}
+
+/** `PageResponse<T>` shape used by the class-session endpoints. */
+export interface ClassroomSessionsPage<T> {
+  items: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  sort: string;
+}
+
+/** Params for `GET /api/classrooms/{id}/sessions` (teacher). */
+export interface ClassroomSessionsParams {
+  page?: number;
+  size?: number;
+  status?: string;
+  search?: string;
+}
+
+/** `GET /api/classrooms/{id}/sessions` — assigned sessions (owner view). */
+export function getClassroomSessions(
+  id: number,
+  params: ClassroomSessionsParams = {}
+): Promise<ClassroomSessionsPage<ClassroomSessionItem>> {
+  return http.get<ClassroomSessionsPage<ClassroomSessionItem>>(
+    `/api/classrooms/${id}/sessions`,
+    { params }
+  );
+}
+
+/** `GET /api/classrooms/{id}/sessions/assignable` — own eligible sessions not
+ *  yet assigned to this classroom (the assign picker). */
+export function getAssignableSessions(
+  id: number,
+  params: { page?: number; size?: number; search?: string } = {}
+): Promise<ClassroomSessionsPage<AssignableSessionItem>> {
+  return http.get<ClassroomSessionsPage<AssignableSessionItem>>(
+    `/api/classrooms/${id}/sessions/assignable`,
+    { params }
+  );
+}
+
+/** `POST /api/classrooms/{id}/sessions/{sessionId}` → 204 (additive, idempotent). */
+export function assignSessionToClassroom(id: number, sessionId: number): Promise<void> {
+  return http.post<void>(`/api/classrooms/${id}/sessions/${sessionId}`, {});
+}
+
+/** `DELETE /api/classrooms/{id}/sessions/{sessionId}` → 204 (idempotent). */
+export function unassignSessionFromClassroom(id: number, sessionId: number): Promise<void> {
+  return http.delete<void>(`/api/classrooms/${id}/sessions/${sessionId}`);
+}
+
+/** `GET /api/classrooms/joined/{id}` — learner-safe detail (members only). */
+export function getJoinedClassroom(id: number): Promise<JoinedClassroomDetail> {
+  return http.get<JoinedClassroomDetail>(`/api/classrooms/joined/${id}`);
+}
+
+/** `GET /api/classrooms/joined/{id}/sessions` — learner-safe assigned sessions. */
+export function getJoinedClassroomSessions(
+  id: number,
+  params: { page?: number; size?: number; status?: string } = {}
+): Promise<ClassroomSessionsPage<LearnerClassroomSessionItem>> {
+  return http.get<ClassroomSessionsPage<LearnerClassroomSessionItem>>(
+    `/api/classrooms/joined/${id}/sessions`,
+    { params }
+  );
+}

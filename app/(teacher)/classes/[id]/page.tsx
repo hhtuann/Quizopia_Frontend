@@ -1,19 +1,21 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   useClassroomQuery,
   useClassroomRosterQuery,
+  useClassroomSessionsQuery,
   useRemoveMemberMutation,
   useRevokeRosterEntryMutation,
   useUpdateClassroomMutation,
 } from "@/hooks/queries/use-classrooms";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
 import { AddStudentsPanel } from "@/components/teacher/AddStudentsPanel";
+import { ClassSessionsTab } from "@/components/teacher/class-sessions/ClassSessionsTab";
 import { Badge, Button, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { updateClassroomSchema, type UpdateClassroomValues } from "@/lib/validation/classroom-schemas";
@@ -54,12 +56,33 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+type ClassTab = "overview" | "students" | "sessions";
+
+function parseTab(raw: string | null): ClassTab {
+  return raw === "students" || raw === "sessions" ? raw : "overview";
+}
+
 export default function ClassDetailPage() {
+  return (
+    <Suspense fallback={<Skeleton />}>
+      <ClassDetailPageInner />
+    </Suspense>
+  );
+}
+
+function ClassDetailPageInner() {
   const { id } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const idNum = Number(id);
   const valid = Number.isFinite(idNum);
+  const tab = parseTab(searchParams.get("tab"));
 
   const { data, isPending, isError, error } = useClassroomQuery(valid ? idNum : 0);
+
+  const setTab = (next: ClassTab) => {
+    router.replace(`?tab=${next}`, { scroll: false });
+  };
 
   if (!valid) return <NotFound />;
   if (isPending) return <Skeleton />;
@@ -69,12 +92,22 @@ export default function ClassDetailPage() {
     return <LoadError error={norm} />;
   }
   if (!data) return <NotFound />;
-  return <DetailView classroom={data} />;
+  return <DetailView classroom={data} tab={tab} onTabChange={setTab} />;
 }
 
-function DetailView({ classroom }: { classroom: ClassroomDetailView }) {
+function DetailView({
+  classroom,
+  tab,
+  onTabChange,
+}: {
+  classroom: ClassroomDetailView;
+  tab: ClassTab;
+  onTabChange: (tab: ClassTab) => void;
+}) {
   const [editOpen, setEditOpen] = useState(false);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; message: string } | null>(null);
+  // Overview quick-fact: total assigned sessions (size=1 — count only).
+  const { data: sessionsOverview } = useClassroomSessionsQuery(classroom.id, { size: 1 });
 
   // Auto-dismiss notices after 4 seconds.
   useEffect(() => {
@@ -82,6 +115,12 @@ function DetailView({ classroom }: { classroom: ClassroomDetailView }) {
     const t = setTimeout(() => setNotice(null), 4000);
     return () => clearTimeout(t);
   }, [notice]);
+
+  const tabs: readonly { id: ClassTab; label: string }[] = [
+    { id: "overview", label: "Overview" },
+    { id: "students", label: "Students" },
+    { id: "sessions", label: "Sessions" },
+  ];
 
   return (
     <div>
@@ -108,13 +147,42 @@ function DetailView({ classroom }: { classroom: ClassroomDetailView }) {
         <div className="mt-3 flex items-center gap-3">
           <span className="text-sm font-medium text-[#64748B]">
             <span className="font-semibold text-[#0F172A] tabular-nums">{classroom.memberCount}</span> member
-            {classroom.memberCount === 1 ? "" : "s"} · created {formatDate(classroom.createdAt)}
+            {classroom.memberCount === 1 ? "" : "s"} ·{" "}
+            <span className="font-semibold text-[#0F172A] tabular-nums">
+              {sessionsOverview?.totalElements ?? "…"}
+            </span>{" "}
+            session{sessionsOverview?.totalElements === 1 ? "" : "s"} · created{" "}
+            {formatDate(classroom.createdAt)}
           </span>
           <Button type="button" variant="outline" size="sm" onClick={() => setEditOpen(true)}>
             Edit class
           </Button>
         </div>
       </header>
+
+      <div
+        className="mb-6 flex w-fit gap-1 rounded-xl border border-[#E2E8F0] bg-[#F1F5F9] p-1"
+        role="tablist"
+        aria-label="Class sections"
+      >
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => onTabChange(t.id)}
+            className={cn(
+              "rounded-lg px-4 py-2.5 text-sm font-semibold outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#0052FF]",
+              tab === t.id
+                ? "bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] text-white shadow-[0_4px_14px_rgba(0,82,255,0.25)]"
+                : "text-[#64748B] hover:bg-white hover:text-[#0F172A]"
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
       {notice && (
         <div
@@ -131,20 +199,61 @@ function DetailView({ classroom }: { classroom: ClassroomDetailView }) {
         </div>
       )}
 
-      <AddStudentsPanel
-        classId={classroom.id}
-        excludeIds={classroom.members.map((m) => m.userId)}
-        onSearchResult={(r) =>
-          setNotice({
-            kind: r.declined.length > 0 && r.added === 0 ? "error" : "success",
-            message: `Added ${r.added} student${r.added === 1 ? "" : "s"}.${r.duplicated.length > 0 ? ` ${r.duplicated.length} already members.` : ""}${r.invalid.length > 0 ? ` ${r.invalid.length} invalid.` : ""}${r.declined.length > 0 ? ` ${r.declined.length} declined: they left this class — send them an invitation to rejoin (they must accept).` : ""}`,
-          })
-        }
-      />
+      {tab === "overview" && (
+        <section aria-label="Class overview" className={cn(cardVariants(), "p-4 sm:p-6")}>
+          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <dt className="mb-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">Members</dt>
+              <dd className="text-2xl font-bold tabular-nums text-[#0F172A]">{classroom.memberCount}</dd>
+            </div>
+            <div>
+              <dt className="mb-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
+                Assigned sessions
+              </dt>
+              <dd className="text-2xl font-bold tabular-nums text-[#0F172A]">
+                {sessionsOverview?.totalElements ?? "…"}
+              </dd>
+            </div>
+            <div>
+              <dt className="mb-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">Status</dt>
+              <dd className="mt-2">
+                <Badge variant={statusVariant(classroom.status)}>{classroom.status}</Badge>
+              </dd>
+            </div>
+          </dl>
+          <div className="mt-6 flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => onTabChange("students")}>
+              Manage students
+            </Button>
+            <Button size="sm" onClick={() => onTabChange("sessions")}>
+              View sessions
+            </Button>
+          </div>
+        </section>
+      )}
 
-      <div className={cn(cardVariants(), "mt-6 p-4 sm:p-6")}>
-        <MembersTable classId={classroom.id} members={classroom.members} />
-      </div>
+      {tab === "students" && (
+        <>
+          <AddStudentsPanel
+            classId={classroom.id}
+            excludeIds={classroom.members.map((m) => m.userId)}
+            onSearchResult={(r) =>
+              setNotice({
+                kind: r.declined.length > 0 && r.added === 0 ? "error" : "success",
+                message: `Added ${r.added} student${r.added === 1 ? "" : "s"}.${r.duplicated.length > 0 ? ` ${r.duplicated.length} already members.` : ""}${r.invalid.length > 0 ? ` ${r.invalid.length} invalid.` : ""}${r.declined.length > 0 ? ` ${r.declined.length} declined: they left this class — send them an invitation to rejoin (they must accept).` : ""}`,
+              })
+            }
+          />
+
+          <div className={cn(cardVariants(), "mt-6 p-4 sm:p-6")}>
+            <MembersTable classId={classroom.id} members={classroom.members} />
+          </div>
+        </>
+      )}
+
+      {tab === "sessions" && (
+        <ClassSessionsTab classId={classroom.id} onNotice={setNotice} />
+      )}
 
       {editOpen && (
         <EditClassroomModal

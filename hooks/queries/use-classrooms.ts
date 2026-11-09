@@ -22,6 +22,13 @@ import {
   type CreateRosterEntryRequest,
   type RosterEntryResponse,
   type UpdateClassroomRequest,
+  type ClassroomSessionsParams,
+  getClassroomSessions,
+  getAssignableSessions,
+  assignSessionToClassroom,
+  unassignSessionFromClassroom,
+  getJoinedClassroom,
+  getJoinedClassroomSessions,
   confirmRosterImport,
   downloadRosterTemplate,
   previewRosterImport,
@@ -191,5 +198,75 @@ export function useLeaveClassroomMutation() {
     mutationFn: (classroomId: number) => leaveClassroom(classroomId),
     onSuccess: invalidate,
     onError: invalidate,
+  });
+}
+
+// ----- CLASS-M2 (issue #52): classroom sessions -----
+
+/** Teacher: sessions assigned to one owned classroom (paged, filterable). */
+export function useClassroomSessionsQuery(id: number, params: ClassroomSessionsParams = {}) {
+  const { page = 0, size = 20, status, search } = params;
+  return useQuery({
+    queryKey: ["classrooms", id, "sessions", { page, size, status, search }],
+    queryFn: () => getClassroomSessions(id, { page, size, status, search }),
+    enabled: !!id,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Teacher: own eligible sessions not yet assigned to the classroom. */
+export function useAssignableSessionsQuery(
+  id: number,
+  params: { page?: number; size?: number; search?: string } = {}
+) {
+  const { page = 0, size = 20, search } = params;
+  return useQuery({
+    queryKey: ["classrooms", id, "sessions", "assignable", { page, size, search }],
+    queryFn: () => getAssignableSessions(id, { page, size, search }),
+    enabled: !!id,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Teacher: ADDITIVE assign of one own session to the classroom (idempotent). */
+export function useAssignSessionMutation(classroomId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: number) => assignSessionToClassroom(classroomId, sessionId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["classrooms", classroomId, "sessions"] }),
+  });
+}
+
+/** Teacher: remove exactly this (classroom, session) association (idempotent). */
+export function useUnassignSessionMutation(classroomId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: number) => unassignSessionFromClassroom(classroomId, sessionId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["classrooms", classroomId, "sessions"] }),
+  });
+}
+
+/** Learner: learner-safe detail of one joined classroom. */
+export function useJoinedClassroomQuery(id: number, enabled = true) {
+  return useQuery({
+    queryKey: ["classrooms", "joined", id],
+    queryFn: () => getJoinedClassroom(id),
+    enabled: enabled && !!id,
+  });
+}
+
+/** Learner: assigned sessions (no DRAFT) of one joined classroom. */
+export function useJoinedClassroomSessionsQuery(
+  id: number,
+  params: { page?: number; size?: number; status?: string } = {}
+) {
+  const { page = 0, size = 20, status } = params;
+  return useQuery({
+    queryKey: ["classrooms", "joined", id, "sessions", { page, size, status }],
+    queryFn: () => getJoinedClassroomSessions(id, { page, size, status }),
+    enabled: !!id,
+    placeholderData: keepPreviousData,
   });
 }

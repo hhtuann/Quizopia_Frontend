@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import {
   useAcceptRosterInvitationMutation,
@@ -111,9 +112,17 @@ export default function MyClassesPage() {
 
       <ul className="space-y-3">
         {classes.map((c: JoinedClassroomResponse) => (
-          <li key={c.classroomId} className={cn(cardVariants(), "flex items-center justify-between p-4")}>
-            <div>
-              <p className="font-medium">{c.name}</p>
+          <li
+            key={c.classroomId}
+            className={cn(cardVariants(), "relative flex items-center justify-between p-4")}
+          >
+            <div className="min-w-0">
+              <Link
+                href={`/my-classes/${c.classroomId}`}
+                className="font-medium text-[#0F172A] outline-none after:absolute after:inset-0 after:content-[''] hover:text-[#0052FF] focus-visible:ring-2 focus-visible:ring-[#0052FF]"
+              >
+                {c.name}
+              </Link>
               <p className="mt-0.5 text-xs text-[#64748B]">
                 Teacher: {c.teacherDisplayName} · joined{" "}
                 {new Date(c.joinedAt).toLocaleDateString("en-GB")}
@@ -122,7 +131,7 @@ export default function MyClassesPage() {
                 <p className="mt-1 text-xs text-[#64748B]">{c.description}</p>
               )}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="relative z-10 flex items-center gap-3">
               <Badge variant={c.status === "ACTIVE" ? "success" : "default"}>{c.status}</Badge>
               <Button
                 variant="ghost"
