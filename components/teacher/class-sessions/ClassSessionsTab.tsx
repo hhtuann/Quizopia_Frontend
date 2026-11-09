@@ -289,7 +289,12 @@ export function ClassSessionsTab({
                 setPickerOpen(false);
                 onNotice({ kind: "success", message: `Assigned "${s.title}" to this class.` });
               },
-              onError: (err) => handleAssignError(err, "Assign session"),
+              onError: (err) => {
+                // Same z-50 rationale as onSuccess: the notice renders at
+                // page level, below the open picker — close first.
+                setPickerOpen(false);
+                handleAssignError(err, "Assign session");
+              },
             })
           }
         />
