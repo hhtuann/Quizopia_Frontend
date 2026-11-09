@@ -109,7 +109,7 @@ export default function StudentSessionsPage() {
       ) : sorted.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="adaptive-grid">
           {sorted.map((s) => (
             <SessionCard key={s.sessionId} item={s} onWindowOpen={() => void refetch()} />
           ))}
@@ -260,7 +260,7 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
 
 function Skeleton() {
   return (
-    <div role="status" aria-busy="true" aria-label="Loading available sessions" className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <div role="status" aria-busy="true" aria-label="Loading available sessions" className="adaptive-grid">
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="h-44 animate-pulse rounded-xl border border-[#E2E8F0] bg-[#F1F5F9]" />
       ))}

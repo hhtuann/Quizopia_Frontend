@@ -16,6 +16,7 @@ import {
 } from "@/hooks/queries/use-community";
 import { Badge, Card, Input } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
+import { CommunitySectionNav } from "@/components/community/CommunitySectionNav";
 import type { PublicPublicationCard } from "@/lib/api/community";
 import type { NormalizedApiError } from "@/lib/api";
 
@@ -163,6 +164,8 @@ function CommunityExplore() {
           needed to explore.
         </p>
       </header>
+
+      <CommunitySectionNav current="browse" />
 
       {/* Filters — every control commits to the URL (shareable deep links). */}
       <section aria-label="Filter community quizzes" className="mb-6 space-y-3">

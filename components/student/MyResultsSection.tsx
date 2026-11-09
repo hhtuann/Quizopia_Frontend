@@ -103,7 +103,7 @@ export function MyResultsSection({ classId }: { classId: number }) {
         </div>
       ) : (
         <>
-          <ul className="mt-3 space-y-3">
+          <ul className="mt-3 adaptive-grid">
             {items.map((r) => (
               <li
                 key={r.sessionId}

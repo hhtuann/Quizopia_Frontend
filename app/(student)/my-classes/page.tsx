@@ -72,11 +72,11 @@ export default function MyClassesPage() {
       {pending.length > 0 && (
         <section aria-label="Pending invitations">
           <h2 className="text-lg font-semibold">Invitations waiting for you</h2>
-          <ul className="mt-3 space-y-3">
+          <ul className="mt-3 adaptive-grid">
             {pending.map((entry: RosterEntryResponse) => (
               <li
                 key={entry.id}
-                className={cn(cardVariants(), "flex items-center justify-between p-4")}
+                className={cn(cardVariants(), "flex flex-wrap items-start justify-between gap-3 p-4")}
               >
                 <div>
                   <p className="font-medium">
@@ -110,13 +110,13 @@ export default function MyClassesPage() {
         </div>
       )}
 
-      <ul className="space-y-3">
+      <ul className="adaptive-grid">
         {classes.map((c: JoinedClassroomResponse) => (
           <li
             key={c.classroomId}
-            className={cn(cardVariants(), "relative flex items-center justify-between p-4")}
+            className={cn(cardVariants(), "relative flex flex-wrap items-start justify-between gap-3 p-4")}
           >
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <Link
                 href={`/my-classes/${c.classroomId}`}
                 className="font-medium text-[#0F172A] outline-none after:absolute after:inset-0 after:content-[''] hover:text-[#0052FF] focus-visible:ring-2 focus-visible:ring-[#0052FF]"
@@ -131,7 +131,7 @@ export default function MyClassesPage() {
                 <p className="mt-1 text-xs text-[#64748B]">{c.description}</p>
               )}
             </div>
-            <div className="relative z-10 flex items-center gap-3">
+            <div className="relative z-10 flex flex-wrap items-center gap-2">
               <Badge variant={c.status === "ACTIVE" ? "success" : "default"}>{c.status}</Badge>
               <Button
                 variant="ghost"

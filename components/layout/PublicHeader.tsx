@@ -13,9 +13,9 @@ import { cn } from "@/lib/utils/cn";
  * calls for — brand + Log in/Register CTAs — and it is used ONLY by
  * `app/community/layout.tsx`. It is deliberately static:
  *
- * - no `useAuth` (renders identically for guests AND during hydration —
- *   authenticated users reach /community through the sidebar but this header
- *   stays anonymous-only chrome; the brand link leads back to the app);
+ * - no `useAuth`: CommunityAdaptiveShell renders this header only after the
+ *   auth bootstrap has resolved to a guest session. Authenticated visitors
+ *   see the normal AppShell/Header/Sidebar, not login/register buttons;
  * - no user data, no notifications, no view switch — nothing to leak;
  * - geometry comes from the shared tokens (`app-topbar`, `app-topbar-inner`,
  *   `--page-gutter`, `--topbar-height`) so it aligns with DESIGN.md's fixed

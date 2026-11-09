@@ -186,7 +186,7 @@ function AssignedSessions({ classId }: { classId: number }) {
         </div>
       ) : (
         <>
-          <ul className="mt-3 space-y-3">
+          <ul className="mt-3 adaptive-grid">
             {items.map((s: LearnerClassroomSessionItem) => (
               <li
                 key={s.sessionId}
