@@ -1,4 +1,4 @@
-import { http } from "./http-client";
+import { http, httpClient } from "./http-client";
 
 /**
  * Classrooms API + types (user-owned, CLASSROOM_* + CLASSROOM_MEMBER_*
@@ -427,4 +427,207 @@ export function getJoinedClassroomSessions(
     `/api/classrooms/joined/${id}/sessions`,
     { params }
   );
+}
+// ---------------------------------------------------------------------------
+// CLASS-M3 (issue #54): gradebook + analytics + learner my-results
+// ---------------------------------------------------------------------------
+
+/** Backend `GradebookSessionColumn.windowState`. */
+export type GradebookWindowState = "UPCOMING" | "WINDOW" | "NOT_HELD" | "DRAFT" | "CANCELLED";
+
+/** Backend record `GradebookSessionColumn` (GET .../gradebook/sessions). */
+export interface GradebookSessionColumn {
+  id: number;
+  code: string;
+  title: string;
+  status: ClassroomSessionStatus;
+  startsAt: string;
+  endsAt: string;
+  windowState: GradebookWindowState;
+  examId: number;
+  examTitle: string;
+  cohortSize: number;
+  startedCount: number;
+  submittedCount: number;
+  gradedCount: number;
+  completionPercentage: number | null;
+  averagePercentage: number | null;
+}
+
+/** `PageResponse<GradebookSessionColumn>` shape. */
+export interface GradebookSessionsPage {
+  items: GradebookSessionColumn[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  sort: string;
+}
+
+/** Backend `GradebookCellStatus` (per student × session cell / result). */
+export type GradebookCellStatus =
+  | "SCORED"
+  | "PENDING_GRADING"
+  | "IN_PROGRESS"
+  | "NOT_ATTEMPTED"
+  | "NOT_IN_COHORT"
+  | "UPCOMING"
+  | "DRAFT"
+  | "CANCELLED"
+  | "NOT_HELD";
+
+/** Backend record `GradebookCell` — cells[] index aligns with sessions[] order. */
+export interface GradebookCell {
+  status: GradebookCellStatus;
+  score: number | null;
+  maxScore: number | null;
+  percentage: number | null;
+  bestAttemptId: number | null;
+  attemptCount: number | null;
+  gradeStatus: string | null;
+}
+
+/** Backend record `GradebookStudentRow`. */
+export interface GradebookStudentRow {
+  userId: number;
+  displayName: string;
+  currentMember: boolean;
+  cells: GradebookCell[];
+  meanPercentage: number | null;
+  cohortSessions: number;
+  submittedSessions: number;
+  completionPercentage: number | null;
+}
+
+/** Backend record `GradebookResponse` (paged students + aligned sessions). */
+export interface GradebookResponse {
+  sessions: GradebookSessionColumn[];
+  students: GradebookStudentRow[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  sort: string;
+  historyCoverage: "SINCE_MIGRATION";
+}
+
+/** Sortable gradebook fields (server `sort` param). */
+export type GradebookSortField = "displayName" | "meanPercentage" | "completionPercentage";
+
+/** Params for `GET /api/classrooms/{id}/gradebook`. */
+export interface GradebookParams {
+  /** Explicit session-column selection; omitted → server default (first 5). */
+  sessionIds?: number[];
+  page?: number;
+  size?: number;
+  search?: string;
+  sort?: GradebookSortField;
+  direction?: "asc" | "desc";
+}
+
+/** Per-session trend row inside {@link ClassroomAnalyticsResponse} (chronological, ≤20). */
+export interface ClassroomAnalyticsSessionItem {
+  sessionId: number;
+  code: string;
+  title: string;
+  status: ClassroomSessionStatus;
+  startsAt: string;
+  cohortSize: number;
+  startedCount: number;
+  submittedCount: number;
+  gradedCount: number;
+  completionPercentage: number | null;
+  averagePercentage: number | null;
+}
+
+/** Backend record `ClassroomAnalyticsResponse` (class-wide, sessionId null). */
+export interface ClassroomAnalyticsResponse {
+  sessionId: null;
+  currentRosterSize: number;
+  assignedSessionCount: number;
+  overallCompletionPercentage: number | null;
+  sessions: ClassroomAnalyticsSessionItem[];
+  historyCoverage: "SINCE_MIGRATION";
+}
+
+/** Backend record `LearnerMyResultsItem` (GET /joined/{id}/my-results). */
+export interface LearnerMyResultsItem {
+  sessionId: number;
+  code: string;
+  title: string;
+  status: ClassroomSessionStatus;
+  startsAt: string;
+  endsAt: string;
+  examTitle: string;
+  resultStatus: GradebookCellStatus;
+  score: number | null;
+  maxScore: number | null;
+  percentage: number | null;
+  bestAttemptId: number | null;
+  attemptCount: number | null;
+}
+
+/** `PageResponse<LearnerMyResultsItem>` shape. */
+export interface LearnerMyResultsPage {
+  items: LearnerMyResultsItem[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  sort: string;
+}
+
+/** `GET /api/classrooms/{id}/gradebook/sessions` — the column catalog. */
+export function getGradebookSessions(
+  id: number,
+  params: { page?: number; size?: number } = {}
+): Promise<GradebookSessionsPage> {
+  return http.get<GradebookSessionsPage>(`/api/classrooms/${id}/gradebook/sessions`, { params });
+}
+
+/** `GET /api/classrooms/{id}/gradebook` — the student × session matrix. */
+export function getGradebook(id: number, params: GradebookParams = {}): Promise<GradebookResponse> {
+  const { sessionIds, ...rest } = params;
+  return http.get<GradebookResponse>(`/api/classrooms/${id}/gradebook`, {
+    params: sessionIds ? { sessionIds: sessionIds.join(","), ...rest } : rest,
+  });
+}
+
+/** `GET /api/classrooms/{id}/analytics` — class-wide KPIs (no sessionId). */
+export function getClassroomAnalytics(id: number): Promise<ClassroomAnalyticsResponse> {
+  return http.get<ClassroomAnalyticsResponse>(`/api/classrooms/${id}/analytics`);
+}
+
+/** Blob + filename of a gradebook XLSX export. */
+export interface GradebookExport {
+  blob: Blob;
+  filename: string;
+}
+
+/**
+ * `GET /api/classrooms/{id}/gradebook/export?sessionIds=` — XLSX blob with the
+ * filename taken from `Content-Disposition` (falling back to the documented
+ * `quizopia-class-{id}-gradebook-{timestamp}.xlsx` pattern).
+ */
+export async function exportGradebook(id: number, sessionIds: number[]): Promise<GradebookExport> {
+  const res = await httpClient.get<Blob>(`/api/classrooms/${id}/gradebook/export`, {
+    responseType: "blob",
+    params: { sessionIds: sessionIds.join(",") },
+  });
+  const disposition = String(res.headers?.["content-disposition"] ?? "");
+  const starred = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+  const plain = /filename="?([^";]+)"?/i.exec(disposition);
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const filename =
+    decodeURIComponent((starred?.[1] ?? plain?.[1] ?? "").trim()) ||
+    `quizopia-class-${id}-gradebook-${stamp}.xlsx`;
+  return { blob: res.data, filename };
+}
+
+/** `GET /api/classrooms/joined/{id}/my-results` — learner result summary. */
+export function getMyResults(
+  id: number,
+  params: { page?: number; size?: number } = {}
+): Promise<LearnerMyResultsPage> {
+  return http.get<LearnerMyResultsPage>(`/api/classrooms/joined/${id}/my-results`, { params });
 }
