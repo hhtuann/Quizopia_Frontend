@@ -15,7 +15,8 @@ import type * as SocialApi from "@/lib/api/community-social";
 /**
  * P3-C4 (#68) — the accessible star rating selector that replaces #67's
  * RATE_DIALOG_SEAM: radiogroup semantics (roles, names, aria-checked, roving
- * tabindex), keyboard operation (arrows/Home/End move AND submit), the
+ * tabindex), keyboard operation (arrows/Home/End move AND submit; the ends
+ * clamp — never wrap), the
  * update path (PUT on selection), Clear (DELETE), live aggregate rendering
  * (null average → "—"), and the publisher self-rating 409 informative state.
  */
