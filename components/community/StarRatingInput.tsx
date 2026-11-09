@@ -3,9 +3,8 @@
 import { useRef, useState } from "react";
 import { Badge, Button } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
-import {
-  classifySocialError,
-} from "@/lib/api/community-social";
+import { waitHint } from "./community-errors";
+import { classifySocialError } from "@/lib/api/community-social";
 import {
   useDeleteRatingMutation,
   usePutRatingMutation,
@@ -23,7 +22,8 @@ import {
  * A11Y — WAI-ARIA radiogroup pattern: a fieldset/legend-wrapped
  * `role="radiogroup"` of five `role="radio"` buttons ("1 star"…"5 stars")
  * with roving tabindex and arrow-key operation (ArrowRight/Down and
- * ArrowLeft/Up cycle, Home/End jump). Per the APG, moving with the arrows
+ * ArrowLeft/Up move — clamped at 1★/5★, never wrap; Home/End jump). Per
+ * the APG, moving with the arrows
  * also CHECKS the focused radio — here selection submits immediately (the
  * §5 rating PUT is an idempotent upsert, so every selection is "the update
  * path").
@@ -76,15 +76,8 @@ export function formatAverage(average: number | null): string {
   return trimmed === "" ? "0" : trimmed;
 }
 
-/** Humanize a `Retry-After` wait for the 429 copy (#67 `waitHint`). */
-function waitHint(seconds: number | null): string {
-  if (seconds == null) return "please wait a moment and try again";
-  if (seconds < 60) {
-    return `wait about ${seconds} second${seconds === 1 ? "" : "s"} and try again`;
-  }
-  const minutes = Math.ceil(seconds / 60);
-  return `wait about ${minutes} minute${minutes === 1 ? "" : "s"} and try again`;
-}
+// `waitHint` is imported from ./community-errors — the shared #67 helper
+// for every 429 copy (consumed by describeRatingError below).
 
 /**
  * Rating-action copy — the social classifier (lib single source) mapped to
@@ -121,7 +114,7 @@ function Spinner() {
 
 const STAR_VALUES = [1, 2, 3, 4, 5] as const;
 
-/** Accessible radiogroup: roving tabindex, arrows/Home/End check + submit. */
+/** Accessible radiogroup: roving tabindex, arrows/Home/End check + submit (arrows clamp at the ends). */
 function StarRadioGroup({
   value,
   busy,
@@ -174,9 +167,11 @@ function StarRadioGroup({
             onKeyDown={(e) => {
               let next: number | null = null;
               if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-                next = (i + 1) % STAR_VALUES.length;
+                // CLAMPED at the top end — a wrap from 5★ to 1★ would
+                // downgrade the rating on a single keypress.
+                next = Math.min(i + 1, STAR_VALUES.length - 1);
               } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-                next = (i - 1 + STAR_VALUES.length) % STAR_VALUES.length;
+                next = Math.max(i - 1, 0);
               } else if (e.key === "Home") {
                 next = 0;
               } else if (e.key === "End") {
@@ -184,7 +179,9 @@ function StarRadioGroup({
               }
               if (next == null) return;
               e.preventDefault();
-              move(next);
+              // At a boundary the press is consumed silently: focus stays
+              // put and the current value is NOT re-submitted.
+              if (next !== i) move(next);
             }}
             className={cn(
               "flex h-11 w-11 items-center justify-center rounded-lg outline-none transition-colors",

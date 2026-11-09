@@ -22,7 +22,8 @@ import type { CurrentUserResponse } from "@/lib/auth/types";
  * + empty/error/retry, the create flow (char-count bounds, disabled states,
  * first-comment alias capture + §4 consent copy, alias-taken 409 copy,
  * collapse after the first success), own edit/delete vs foreign-report
- * (alias-match heuristic), the report dialog's validation, and poisoned-
+ * (alias-set heuristic — an in-session alias change keeps older own rows
+ * editable), the report dialog's validation, and poisoned-
  * fixture leak checks — the §5 DTO renders authorAlias/body only, never any
  * user identity.
  */
@@ -240,7 +241,7 @@ describe("comment section — pagination", () => {
     asUser();
     // Seed the alias so the item is the caller's own (deletable).
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    qc.setQueryData(["community", "comments", "my-alias"], "MathWhiz");
+    qc.setQueryData(["community", "comments", "my-alias"], ["MathWhiz"]);
     render(
       <StrictMode>
         <QueryClientProvider client={qc}>
@@ -386,6 +387,35 @@ describe("comment section — create flow + alias capture", () => {
       (within(editor).getByLabelText("Comment") as HTMLTextAreaElement).value
     ).toBe("First!");
   });
+
+  it("keeps the publication-scoped quiz copy when a create hits a 404", async () => {
+    asUser();
+    createMock.mockRejectedValue({
+      kind: "api",
+      status: 404,
+      code: "COMMUNITY_NOT_FOUND",
+      message: "Not found",
+      raw: {},
+    });
+    mount();
+
+    const editor = await screen.findByTestId("comment-editor");
+    fireEvent.change(within(editor).getByLabelText("Display name"), {
+      target: { value: "Ada" },
+    });
+    fireEvent.change(within(editor).getByLabelText("Comment"), {
+      target: { value: "First!" },
+    });
+    fireEvent.click(within(editor).getByRole("button", { name: "Post comment" }));
+
+    // The create POST addresses the PUBLICATION — the 404 is the quiz copy.
+    expect(
+      await within(editor).findByText("This quiz is no longer available.")
+    ).toBeTruthy();
+    expect(
+      within(editor).queryByText("This comment is no longer available.")
+    ).toBeNull();
+  });
 });
 
 describe("comment section — own edit/delete vs foreign report", () => {
@@ -393,7 +423,7 @@ describe("comment section — own edit/delete vs foreign report", () => {
     asUser();
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     if (alias != null) {
-      qc.setQueryData(["community", "comments", "my-alias"], alias);
+      qc.setQueryData(["community", "comments", "my-alias"], [alias]);
     }
     return render(
       <StrictMode>
@@ -471,6 +501,76 @@ describe("comment section — own edit/delete vs foreign report", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
     await waitFor(() => expect(deleteMock).toHaveBeenCalledWith(11));
+  });
+
+  it("alias SET: an in-session alias change keeps older own rows editable", async () => {
+    asUser();
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(["community", "comments", "my-alias"], ["Ada"]);
+    listMock.mockResolvedValue(page([comment({ commentId: 11, authorAlias: "Ada" })]));
+    render(
+      <StrictMode>
+        <QueryClientProvider client={qc}>
+          <CommentSection publicationId={7} loginHref={LOGIN_HREF} />
+        </QueryClientProvider>
+      </StrictMode>
+    );
+
+    // Own row under the previously stored alias.
+    const older = await screen.findByTestId("comment-11");
+    expect(within(older).getByRole("button", { name: "Edit" })).toBeTruthy();
+
+    // §4 alias change: post once under a new name — the create APPENDS the
+    // stored snapshot to the set (it must not replace the older entry).
+    createMock.mockResolvedValue(comment({ commentId: 13, authorAlias: "Grace" }));
+    listMock.mockResolvedValue(
+      page([
+        comment({ commentId: 13, authorAlias: "Grace" }),
+        comment({ commentId: 11, authorAlias: "Ada" }),
+      ])
+    );
+    const editor = screen.getByTestId("comment-editor");
+    fireEvent.click(within(editor).getByRole("button", { name: "Change" }));
+    fireEvent.change(within(editor).getByLabelText("Display name"), {
+      target: { value: "Grace" },
+    });
+    fireEvent.change(within(editor).getByLabelText("Comment"), {
+      target: { value: "New name, same me." },
+    });
+    fireEvent.click(within(editor).getByRole("button", { name: "Post comment" }));
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+
+    // After the settle-refetch BOTH aliases are recognised as own — the
+    // older row keeps Edit/Delete instead of falling back to Report — and
+    // the editor credits the CURRENT (last-appended) alias.
+    const olderRow = await screen.findByTestId("comment-11");
+    expect(within(olderRow).getByRole("button", { name: "Edit" })).toBeTruthy();
+    expect(within(olderRow).getByRole("button", { name: "Delete" })).toBeTruthy();
+    expect(within(olderRow).queryByRole("button", { name: "Report" })).toBeNull();
+    const newRow = screen.getByTestId("comment-13");
+    expect(within(newRow).getByRole("button", { name: "Edit" })).toBeTruthy();
+    expect(within(editor).getByText("Grace")).toBeTruthy();
+  });
+
+  it("surfaces the comment-scoped gone copy when a delete hits a 404", async () => {
+    listMock.mockResolvedValue(page([comment({ commentId: 11, authorAlias: "Ada" })]));
+    deleteMock.mockRejectedValue({
+      kind: "api",
+      status: 404,
+      code: "COMMUNITY_NOT_FOUND",
+      message: "Not found",
+      raw: {},
+    });
+    mountAuthedWithAlias("Ada");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    // The DELETE addresses the COMMENT row — not the quiz copy.
+    expect(
+      await screen.findByText("This comment is no longer available.")
+    ).toBeTruthy();
+    expect(
+      screen.queryByText("This quiz is no longer available.")
+    ).toBeNull();
   });
 });
 

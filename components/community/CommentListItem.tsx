@@ -6,7 +6,6 @@ import { describeCommentError } from "./community-errors";
 import { CommentBodyTextarea } from "./CommentEditor";
 import { CommentReportDialog } from "./CommentReportDialog";
 import {
-  useCommunityCommentsQuery,
   useDeleteCommentMutation,
   useReportCommentMutation,
   useUpdateCommentMutation,
@@ -19,14 +18,20 @@ import { communityCommentBodySchema } from "@/lib/validation/community-schemas";
  * edited marker, plain-text body (React escaping only — never HTML), and the
  * ownership-split actions.
  *
- * OWNERSHIP HEURISTIC (documented in `CommentEditor` + module doc of
- * use-community-comments): the §5 DTO carries no ownership flag, so "own"
- * means `authorAlias === the caller's last-known stored alias` (exact-match;
-import {
-  useDeleteCommentMutation,
-  useReportCommentMutation,
-  useUpdateCommentMutation,
-} from "@/hooks/queries/use-community-comments";
+ * OWNERSHIP HEURISTIC (the full contract also lives in `CommentEditor` and
+ * the use-community-comments module doc): the §5 DTO carries no ownership
+ * flag, so "own" means `comment.authorAlias` EXACTLY-MATCHES a member of
+ * this session's known aliases — the cache-only SET each successful create
+ * appends its stored alias snapshot to. Failure modes, deliberate and
+ * server-guarded:
+ * - Aliases stored only in EARLIER sessions start unknown, so an alias
+ *   changed since then hides older own comments (Report renders instead of
+ *   Edit/Delete) until the next create re-captures the stored alias.
+ * - Alias recycling (the released ci-unique name later taken over by
+ *   someone else) can show owner actions on a foreign comment — the server
+ *   remains the truth and the owner-scoped PATCH/DELETE then 404s, surfaced
+ *   as the comment-scoped "no longer available" copy.
+ */
 
 /** `createdAt` display form — same en-GB short-date shape as the detail page. */
 function formatTimestamp(iso: string): string {
@@ -43,15 +48,15 @@ export function CommentListItem({
   comment,
   publicationId,
   authenticated,
-  myAlias,
+  myAliases,
 }: {
   comment: CommunityComment;
   publicationId: number;
   authenticated: boolean;
-  /** Caller's known alias from the cache-only entry; `null` until set. */
-  myAlias: string | null;
+  /** Aliases the caller has stored this session (cache-only set; empty until the first create). */
+  myAliases: readonly string[];
 }) {
-  const mine = authenticated && myAlias != null && comment.authorAlias === myAlias;
+  const mine = authenticated && myAliases.includes(comment.authorAlias);
 
   const updateMut = useUpdateCommentMutation(publicationId);
   const deleteMut = useDeleteCommentMutation(publicationId);
@@ -131,7 +136,7 @@ export function CommentListItem({
           </div>
           {updateMut.error && (
             <p role="alert" className="text-sm font-medium text-[#EF4444]">
-              {describeCommentError(updateMut.error)}
+              {describeCommentError(updateMut.error, "comment")}
             </p>
           )}
         </form>
@@ -188,7 +193,7 @@ export function CommentListItem({
 
           {deleteMut.error && (
             <p role="alert" className="mt-2 text-sm font-medium text-[#EF4444]">
-              {describeCommentError(deleteMut.error)}
+              {describeCommentError(deleteMut.error, "comment")}
             </p>
           )}
         </>
@@ -204,5 +209,3 @@ export function CommentListItem({
   );
 }
 
-/** Re-exported for the section's pagination clamp (same key family). */
-export { useCommunityCommentsQuery };

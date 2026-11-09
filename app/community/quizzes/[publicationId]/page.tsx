@@ -12,6 +12,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { PublicationActionToolbar } from "@/components/community/PublicationActionToolbar";
 import { CommentSection } from "@/components/community/CommentSection";
+import { formatAverage } from "@/components/community/StarRatingInput";
 import { Badge, Card, buttonVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { buildLoginRedirect } from "@/lib/auth/redirect";
@@ -219,7 +220,7 @@ export default function PublicationDetailPage() {
             />
           </svg>
           {social
-            ? `${formatAvg(social.average)} / 5 · ${social.ratingCount} ${social.ratingCount === 1 ? "rating" : "ratings"}`
+            ? `${formatAverage(social.average)} / 5 · ${social.ratingCount} ${social.ratingCount === 1 ? "rating" : "ratings"}`
             : "— / 5"}
         </p>
 
@@ -265,12 +266,8 @@ export default function PublicationDetailPage() {
   );
 }
 
-/** §7 2dp display form — trailing zeros trimmed, `—` for a null average. */
-function formatAvg(average: number | null): string {
-  if (average == null || !Number.isFinite(average)) return "—";
-  const trimmed = average.toFixed(2).replace(/\.?0+$/, "");
-  return trimmed === "" ? "0" : trimmed;
-}
+// formatAverage (the §7 2dp display form) is imported from StarRatingInput —
+// the single export every aggregate surface consumes.
 
 /** Neutral 404 state — no reason string (§7 anti-enumeration). */
 function NotAvailable() {

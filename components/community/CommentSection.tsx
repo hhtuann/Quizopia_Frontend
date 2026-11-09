@@ -10,7 +10,7 @@ import { classifyCommentError } from "@/lib/api/community-comments";
 import {
   DEFAULT_COMMENT_PAGE_SIZE,
   useCommunityCommentsQuery,
-  useMyCommentAliasQuery,
+  useMyCommentAliasesQuery,
 } from "@/hooks/queries/use-community-comments";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -54,8 +54,8 @@ export function CommentSection({
     setPage(Math.max(0, totalPages - 1));
   }
 
-  const aliasQ = useMyCommentAliasQuery();
-  const myAlias = aliasQ.data ?? null;
+  const aliasQ = useMyCommentAliasesQuery();
+  const myAliases = aliasQ.data ?? [];
 
   const listError = comments.error ? classifyCommentError(comments.error) : null;
 
@@ -127,7 +127,7 @@ export function CommentSection({
               comment={comment}
               publicationId={publicationId}
               authenticated={authenticated}
-              myAlias={myAlias}
+              myAliases={myAliases}
             />
           ))}
         </ul>

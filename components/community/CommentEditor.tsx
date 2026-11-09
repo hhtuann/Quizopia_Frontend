@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils/cn";
 import { describeCommentError } from "./community-errors";
 import {
   useCreateCommentMutation,
-  useMyCommentAliasQuery,
+  useMyCommentAliasesQuery,
 } from "@/hooks/queries/use-community-comments";
 import {
   COMMUNITY_COMMENT_ALIAS_MAX,
@@ -23,8 +23,8 @@ import {
  * no ownership flag), so the FE cannot ask the server "do I already have a
  * display name?". It therefore keeps an alias field visible in the editor
  * UNTIL a create succeeds in this session — the create response's
- * `authorAlias` (the post-upsert STORED snapshot, §4) is written to the
- * cache-only `["community","comments","my-alias"]` entry and the field
+ * `authorAlias` (the post-upsert STORED snapshot, §4) is appended to the
+ * cache-only `["community","comments","my-alias"]` set and the field
  * collapses to "Posting as …". Consequences, deliberate:
  * - A user who commented in an earlier session sees the alias field once
  *   more; resubmitting the same name is a server-side no-op (§4 upsert), and
@@ -90,8 +90,9 @@ export function CommentBodyTextarea({
 
 export function CommentEditor({ publicationId }: { publicationId: number }) {
   const createMut = useCreateCommentMutation(publicationId);
-  const aliasQ = useMyCommentAliasQuery();
-  const storedAlias = aliasQ.data ?? null;
+  const aliasQ = useMyCommentAliasesQuery();
+  // The set's LAST entry is the caller's current stored alias.
+  const storedAlias = aliasQ.data?.at(-1) ?? null;
 
   const [body, setBody] = useState("");
   const [alias, setAlias] = useState(() => storedAlias ?? "");
@@ -111,7 +112,9 @@ export function CommentEditor({ publicationId }: { publicationId: number }) {
   // form, collapse the alias capture, surface the posted notice until the
   // next keystroke.
   const [posted, setPosted] = useState(false);
-  const errorCopy = createMut.error ? describeCommentError(createMut.error) : null;
+  const errorCopy = createMut.error
+    ? describeCommentError(createMut.error, "publication")
+    : null;
 
   const canSubmit = bodyOk && aliasOk && !createMut.isPending;
 

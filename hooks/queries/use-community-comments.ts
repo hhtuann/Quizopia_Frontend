@@ -29,12 +29,14 @@ import {
  * prefix (creates/deletes move the summary `commentCount` — §3 keeps the two
  * counts on the same VISIBLE predicate, so one settle keeps them honest).
  *
- * ALIAS KNOWLEDGE: the §5 comment DTO carries no ownership flag (an author is
- * public only as `authorAlias`), so the FE tracks the caller's own alias in a
- * cache-only entry under `["community","comments","my-alias"]`. It is written
- * from the first successful create's response (the post-upsert STORED alias
- * snapshot, §4) and is a SIBLING of the per-publication list keys, so list
- * invalidation never disturbs it. See `CommentSection` for the full UX
+ * ALIAS KNOWLEDGE: the §5 comment DTO carries no ownership flag (an author
+ * is public only as `authorAlias`), so the FE tracks the caller's own
+ * aliases in a cache-only SET under `["community","comments","my-alias"]`.
+ * Every successful create APPENDS the response's stored alias snapshot (the
+ * post-upsert value, §4; most recent last, no duplicates), so an in-session
+ * alias change never hides rows authored under the previous name. The entry
+ * is a SIBLING of the per-publication list keys, so list invalidation never
+ * disturbs it. See `CommentSection`/`CommentListItem` for the ownership
  * heuristic built on it.
  *
  * Mutations are EXPLICIT-LOADING (no optimistic updates); a 404 "gone"
@@ -45,20 +47,24 @@ import {
 /** §5 default list size (1..50; the backend clamps to the same range). */
 export { DEFAULT_COMMENT_PAGE_SIZE };
 
-/** Cache-only key holding the caller's known comment alias (see module doc). */
+/**
+ * Cache-only key holding the SET of aliases the caller has stored this
+ * session (see module doc) — most recent LAST, no duplicates.
+ */
 export const MY_COMMENT_ALIAS_KEY = ["community", "comments", "my-alias"] as const;
 
 /**
- * The caller's known comment alias — `string` once a create has succeeded in
- * this session, `null` before. Cache-only: never fetches (a forced refetch
- * round-trips the cached value), so invalidations can never clobber it.
+ * Every alias the caller has stored THIS session — append-only, most recent
+ * last (the LAST entry is the current alias), `[]` before the first create.
+ * Cache-only: never fetches (a forced refetch round-trips the cached
+ * value), so invalidations can never clobber it.
  */
-export function useMyCommentAliasQuery() {
+export function useMyCommentAliasesQuery() {
   const queryClient = useQueryClient();
   return useQuery({
     queryKey: MY_COMMENT_ALIAS_KEY,
     queryFn: () =>
-      queryClient.getQueryData<string | null>(MY_COMMENT_ALIAS_KEY) ?? null,
+      queryClient.getQueryData<readonly string[]>(MY_COMMENT_ALIAS_KEY) ?? [],
     enabled: false,
     staleTime: Infinity,
     gcTime: Infinity,
@@ -100,9 +106,9 @@ function useCommentInvalidation(publicationId: number) {
 
 /**
  * Create a comment (§5 POST). On success the response's stored `authorAlias`
- * becomes the caller's known alias; on 409 `COMMUNITY_ALIAS_TAKEN` the editor
- * surfaces the retry-with-another-name copy (nothing is invalidated — the
- * server aborted atomically, §4).
+ * is APPENDED to the caller's known alias set; on 409 `COMMUNITY_ALIAS_TAKEN`
+ * the editor surfaces the retry-with-another-name copy (nothing is
+ * invalidated — the server aborted atomically, §4).
  */
 export function useCreateCommentMutation(publicationId: number) {
   const queryClient = useQueryClient();
@@ -112,7 +118,16 @@ export function useCreateCommentMutation(publicationId: number) {
     mutationFn: (input: CreateCommentInput) =>
       createComment(publicationId, input),
     onSuccess: (created) => {
-      queryClient.setQueryData(MY_COMMENT_ALIAS_KEY, created.authorAlias);
+      // Append the stored snapshot to the session's alias SET (dedup, most
+      // recent last): an alias change keeps older own rows recognised, and
+      // the last entry stays the caller's current alias.
+      const known = (
+        queryClient.getQueryData<readonly string[]>(MY_COMMENT_ALIAS_KEY) ?? []
+      ).filter((alias) => alias !== created.authorAlias);
+      queryClient.setQueryData(MY_COMMENT_ALIAS_KEY, [
+        ...known,
+        created.authorAlias,
+      ]);
     },
     onSettled: () => {
       invalidateComments();

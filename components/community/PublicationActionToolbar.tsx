@@ -21,7 +21,10 @@ import {
   StarIcon,
   StarRatingInput,
 } from "@/components/community/StarRatingInput";
-import { describeBookmarkError } from "@/components/community/community-errors";
+import {
+  describeBookmarkError,
+  waitHint,
+} from "@/components/community/community-errors";
 import { classifySocialError } from "@/lib/api/community-social";
 import { Button, buttonVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
@@ -64,17 +67,8 @@ export interface PublicationActionTarget {
 }
 
 // formatAverage + StarIcon live in StarRatingInput (the star selector owns
-// them; imported here for the toolbar chips and dialog copy).
-
-/** Humanize a `Retry-After` wait for the 429 copy. */
-function waitHint(seconds: number | null): string {
-  if (seconds == null) return "please wait a moment and try again";
-  if (seconds < 60) {
-    return `wait about ${seconds} second${seconds === 1 ? "" : "s"} and try again`;
-  }
-  const minutes = Math.ceil(seconds / 60);
-  return `wait about ${minutes} minute${minutes === 1 ? "" : "s"} and try again`;
-}
+// them; imported here for the toolbar chips and dialog copy). `waitHint`
+// likewise lives in community-errors — the shared #67 429 helper.
 
 /**
  * Social-action copy. Distinct from the bookmark/fork copy because the

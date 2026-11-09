@@ -129,7 +129,7 @@ describe("star rating input — keyboard operation", () => {
     await waitFor(() => expect(putRatingMock).toHaveBeenCalledWith(7, 3));
   });
 
-  it("ArrowLeft cycles backwards; Home/End jump", async () => {
+  it("ArrowLeft moves backwards; Home/End jump", async () => {
     socialMock.mockResolvedValue(summary({ myRating: 3 }));
     mount();
     const three = await screen.findByRole("radio", { name: "3 stars" });
@@ -144,6 +144,24 @@ describe("star rating input — keyboard operation", () => {
     const five = screen.getByRole("radio", { name: "5 stars" });
     fireEvent.keyDown(five, { key: "Home" });
     await waitFor(() => expect(putRatingMock).toHaveBeenCalledWith(7, 1));
+  });
+
+  it("CLAMPS at the ends: ArrowRight on 5★ stays on 5★ (no wrap-and-downgrade), ArrowLeft on 1★ stays", async () => {
+    socialMock.mockResolvedValue(summary({ myRating: 5 }));
+    mount();
+    const five = await screen.findByRole("radio", { name: "5 stars" });
+    five.focus();
+
+    fireEvent.keyDown(five, { key: "ArrowRight" });
+    // A wrap would have submitted 1★ — a silent downgrade in one press.
+    expect(putRatingMock).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(five);
+
+    const one = screen.getByRole("radio", { name: "1 star" });
+    one.focus();
+    fireEvent.keyDown(one, { key: "ArrowLeft" });
+    expect(putRatingMock).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(one);
   });
 });
 

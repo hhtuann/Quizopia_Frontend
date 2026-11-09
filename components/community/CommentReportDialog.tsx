@@ -149,7 +149,7 @@ export function CommentReportDialog({
         )}
         {reportMut.error && (
           <p role="alert" className="text-sm font-medium text-[#EF4444]">
-            {describeCommentError(reportMut.error)}
+            {describeCommentError(reportMut.error, "comment")}
           </p>
         )}
       </form>

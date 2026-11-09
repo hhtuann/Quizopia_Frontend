@@ -33,10 +33,11 @@ import type { CurrentUserResponse } from "@/lib/auth/types";
  * P3-C3 (#67) — the compact publication action toolbar. Auth-state matrices
  * (guest login CTAs with returnTo + public-summary counts, STUDENT fork
  * state, TEACHER consent-dialog flow), like toggle (PUT then DELETE, count
- * refresh, in-flight disable), the minimal ratings dialog (#68 seam: average
- * + count + Clear via the REAL deleteRating mutation), rating-value
- * pass-through into putRating, safe-DOM leak checks with poisoned fixtures,
- * and the §7 wrap/target contract (flex-wrap row, 44px controls).
+ * refresh, in-flight disable), the #68 rate dialog hosting the REAL
+ * StarRatingInput (fieldset/legend radiogroup, live aggregate + own rating,
+ * Clear via the REAL deleteRating mutation), rating-value pass-through
+ * into putRating, safe-DOM leak checks with poisoned fixtures, and the §7
+ * wrap/target contract (flex-wrap row, 44px controls).
  */
 
 const push = vi.fn();
