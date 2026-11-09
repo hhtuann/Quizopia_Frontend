@@ -22,6 +22,8 @@ import {
   type PublicSocialSummary,
 } from "@/lib/api/community-social";
 import type * as SocialApi from "@/lib/api/community-social";
+import { listComments } from "@/lib/api/community-comments";
+import type * as CommentsApi from "@/lib/api/community-comments";
 import { useAuth } from "@/hooks/useAuth";
 import { sanitizeReturnTo } from "@/lib/auth/redirect";
 import type { CurrentUserResponse } from "@/lib/auth/types";
@@ -80,6 +82,19 @@ vi.mock("@/lib/api/community-social", async (importOriginal) => {
   };
 });
 
+// #68 discussion body — mocked transport (empty page) so the shared-suite
+// assertions stay about the detail surface, not the comment list.
+vi.mock("@/lib/api/community-comments", async (importOriginal) => {
+  const actual = await importOriginal<typeof CommentsApi>();
+  return {
+    ...actual,
+    listComments: vi.fn(),
+    createComment: vi.fn(),
+    updateComment: vi.fn(),
+    deleteComment: vi.fn(),
+    reportComment: vi.fn(),
+  };
+});
 vi.mock("@/hooks/useAuth", () => ({ useAuth: vi.fn() }));
 
 function detail(
@@ -194,6 +209,14 @@ beforeEach(() => {
     ...socialSummary(),
     liked: false,
     myRating: null,
+  });
+  vi.mocked(listComments).mockResolvedValue({
+    items: [],
+    page: 0,
+    size: 20,
+    totalElements: 0,
+    totalPages: 0,
+    sort: "createdAt: DESC",
   });
 });
 afterEach(cleanup);

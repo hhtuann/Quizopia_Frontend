@@ -100,3 +100,68 @@ export const moderationNoteFormSchema = z.object({
   note: moderationNoteSchema.optional(),
 });
 export type ModerationNoteValues = z.infer<typeof moderationNoteFormSchema>;
+
+/* ------------------------------------------------------------------ */
+/* Community comments (P3-C4, issue #68 — ADR-007 §3/§4/§5)            */
+/* ------------------------------------------------------------------ */
+
+/** §3 `community_comments.body` bound — trimmed, non-blank, ≤2000 chars. */
+export const COMMUNITY_COMMENT_BODY_MAX = 2000;
+
+/** §4/§3 comment-author alias bound — 1–80 characters after trim. */
+export const COMMUNITY_COMMENT_ALIAS_MAX = 80;
+
+/** §3 `community_comment_reports.details` bound. */
+export const COMMUNITY_COMMENT_REPORT_DETAILS_MAX = 500;
+
+/** Comment body — the server trims and rejects blank/control-only text. */
+export const communityCommentBodySchema = z
+  .string()
+  .trim()
+  .min(1, "Write a comment before posting.")
+  .max(
+    COMMUNITY_COMMENT_BODY_MAX,
+    `Comments must be ${COMMUNITY_COMMENT_BODY_MAX} characters or fewer.`
+  );
+
+/** Comment-author display name (§4 consent-based pseudonym). */
+export const communityCommentAliasSchema = z
+  .string()
+  .trim()
+  .min(1, "A display name is required to comment.")
+  .max(
+    COMMUNITY_COMMENT_ALIAS_MAX,
+    `Display names must be ${COMMUNITY_COMMENT_ALIAS_MAX} characters or fewer.`
+  );
+
+/** Create-comment form — `alias` is required until the first success stores one. */
+export const createCommentFormSchema = z.object({
+  body: communityCommentBodySchema,
+  alias: communityCommentAliasSchema.optional(),
+});
+export type CreateCommentFormValues = z.infer<typeof createCommentFormSchema>;
+
+/** Inline edit form — body only (aliases never change through edits). */
+export const updateCommentFormSchema = z.object({
+  body: communityCommentBodySchema,
+});
+export type UpdateCommentFormValues = z.infer<typeof updateCommentFormSchema>;
+
+/**
+ * Report-comment form — one §3 reason code plus optional free-text details.
+ * The reason select starts empty ("Choose a reason…"), so `reasonCode`
+ * accepts "" only to fail validation with the actionable message.
+ */
+export const commentReportFormSchema = z.object({
+  reasonCode: z
+    .string()
+    .min(1, "Choose a reason for the report."),
+  details: z
+    .string()
+    .max(
+      COMMUNITY_COMMENT_REPORT_DETAILS_MAX,
+      `Details must be ${COMMUNITY_COMMENT_REPORT_DETAILS_MAX} characters or fewer.`
+    )
+    .optional(),
+});
+export type CommentReportFormValues = z.infer<typeof commentReportFormSchema>;

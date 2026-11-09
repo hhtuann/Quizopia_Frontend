@@ -11,6 +11,7 @@ import {
 } from "@/hooks/queries/use-community-social";
 import { useAuth } from "@/hooks/useAuth";
 import { PublicationActionToolbar } from "@/components/community/PublicationActionToolbar";
+import { CommentSection } from "@/components/community/CommentSection";
 import { Badge, Card, buttonVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { buildLoginRedirect } from "@/lib/auth/redirect";
@@ -34,8 +35,9 @@ import type { NormalizedApiError } from "@/lib/api";
  * dialog, idempotent explicit-loading writes). The rating aggregate moves
  * into the metadata area — rendered for guests too, fed by the ANONYMOUS
  * social-summary — and the Comment button anchor-scrolls to the labelled
- * `#discussion` section below the toolbar (the full discussion section is
- * #68; today it renders the heading with the live comment count).
+ * `#discussion` section below the toolbar, whose body (#68) is the paginated
+ * discussion: newest-first plain-text comments with the alias-consent editor,
+ * own edit/delete, report dialog and star-rating selector.
  */
 
 function formatDate(iso: string): string {
@@ -242,9 +244,9 @@ export default function PublicationDetailPage() {
         loginHref={loginHref}
       />
 
-      {/* #68 lands the full discussion section here; the Comment button
-          anchor-scrolls to this labelled section (comments stay readable for
-          guests — no login detour). */}
+      {/* #68 discussion section: the page keeps the labelled `#discussion`
+          anchor + live count heading (the toolbar's Comment button
+          anchor-scrolls here); the section body owns the list + editor. */}
       <section
         id="discussion"
         aria-labelledby="discussion-heading"
@@ -257,9 +259,7 @@ export default function PublicationDetailPage() {
           Community Discussion
           {social ? ` (${social.commentCount})` : ""}
         </h2>
-        <p className="mt-2 text-sm text-[#64748B]">
-          Comments open with the community discussion update (#68).
-        </p>
+        <CommentSection publicationId={data.publicationId} loginHref={loginHref} />
       </section>
     </div>
   );

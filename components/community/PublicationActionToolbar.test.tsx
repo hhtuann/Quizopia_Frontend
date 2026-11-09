@@ -408,7 +408,7 @@ describe("publication action toolbar — authenticated (#67)", () => {
     ).toBeTruthy();
   });
 
-  it("opens the minimal ratings dialog (#68 seam): aggregate + own rating + Clear via DELETE", async () => {
+  it("hosts the #68 star selector in the rate dialog: radiogroup + aggregate + Clear via DELETE", async () => {
     asUser();
     socialMock.mockResolvedValue(
       socialSummary({ average: 4.25, ratingCount: 8, myRating: 4 })
@@ -424,6 +424,13 @@ describe("publication action toolbar — authenticated (#67)", () => {
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("4.25 / 5 · 8 ratings")).toBeTruthy();
     expect(within(dialog).getByText("Your rating: 4")).toBeTruthy();
+    // The accessible 1–5 radiogroup replaced the #67 seam content.
+    const group = within(dialog).getByTestId("star-radiogroup");
+    expect(group.getAttribute("role")).toBe("radiogroup");
+    expect(within(dialog).getByRole("radio", { name: "4 stars" })).toBeTruthy();
+    expect(
+      within(dialog).getByRole("radio", { name: "4 stars" }).getAttribute("aria-checked")
+    ).toBe("true");
 
     const clear = within(dialog).getByRole("button", {
       name: "Clear my rating",

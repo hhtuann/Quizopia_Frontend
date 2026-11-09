@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import {
   useDeleteLikeMutation,
-  useDeleteRatingMutation,
   usePublicSocialSummaryQuery,
   usePutLikeMutation,
   useSocialSummaryQuery,
@@ -17,9 +16,14 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { ForkPublicationDialog } from "@/components/community/ForkPublicationDialog";
 import { CommunityDialog } from "@/components/community/CommunityDialog";
+import {
+  formatAverage,
+  StarIcon,
+  StarRatingInput,
+} from "@/components/community/StarRatingInput";
 import { describeBookmarkError } from "@/components/community/community-errors";
 import { classifySocialError } from "@/lib/api/community-social";
-import { Badge, Button, buttonVariants } from "@/components/ui";
+import { Button, buttonVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -44,13 +48,10 @@ import { cn } from "@/lib/utils/cn";
  * (probe-derived state + idempotent PUT/DELETE — REUSED from
  * use-community-bookmarks, not duplicated).
  *
- * #68 SEAM — RATE: this issue ships the toolbar Rate control (renders the
- * average, opens this minimal ratings dialog with the aggregate + own
- * rating + Clear) and the full mutation set (`usePutRatingMutation` /
- * `useDeleteRatingMutation` in use-community-social). The accessible 1–5
- * star radiogroup selector that CALLS `usePutRatingMutation` is #68's
- * deliverable per the epic split; wiring it means replacing the
- * `RATE_DIALOG_SEAM` block below with the selector, everything else stays.
+ * RATE (#68): the rate dialog hosts the accessible 1–5 star radiogroup
+ * (`StarRatingInput` — submit-on-selection, Clear, publisher self-rating
+ * 409 informative state). The selector owns its PUT/DELETE mutations; the
+ * toolbar only opens the dialog and keeps the aggregate chip in sync.
  */
 
 /** §7 detail allowlist slice the toolbar actions need (nothing more). */
@@ -62,16 +63,8 @@ export interface PublicationActionTarget {
   allowFork: boolean;
 }
 
-/**
- * §7 aggregate formatting — 2 decimals with trailing zeros trimmed
- * (`4.58 → "4.58"`, `4.6 → "4.6"`, `4 → "4"`), `—` when `null`
- * (zero ratings).
- */
-export function formatAverage(average: number | null): string {
-  if (average == null || !Number.isFinite(average)) return "—";
-  const trimmed = average.toFixed(2).replace(/\.?0+$/, "");
-  return trimmed === "" ? "0" : trimmed;
-}
+// formatAverage + StarIcon live in StarRatingInput (the star selector owns
+// them; imported here for the toolbar chips and dialog copy).
 
 /** Humanize a `Retry-After` wait for the 429 copy. */
 function waitHint(seconds: number | null): string {
@@ -153,17 +146,7 @@ function CommentIcon() {
   );
 }
 
-function StarIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg {...iconProps(filled)}>
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z"
-      />
-    </svg>
-  );
-}
+// StarIcon moved to StarRatingInput — imported above.
 
 function ForkIcon() {
   return (
@@ -249,8 +232,7 @@ export function PublicationActionToolbar({
   const removeMut = useRemoveBookmarkMutation();
   const saveBusy = saveMut.isPending || removeMut.isPending;
 
-  // Rate dialog (#68 seam — see module doc).
-  const clearRatingMut = useDeleteRatingMutation(id);
+  // Rate dialog (#68) — StarRatingInput owns the rating mutations.
   const myRating = mySummary.data?.myRating ?? null;
   const [rateOpen, setRateOpen] = useState(false);
 
@@ -293,15 +275,6 @@ export function PublicationActionToolbar({
       setNotice({ kind: "success", message: "Removed from your collection." });
     } catch (err) {
       setNotice({ kind: "error", message: describeBookmarkError(err) });
-    }
-  };
-
-  const onClearRating = async () => {
-    setNotice(null);
-    try {
-      await clearRatingMut.mutateAsync();
-    } catch (err) {
-      setNotice({ kind: "error", message: describeSocialError(err) });
     }
   };
 
@@ -481,49 +454,17 @@ export function PublicationActionToolbar({
         </p>
       )}
 
-      {/* RATE_DIALOG_SEAM (#68): minimal aggregate dialog — the accessible
-          1–5 star radiogroup selector that sets a rating lands with the
-          community discussion update; Clear (DELETE) is live today. */}
+      {/* Rate dialog (#68): StarRatingInput owns the aggregate line, the
+          accessible 1–5 radiogroup (submit-on-selection PUT), Clear (DELETE)
+          and the publisher self-rating 409 informative state. */}
       <CommunityDialog
         open={rateOpen}
         titleId="rate-dialog-title"
         title="Ratings"
         description="How the community rates this quiz."
         onCancel={() => setRateOpen(false)}
-        busy={clearRatingMut.isPending}
       >
-        <div className="space-y-4">
-          <p className="flex items-center gap-2 text-sm font-medium text-[#0F172A]">
-            <StarIcon filled={summary != null && (summary.average ?? 0) > 0} />
-            {summary
-              ? `${formatAverage(summary.average)} / 5 · ${summary.ratingCount} ${summary.ratingCount === 1 ? "rating" : "ratings"}`
-              : "Loading ratings…"}
-          </p>
-          {myRating != null ? (
-            <div className="space-y-2">
-              <Badge variant="accent">Your rating: {myRating}</Badge>
-              <div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-11"
-                  disabled={clearRatingMut.isPending}
-                  aria-busy={clearRatingMut.isPending}
-                  onClick={onClearRating}
-                >
-                  {clearRatingMut.isPending ? <Spinner /> : null}
-                  Clear my rating
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <p className="text-xs leading-relaxed text-[#64748B]">
-              Star ratings open with the community discussion update (#68) —
-              the average and count above are live.
-            </p>
-          )}
-        </div>
+        <StarRatingInput publicationId={id} />
       </CommunityDialog>
 
       {/* Mounted for the whole dialog session (see `forkOpen`) — the source
