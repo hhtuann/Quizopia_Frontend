@@ -11,6 +11,7 @@ describe("fluid shell + bounded card collection design contract", () => {
     expect(css).toMatch(/\.adaptive-grid\s*>\s*\*\s*\{[\s\S]*?max-width:\s*var\(--collection-card-max\)/);
     expect(css).toMatch(/--collection-card-min:\s*18rem/);
     expect(css).toMatch(/--collection-card-max:\s*24rem/);
+    expect(css).toMatch(/\.adaptive-grid--wide\s*\{[\s\S]*?--collection-card-min:\s*24rem/);
     expect(css).toMatch(/\.adaptive-grid--wide\s*\{[\s\S]*?--collection-card-max:\s*36rem/);
     expect(css).not.toMatch(/repeat\(auto-fit,\s*minmax/);
   });

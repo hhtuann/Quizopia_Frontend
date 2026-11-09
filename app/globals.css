@@ -118,7 +118,7 @@ body {
 
 /* Content-rich record cards: Community ownership and moderation workflows. */
 .adaptive-grid--wide {
-  --collection-card-min: 21rem;
+  --collection-card-min: 24rem;
   --collection-card-max: 36rem;
 }
 
