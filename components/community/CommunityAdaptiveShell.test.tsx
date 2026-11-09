@@ -41,13 +41,19 @@ describe("CommunityAdaptiveShell", () => {
     show("authenticated");
     expect(screen.getByTestId("authenticated-app-shell")).toBeTruthy();
     expect(screen.queryByTestId("guest-public-header")).toBeNull();
-    expect(screen.getByText("Public catalog")).toBeTruthy();
+    const catalog = screen.getByText("Public catalog");
+    expect(catalog).toBeTruthy();
+    expect(catalog.parentElement?.classList.contains("page-fluid")).toBe(true);
+    expect(catalog.parentElement?.className).not.toContain("max-w-");
   });
 
   it("keeps the catalog public for anonymous visitors", () => {
     show("unauthenticated");
     expect(screen.getByTestId("guest-public-header")).toBeTruthy();
     expect(screen.queryByTestId("authenticated-app-shell")).toBeNull();
-    expect(screen.getByText("Public catalog")).toBeTruthy();
+    const catalog = screen.getByText("Public catalog");
+    expect(catalog).toBeTruthy();
+    expect(catalog.parentElement?.classList.contains("page-fluid")).toBe(true);
+    expect(catalog.parentElement?.className).not.toContain("max-w-");
   });
 });
