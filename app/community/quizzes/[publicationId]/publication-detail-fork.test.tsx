@@ -9,6 +9,9 @@ import {
   type PublicPublicationDetail,
 } from "@/lib/api/community";
 import { listMyBookmarks } from "@/lib/api/community-bookmarks";
+import type * as BookmarksApi from "@/lib/api/community-bookmarks";
+import { getPublicSocialSummary, getSocialSummary } from "@/lib/api/community-social";
+import type * as SocialApi from "@/lib/api/community-social";
 import { forkPublication } from "@/lib/api/community-fork";
 import type * as ForkApi from "@/lib/api/community-fork";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,13 +19,14 @@ import { sanitizeReturnTo } from "@/lib/auth/redirect";
 import type { CurrentUserResponse } from "@/lib/auth/types";
 
 /**
- * P3-B2-FE (#48) — fork CTA gating on the public detail page: NO_FORK ships
- * no fork UI at all, guests get the `returnTo` login CTA with zero fork
- * traffic, STUDENT gets the explanatory non-actionable state, TEACHER (incl.
- * dual-role) runs the full consent → 201 → attribution → /exams/{id} flow,
- * and a 404 mid-flight surfaces the neutral copy while the community tree
- * invalidates (the #46 pattern). #43/#46 assertions live in
- * publication-detail.test.tsx and stay untouched.
+ * P3-B2-FE (#48) + #67 toolbar integration — fork gating on the public
+ * detail page's compact toolbar: NO_FORK ships no fork control at all,
+ * guests get the `returnTo` login CTA with zero fork traffic, STUDENT gets
+ * the explanatory non-actionable state, TEACHER (incl. dual-role) runs the
+ * full consent → 201 → attribution → /exams/{id} flow, and a 404 mid-flight
+ * surfaces the neutral copy while the community tree invalidates (the #46
+ * pattern). #43/#46/#67 assertions live in publication-detail.test.tsx and
+ * PublicationActionToolbar.test.tsx.
  */
 
 const { state } = vi.hoisted(() => ({ state: { id: "7" } }));
@@ -42,13 +46,30 @@ vi.mock("@/lib/api/community", () => ({
   getPublicPublication: vi.fn(),
 }));
 
-vi.mock("@/lib/api/community-bookmarks", () => ({
-  listMyBookmarks: vi.fn(),
-  putBookmark: vi.fn(),
-  deleteBookmark: vi.fn(),
-}));
-
 // Real classifier/constants, mocked transport only.
+vi.mock("@/lib/api/community-bookmarks", async (importOriginal) => {
+  const actual = await importOriginal<typeof BookmarksApi>();
+  return {
+    ...actual,
+    listMyBookmarks: vi.fn(),
+    putBookmark: vi.fn(),
+    deleteBookmark: vi.fn(),
+  };
+});
+
+vi.mock("@/lib/api/community-social", async (importOriginal) => {
+  const actual = await importOriginal<typeof SocialApi>();
+  return {
+    ...actual,
+    getPublicSocialSummary: vi.fn(),
+    getSocialSummary: vi.fn(),
+    putLike: vi.fn(),
+    deleteLike: vi.fn(),
+    putRating: vi.fn(),
+    deleteRating: vi.fn(),
+  };
+});
+
 vi.mock("@/lib/api/community-fork", async (importOriginal) => {
   const actual = await importOriginal<typeof ForkApi>();
   return { ...actual, forkPublication: vi.fn() };
@@ -58,18 +79,9 @@ vi.mock("@/hooks/useAuth", () => ({ useAuth: vi.fn() }));
 
 const detailMock = vi.mocked(getPublicPublication);
 const bookmarksMock = vi.mocked(listMyBookmarks);
+const publicSocialMock = vi.mocked(getPublicSocialSummary);
+const socialMock = vi.mocked(getSocialSummary);
 const fork = vi.mocked(forkPublication);
-
-vi.mock("@/lib/api/community-bookmarks", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@/lib/api/community-bookmarks")>();
-  return {
-    ...actual,
-    listMyBookmarks: vi.fn(),
-    putBookmark: vi.fn(),
-    deleteBookmark: vi.fn(),
-  };
-});
 
 function detail(
   overrides: Partial<PublicPublicationDetail> = {}
@@ -148,12 +160,26 @@ beforeEach(() => {
     totalElements: 0,
     totalPages: 0,
   });
+  publicSocialMock.mockResolvedValue({
+    likeCount: 12,
+    average: 4.5,
+    ratingCount: 8,
+    commentCount: 3,
+  });
+  socialMock.mockResolvedValue({
+    likeCount: 12,
+    average: 4.5,
+    ratingCount: 8,
+    commentCount: 3,
+    liked: false,
+    myRating: null,
+  });
   push.mockReset();
 });
 afterEach(cleanup);
 
-describe("public detail fork section (#48)", () => {
-  it("renders NO fork UI at all for a NO_FORK publication (any caller)", async () => {
+describe("public detail fork section (#48, via the #67 toolbar)", () => {
+  it("renders NO fork control at all for a NO_FORK publication (any caller)", async () => {
     const setups: [string, () => void][] = [
       ["guest", asGuest],
       ["student", () => asUser(["STUDENT"])],
@@ -167,12 +193,15 @@ describe("public detail fork section (#48)", () => {
       mount();
       await screen.findByRole("heading", { level: 1, name: "Algebra fundamentals" });
 
-      expect(
-        screen.queryByRole("button", { name: "Fork this quiz" })
-      ).toBeNull();
       expect(screen.queryByTestId("sign-in-to-fork")).toBeNull();
-      expect(screen.queryByText(/Requires a teacher account/i)).toBeNull();
-      expect(screen.queryByText(/Make it yours/i)).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: /^Fork$/ })
+      ).toBeNull();
+      expect(
+        screen.queryByRole("button", {
+          name: /Only teacher accounts can fork quizzes/,
+        })
+      ).toBeNull();
       expect(fork).not.toHaveBeenCalled();
     }
   });
@@ -189,7 +218,7 @@ describe("public detail fork section (#48)", () => {
         new URLSearchParams(href.slice("/login".length)).get("returnTo")
       )
     ).toBe("/community/quizzes/7");
-    expect(screen.queryByRole("button", { name: "Fork this quiz" })).toBeNull();
+    expect(screen.queryAllByRole("button", { name: "Fork" })).toHaveLength(0);
     expect(fork).not.toHaveBeenCalled();
     expect(bookmarksMock).not.toHaveBeenCalled();
   });
@@ -198,14 +227,12 @@ describe("public detail fork section (#48)", () => {
     asUser(["STUDENT"]);
     mount();
 
-    expect(
-      await screen.findByText(/Requires a teacher account/i)
-    ).toBeTruthy();
-    expect(
-      screen.getByText(/Only teacher accounts can fork quizzes/i)
-    ).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Fork this quiz" })).toBeNull();
-    expect(screen.queryByTestId("sign-in-to-fork")).toBeNull();
+    const forkCta = (await screen.findByRole("button", {
+      name: /Only teacher accounts can fork quizzes/,
+    })) as HTMLButtonElement;
+    expect(forkCta.disabled).toBe(true);
+    fireEvent.click(forkCta);
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(fork).not.toHaveBeenCalled();
   });
 
@@ -220,13 +247,11 @@ describe("public detail fork section (#48)", () => {
     });
     mount();
 
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Fork this quiz" })
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "Fork" }));
     const dialog = await screen.findByRole("dialog");
 
-    // Explicit consent before the POST goes out (scoped: the page CTA behind
-    // the modal shares the "Fork this quiz" name).
+    // Explicit consent before the POST goes out (scoped: the page toolbar
+    // button behind the modal no longer shares the confirm button's name).
     fireEvent.click(
       within(dialog).getByLabelText(/independent, editable copy of this quiz/i)
     );
@@ -246,7 +271,7 @@ describe("public detail fork section (#48)", () => {
     mount();
 
     expect(
-      await screen.findByRole("button", { name: "Fork this quiz" })
+      await screen.findByRole("button", { name: "Fork" })
     ).toBeTruthy();
   });
 
@@ -261,9 +286,7 @@ describe("public detail fork section (#48)", () => {
     });
     mount();
 
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Fork this quiz" })
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "Fork" }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(
       within(dialog).getByLabelText(/independent, editable copy of this quiz/i)

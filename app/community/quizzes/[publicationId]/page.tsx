@@ -2,23 +2,23 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
-import { useCommunityPublicationQuery } from "@/hooks/queries/use-community";
 import {
-  usePublicationSavedQuery,
-  useRemoveBookmarkMutation,
-  useSaveBookmarkMutation,
-} from "@/hooks/queries/use-community-bookmarks";
+  useCommunityPublicationQuery,
+} from "@/hooks/queries/use-community";
+import {
+  usePublicSocialSummaryQuery,
+  useSocialSummaryQuery,
+} from "@/hooks/queries/use-community-social";
 import { useAuth } from "@/hooks/useAuth";
-import { ForkPublicationDialog } from "@/components/community/ForkPublicationDialog";
-import { describeBookmarkError } from "@/components/community/community-errors";
-import { Badge, Button, Card, buttonVariants } from "@/components/ui";
+import { PublicationActionToolbar } from "@/components/community/PublicationActionToolbar";
+import { Badge, Card, buttonVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { buildLoginRedirect } from "@/lib/auth/redirect";
 import type { NormalizedApiError } from "@/lib/api";
 
 /**
- * Public Community quiz detail (P3-A-FE1, issue #43 — ADR-006 §7/§10).
+ * Public Community quiz detail (P3-A-FE1, issue #43 — ADR-006 §7/§10;
+ * social toolbar per ADR-007 §7, issue #67).
  *
  * Anonymous, safe-by-construction: renders ONLY the `PublicPublicationDetail`
  * allowlist (title, alias credit, category, tags, counts, duration, dates) as
@@ -28,21 +28,14 @@ import type { NormalizedApiError } from "@/lib/api";
  * A 404 (absent, unpublished, hidden or archived source) renders a neutral
  * not-available state — the §7 anti-enumeration posture gives no reason why.
  *
- * Save CTA (#46): guests get the "Sign in to save" link carrying `returnTo`
- * (also what SSR/first paint renders while auth status resolves — no wrong
- * state flash); signed-in STUDENT/TEACHER users get the explicit-loading
- * Save/Remove toggle backed by the idempotent PUT/DELETE (no optimistic
- * updates). A 404 mid-save surfaces "no longer available" copy and the
- * mutation invalidates the whole community tree so this page refetches into
- * the neutral not-available state.
- *
- * Fork CTA (#48, ADR-006 §7/§10): rendered ONLY when `allowFork` is true
- * (NO_FORK publications ship no fork UI at all). Guests get the login CTA
- * carrying the same `returnTo`; STUDENT gets an explanatory
- * "requires a teacher account" state (non-actionable); TEACHER opens the
- * consent dialog in ForkPublicationDialog, which owns the per-action
- * `Idempotency-Key` lifecycle, the 200/201/403/409/429/404 handling and the
- * `/exams/{targetExamId}` navigation.
+ * The two large Save/Fork panels are gone: one compact toolbar (#67) below the
+ * metadata card owns Like/Comment/Rate/Fork/Save with the full §7 auth matrix
+ * (guest login CTAs with `returnTo`, STUDENT fork state, TEACHER consent
+ * dialog, idempotent explicit-loading writes). The rating aggregate moves
+ * into the metadata area — rendered for guests too, fed by the ANONYMOUS
+ * social-summary — and the Comment button anchor-scrolls to the labelled
+ * `#discussion` section below the toolbar (the full discussion section is
+ * #68; today it renders the heading with the live comment count).
  */
 
 function formatDate(iso: string): string {
@@ -59,47 +52,8 @@ export default function PublicationDetailPage() {
   const { publicationId } = useParams<{ publicationId: string }>();
   const id = Number(publicationId);
   const validId = Number.isInteger(id) && id > 0;
-  const { status, user } = useAuth();
+  const { status } = useAuth();
   const authenticated = status === "authenticated";
-  // §7 auth matrix: only TEACHER-role callers may fork (dual-role users
-  // qualify); STUDENT sees the explanatory non-actionable state.
-  const isTeacher = (user?.roles ?? []).includes("TEACHER");
-  const { saved, isPending: savedPending } = usePublicationSavedQuery(
-    id,
-    authenticated && validId
-  );
-  const saveMut = useSaveBookmarkMutation();
-  const removeMut = useRemoveBookmarkMutation();
-  const [notice, setNotice] = useState<{
-    kind: "success" | "error";
-    message: string;
-  } | null>(null);
-  // Fork dialog (#48) — one session from button click to dialog close; it
-  // stays mounted while open even if a refetch flips `allowFork`, so a 403
-  // explanation is never yanked away mid-read.
-  const [forkOpen, setForkOpen] = useState(false);
-
-  const busy = saveMut.isPending || removeMut.isPending;
-
-  const onSave = async () => {
-    setNotice(null);
-    try {
-      await saveMut.mutateAsync(id);
-      setNotice({ kind: "success", message: "Saved to your collection." });
-    } catch (err) {
-      setNotice({ kind: "error", message: describeBookmarkError(err) });
-    }
-  };
-
-  const onRemove = async () => {
-    setNotice(null);
-    try {
-      await removeMut.mutateAsync(id);
-      setNotice({ kind: "success", message: "Removed from your collection." });
-    } catch (err) {
-      setNotice({ kind: "error", message: describeBookmarkError(err) });
-    }
-  }
 
   const { data, isPending, isError, error } = useCommunityPublicationQuery(
     id,
@@ -109,6 +63,14 @@ export default function PublicationDetailPage() {
   const notFound =
     normalized?.kind === "api" &&
     (normalized.status === 404 || normalized.code === "COMMUNITY_NOT_FOUND");
+
+  // §5 social-summary twins: the anonymous one feeds the guest-visible
+  // aggregates, the authenticated one (aggregates + caller states) takes
+  // over for signed-in users. The toolbar holds its own copies under the
+  // same keys — one request, one cache entry.
+  const publicSocial = usePublicSocialSummaryQuery(id, validId && !authenticated);
+  const mySocial = useSocialSummaryQuery(id, validId && authenticated);
+  const social = authenticated ? mySocial.data : publicSocial.data;
 
   // `returnTo` preserves this exact URL across the login round-trip.
   const loginHref = buildLoginRedirect(`/community/quizzes/${publicationId}`, "");
@@ -187,7 +149,7 @@ export default function PublicationDetailPage() {
         Back to community
       </Link>
 
-      <Card variant="elevated" className="mt-4 p-6 sm:p-10">
+      <Card variant="elevated" className="p-6 sm:p-10">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="accent">{data.categoryTitle ?? "Uncategorised"}</Badge>
           {data.allowFork && <Badge>Forkable</Badge>}
@@ -233,6 +195,32 @@ export default function PublicationDetailPage() {
           </div>
         </dl>
 
+        {/* §7 aggregate — guest-visible, fed by the anonymous social-summary
+            ("—" until it lands, and for a null average = zero ratings). */}
+        <p
+          data-testid="rating-aggregate"
+          className="mt-4 flex items-center gap-1.5 text-sm font-medium text-[#0F172A]"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.8}
+            className="h-4 w-4 shrink-0 text-[#F59E0B]"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z"
+            />
+          </svg>
+          {social
+            ? `${formatAvg(social.average)} / 5 · ${social.ratingCount} ${social.ratingCount === 1 ? "rating" : "ratings"}`
+            : "— / 5"}
+        </p>
+
         {data.tags.length > 0 && (
           <div className="mt-6 flex flex-wrap gap-1.5">
             {data.tags.map((tag) => (
@@ -240,137 +228,48 @@ export default function PublicationDetailPage() {
             ))}
           </div>
         )}
-
-        {/* Save panel (#46): guests → login CTA with returnTo; signed-in
-            users → explicit-loading idempotent Save/Remove toggle. */}
-        <div className="mt-8 flex flex-col gap-3 rounded-xl border border-[#0052FF]/20 bg-[#0052FF]/5 p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm font-medium text-[#0F172A]">
-              Save this quiz to your personal collection to find it later.
-            </p>
-            {authenticated ? (
-              <Button
-                type="button"
-                variant={saved ? "outline" : "primary"}
-                size="sm"
-                className="h-11 shrink-0"
-                disabled={busy || savedPending}
-                aria-busy={busy || savedPending}
-                onClick={saved ? onRemove : onSave}
-              >
-                {busy || savedPending ? <Spinner /> : null}
-                {savedPending
-                  ? "Checking…"
-                  : saveMut.isPending
-                    ? "Saving…"
-                    : removeMut.isPending
-                      ? "Removing…"
-                      : saved
-                        ? "Remove from saved"
-                        : "Save to my collection"}
-              </Button>
-            ) : (
-              <Link
-                href={loginHref}
-                data-testid="sign-in-to-save"
-                className={cn(buttonVariants({ variant: "primary", size: "sm" }), "h-11 shrink-0")}
-              >
-                Sign in to save
-              </Link>
-            )}
-          </div>
-          {notice && (
-            <p
-              role={notice.kind === "success" ? "status" : "alert"}
-              className={cn(
-                "rounded-lg border px-3 py-2 text-sm font-medium",
-                notice.kind === "success"
-                  ? "border-[#10B981]/30 bg-[#10B981]/5 text-[#0F172A]"
-                  : "border-[#EF4444]/30 bg-[#EF4444]/5 text-[#EF4444]"
-              )}
-            >
-              {notice.message}
-            </p>
-          )}
-        </div>
-
-        {/* Fork panel (#48): rendered ONLY while `allowFork` is true — a
-            NO_FORK publication ships no fork UI at all. Guests get the
-            login CTA (same `returnTo` continuation as save); STUDENT gets
-            the explanatory non-actionable state; TEACHER opens the consent
-            dialog. */}
-        {data.allowFork && (
-          <div className="mt-4 flex flex-col gap-3 rounded-xl border border-[#10B981]/25 bg-[#10B981]/5 p-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm font-medium text-[#0F172A]">
-                Make it yours — fork an independent, editable draft with every
-                question and its correct answers.
-              </p>
-              {authenticated ? (
-                isTeacher ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-11 shrink-0"
-                    onClick={() => setForkOpen(true)}
-                  >
-                    Fork this quiz
-                  </Button>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#64748B]">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={2}
-                      stroke="currentColor"
-                      className="h-4 w-4 shrink-0"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
-                      />
-                    </svg>
-                    Requires a teacher account
-                  </span>
-                )
-              ) : (
-                <Link
-                  href={loginHref}
-                  data-testid="sign-in-to-fork"
-                  className={cn(buttonVariants({ variant: "primary", size: "sm" }), "h-11 shrink-0")}
-                >
-                  Sign in to fork
-                </Link>
-              )}
-            </div>
-            {authenticated && !isTeacher && (
-              <p className="text-xs leading-relaxed text-[#64748B]">
-                Only teacher accounts can fork quizzes into their own drafts.
-                You can still save this quiz to your collection above.
-              </p>
-            )}
-          </div>
-        )}
       </Card>
 
-      {/* Mounted for the whole dialog session (see `forkOpen`) — the source
-          data may refetch underneath it after a 403/404 (#48). */}
-      {forkOpen && data && (
-        <ForkPublicationDialog
-          open
-          publication={{
-            publicationId: data.publicationId,
-            title: data.title,
-            authorName: data.authorName,
-          }}
-          onClose={() => setForkOpen(false)}
-        />
-      )}
+      {/* §7 toolbar (#67) — compact Like → Comment → Rate → Fork → Save row
+          replacing the two large Save/Fork panels. */}
+      <PublicationActionToolbar
+        publication={{
+          publicationId: data.publicationId,
+          title: data.title,
+          authorName: data.authorName,
+          allowFork: data.allowFork,
+        }}
+        loginHref={loginHref}
+      />
+
+      {/* #68 lands the full discussion section here; the Comment button
+          anchor-scrolls to this labelled section (comments stay readable for
+          guests — no login detour). */}
+      <section
+        id="discussion"
+        aria-labelledby="discussion-heading"
+        className="mt-8 scroll-mt-6"
+      >
+        <h2
+          id="discussion-heading"
+          className="font-display text-xl tracking-tight text-[#0F172A]"
+        >
+          Community Discussion
+          {social ? ` (${social.commentCount})` : ""}
+        </h2>
+        <p className="mt-2 text-sm text-[#64748B]">
+          Comments open with the community discussion update (#68).
+        </p>
+      </section>
     </div>
   );
+}
+
+/** §7 2dp display form — trailing zeros trimmed, `—` for a null average. */
+function formatAvg(average: number | null): string {
+  if (average == null || !Number.isFinite(average)) return "—";
+  const trimmed = average.toFixed(2).replace(/\.?0+$/, "");
+  return trimmed === "" ? "0" : trimmed;
 }
 
 /** Neutral 404 state — no reason string (§7 anti-enumeration). */
@@ -390,15 +289,5 @@ function NotAvailable() {
         Browse the community
       </Link>
     </div>
-  );
-}
-
-/** Accent inline spinner — same ring geometry as the auth loader, button-sized. */
-function Spinner() {
-  return (
-    <span
-      aria-hidden="true"
-      className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current"
-    />
   );
 }
