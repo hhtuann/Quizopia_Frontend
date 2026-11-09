@@ -32,6 +32,11 @@ import {
   confirmRosterImport,
   downloadRosterTemplate,
   previewRosterImport,
+  getGradebook,
+  getGradebookSessions,
+  getClassroomAnalytics,
+  getMyResults,
+  type GradebookParams,
 } from "@/lib/api/classrooms";
 
 /** Flat list of the caller's classrooms (feeds the list page + nav). */
@@ -233,8 +238,10 @@ export function useAssignSessionMutation(classroomId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (sessionId: number) => assignSessionToClassroom(classroomId, sessionId),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["classrooms", classroomId, "sessions"] }),
+    // CLASS-M3 (#54): assignments change the gradebook column catalog/matrix
+    // and the analytics KPIs too — invalidate the whole classroom prefix
+    // (same scope as the member mutations), not just the sessions list.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["classrooms", classroomId] }),
   });
 }
 
@@ -243,8 +250,7 @@ export function useUnassignSessionMutation(classroomId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (sessionId: number) => unassignSessionFromClassroom(classroomId, sessionId),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["classrooms", classroomId, "sessions"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["classrooms", classroomId] }),
   });
 }
 
@@ -266,6 +272,56 @@ export function useJoinedClassroomSessionsQuery(
   return useQuery({
     queryKey: ["classrooms", "joined", id, "sessions", { page, size, status }],
     queryFn: () => getJoinedClassroomSessions(id, { page, size, status }),
+    enabled: !!id,
+    placeholderData: keepPreviousData,
+  });
+}
+
+// ----- CLASS-M3 (issue #54): gradebook + analytics + my-results -----
+
+/** Teacher: gradebook column catalog (session-level completion/average stats). */
+export function useGradebookSessionsQuery(id: number, params: { page?: number; size?: number } = {}) {
+  const { page = 0, size = 50 } = params;
+  return useQuery({
+    queryKey: ["classrooms", id, "gradebook", "sessions", { page, size }],
+    queryFn: () => getGradebookSessions(id, { page, size }),
+    enabled: !!id,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Teacher: the gradebook matrix (paged students × the selected sessions). */
+export function useGradebookQuery(id: number, params: GradebookParams = {}) {
+  const { sessionIds, page = 0, size = 20, search, sort, direction } = params;
+  return useQuery({
+    queryKey: [
+      "classrooms",
+      id,
+      "gradebook",
+      "matrix",
+      { sessionIds: sessionIds?.join(","), page, size, search, sort, direction },
+    ],
+    queryFn: () => getGradebook(id, { sessionIds, page, size, search, sort, direction }),
+    enabled: !!id,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Teacher: class-wide analytics (Overview KPIs + session trend). */
+export function useClassroomAnalyticsQuery(id: number) {
+  return useQuery({
+    queryKey: ["classrooms", id, "analytics"],
+    queryFn: () => getClassroomAnalytics(id),
+    enabled: !!id,
+  });
+}
+
+/** Learner: my results across the sessions of one joined classroom. */
+export function useMyResultsQuery(id: number, params: { page?: number; size?: number } = {}) {
+  const { page = 0, size = 20 } = params;
+  return useQuery({
+    queryKey: ["classrooms", "joined", id, "my-results", { page, size }],
+    queryFn: () => getMyResults(id, { page, size }),
     enabled: !!id,
     placeholderData: keepPreviousData,
   });
