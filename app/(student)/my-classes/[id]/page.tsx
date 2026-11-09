@@ -1,21 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useJoinedClassroomQuery, useJoinedClassroomSessionsQuery } from "@/hooks/queries/use-classrooms";
 import type { LearnerClassroomSessionItem } from "@/lib/api/classrooms";
+import { MyResultsSection } from "@/components/student/MyResultsSection";
 import { Badge, Button, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { NormalizedApiError } from "@/lib/api";
 
 /**
- * CLASS-M2 (#52): the learner's joined-classroom detail — overview (name,
- * code, teacher, joined date, assigned-session count) and the assigned
- * SCHEDULED/OPEN/CLOSED(/CANCELLED) sessions with server-authorized
+ * CLASS-M2 (#52) / CLASS-M3 (#54): the learner's joined-classroom detail —
+ * overview (name, code, teacher, joined date, assigned-session count) and the
+ * assigned SCHEDULED/OPEN/CLOSED(/CANCELLED) sessions with server-authorized
  * Start/Resume/Result handled by the existing `/sessions/{sessionId}`
  * landing route (this page never decides eligibility itself). DRAFT sessions
- * never reach the learner (server projection).
+ * never reach the learner (server projection). CLASS-M3 adds the "My
+ * results" tab (`?tab=results`): per-session result summaries deep-linked to
+ * the existing `/attempts/{bestAttemptId}/result` page.
  */
 
 const PAGE_SIZE = 20;
@@ -43,10 +46,27 @@ function formatWindow(startsAt: string, endsAt: string): string {
   return `${fmt(startsAt)} → ${fmt(endsAt)}`;
 }
 
+type ClassTab = "overview" | "results";
+
+function parseTab(raw: string | null): ClassTab {
+  return raw === "results" ? "results" : "overview";
+}
+
 export default function MyClassDetailPage() {
+  return (
+    <Suspense fallback={<p className="text-sm text-[#64748B]">Loading class…</p>}>
+      <MyClassDetailPageInner />
+    </Suspense>
+  );
+}
+
+function MyClassDetailPageInner() {
   const { id } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const idNum = Number(id);
   const valid = Number.isFinite(idNum) && idNum > 0;
+  const tab = parseTab(searchParams.get("tab"));
 
   const { data, isPending, isError, error } = useJoinedClassroomQuery(valid ? idNum : 0, valid);
 
@@ -63,6 +83,15 @@ export default function MyClassDetailPage() {
     );
   }
   if (!data) return <ClassNotFound />;
+
+  const setTab = (next: ClassTab) => {
+    router.replace(`?tab=${next}`, { scroll: false });
+  };
+
+  const tabs: readonly { id: ClassTab; label: string }[] = [
+    { id: "overview", label: "Overview" },
+    { id: "results", label: "My Results" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -93,7 +122,35 @@ export default function MyClassDetailPage() {
         </p>
       </header>
 
-      <AssignedSessions classId={data.classroomId} />
+      <div
+        className="flex w-fit gap-1 rounded-xl border border-[#E2E8F0] bg-[#F1F5F9] p-1"
+        role="tablist"
+        aria-label="Class sections"
+      >
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={cn(
+              "rounded-lg px-4 py-2.5 text-sm font-semibold outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#0052FF]",
+              tab === t.id
+                ? "bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] text-white shadow-[0_4px_14px_rgba(0,82,255,0.25)]"
+                : "text-[#64748B] hover:bg-white hover:text-[#0F172A]"
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "overview" ? (
+        <AssignedSessions classId={data.classroomId} />
+      ) : (
+        <MyResultsSection classId={data.classroomId} />
+      )}
     </div>
   );
 }

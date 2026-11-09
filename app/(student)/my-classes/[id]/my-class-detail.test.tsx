@@ -23,8 +23,12 @@ import type * as ClassroomsApi from "@/lib/api/classrooms";
  * my-classes pagination test).
  */
 
+const routerReplace = vi.fn();
+
 vi.mock("next/navigation", () => ({
   useParams: () => ({ id: "5" }),
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: routerReplace }),
 }));
 
 vi.mock("@/lib/api/classrooms", async (importOriginal) => {
@@ -167,5 +171,16 @@ describe("MyClassesDetailPage (CLASS-M2)", () => {
     await waitFor(() =>
       expect(getJoinedClassroomSessions).toHaveBeenLastCalledWith(5, { page: 1, size: 20 }));
     expect(screen.getByText("Page 2 of 2")).toBeTruthy();
+  });
+
+  it("offers the My Results tab as a URL-param deep link (CLASS-M3)", async () => {
+    mount();
+
+    expect(await screen.findByRole("tab", { name: "Overview" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Overview", selected: true })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("tab", { name: "My Results" }));
+    expect(routerReplace).toHaveBeenCalledWith("?tab=results", { scroll: false });
+    routerReplace.mockClear();
   });
 });
