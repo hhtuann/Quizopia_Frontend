@@ -16,6 +16,8 @@ import {
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
 import { AddStudentsPanel } from "@/components/teacher/AddStudentsPanel";
 import { ClassSessionsTab } from "@/components/teacher/class-sessions/ClassSessionsTab";
+import { ClassOverviewKpis } from "@/components/teacher/gradebook/ClassOverviewKpis";
+import { GradebookTab } from "@/components/teacher/gradebook/GradebookTab";
 import { Badge, Button, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { updateClassroomSchema, type UpdateClassroomValues } from "@/lib/validation/classroom-schemas";
@@ -56,10 +58,10 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-type ClassTab = "overview" | "students" | "sessions";
+type ClassTab = "overview" | "students" | "sessions" | "gradebook";
 
 function parseTab(raw: string | null): ClassTab {
-  return raw === "students" || raw === "sessions" ? raw : "overview";
+  return raw === "students" || raw === "sessions" || raw === "gradebook" ? raw : "overview";
 }
 
 export default function ClassDetailPage() {
@@ -120,6 +122,7 @@ function DetailView({
     { id: "overview", label: "Overview" },
     { id: "students", label: "Students" },
     { id: "sessions", label: "Sessions" },
+    { id: "gradebook", label: "Gradebook" },
   ];
 
   return (
@@ -201,26 +204,9 @@ function DetailView({
 
       {tab === "overview" && (
         <section aria-label="Class overview" className={cn(cardVariants(), "p-4 sm:p-6")}>
-          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div>
-              <dt className="mb-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">Members</dt>
-              <dd className="text-2xl font-bold tabular-nums text-[#0F172A]">{classroom.memberCount}</dd>
-            </div>
-            <div>
-              <dt className="mb-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
-                Assigned sessions
-              </dt>
-              <dd className="text-2xl font-bold tabular-nums text-[#0F172A]">
-                {sessionsOverview?.totalElements ?? "…"}
-              </dd>
-            </div>
-            <div>
-              <dt className="mb-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">Status</dt>
-              <dd className="mt-2">
-                <Badge variant={statusVariant(classroom.status)}>{classroom.status}</Badge>
-              </dd>
-            </div>
-          </dl>
+          {/* CLASS-M3 (#54): real KPIs from /analytics — nulls render "—",
+              never 0 — plus the per-session completion/average trend. */}
+          <ClassOverviewKpis classroomId={classroom.id} />
           <div className="mt-6 flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={() => onTabChange("students")}>
               Manage students
@@ -254,6 +240,8 @@ function DetailView({
       {tab === "sessions" && (
         <ClassSessionsTab classId={classroom.id} isArchived={classroom.status === "ARCHIVED"} onNotice={setNotice} />
       )}
+
+      {tab === "gradebook" && <GradebookTab classId={classroom.id} />}
 
       {editOpen && (
         <EditClassroomModal
