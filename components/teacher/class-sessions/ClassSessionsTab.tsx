@@ -95,9 +95,11 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
 
 export function ClassSessionsTab({
   classId,
+  isArchived = false,
   onNotice,
 }: {
   classId: number;
+  isArchived?: boolean;
   onNotice: (notice: { kind: "success" | "error"; message: string }) => void;
 }) {
   const [page, setPage] = useState(0);
@@ -180,9 +182,11 @@ export function ClassSessionsTab({
               className="h-9 w-44"
             />
           </form>
-          <Button size="sm" onClick={() => setPickerOpen(true)}>
-            Assign session
-          </Button>
+          {!isArchived && (
+            <Button size="sm" onClick={() => setPickerOpen(true)}>
+              Assign session
+            </Button>
+          )}
         </div>
       </div>
 
@@ -196,6 +200,8 @@ export function ClassSessionsTab({
         <div className={cn(cardVariants(), "mt-6 p-6 text-sm text-[#64748B]")}>
           {status || search ? (
             <>No sessions match this filter.</>
+          ) : isArchived ? (
+            <>No sessions were assigned to this archived class.</>
           ) : (
             <>
               No sessions assigned to this class yet. Use{" "}
@@ -236,7 +242,7 @@ export function ClassSessionsTab({
                     <Badge variant={statusVariant(s.status)}>{s.status}</Badge>
                   </td>
                   <td className="relative z-10 px-3 py-3 text-right">
-                    {s.status === "DRAFT" || s.status === "SCHEDULED" ? (
+                    {!isArchived && (s.status === "DRAFT" || s.status === "SCHEDULED") ? (
                       <button
                         type="button"
                         onClick={() => setRemoving(s)}
