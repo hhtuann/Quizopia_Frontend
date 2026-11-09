@@ -19,9 +19,9 @@ export function CommunityAdaptiveShell({ children }: { children: ReactNode }) {
 
   if (status === "loading") return <AuthLoader />;
 
-  const content = (
-    <div className="mx-auto w-full max-w-6xl">{children}</div>
-  );
+  // Follow DESIGN.md Adaptive / Fluid Layout: the shell owns the gutter,
+  // while Community content fills all remaining width beside the sidebar.
+  const content = <div className="page-fluid">{children}</div>;
 
   if (status === "authenticated") {
     return <AppShell>{content}</AppShell>;
