@@ -67,12 +67,12 @@ function pageOf<T>(items: T[]): ClassroomSessionsPage<T> {
   return { items, page: 0, size: 10, totalElements: items.length, totalPages: 1, sort: "startsAt,desc" };
 }
 
-function mount() {
+function mount(isArchived = false) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <StrictMode>
       <QueryClientProvider client={qc}>
-        <ClassSessionsTab classId={5} onNotice={vi.fn()} />
+        <ClassSessionsTab classId={5} isArchived={isArchived} onNotice={vi.fn()} />
       </QueryClientProvider>
     </StrictMode>
   );
@@ -169,6 +169,15 @@ describe("ClassSessionsTab (CLASS-M2)", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Remove" })[1]);
 
     await waitFor(() => expect(unassignSessionFromClassroom).toHaveBeenCalledWith(5, 21));
+  });
+
+  it("keeps archived classrooms read-only while still listing assigned sessions", async () => {
+    vi.mocked(getClassroomSessions).mockResolvedValue(pageOf([session()]));
+    mount(true);
+    expect(await screen.findByText("Midterm sitting")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Assign session" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Midterm sitting" })).toBeTruthy();
   });
 
   it("offers Remove only for DRAFT/SCHEDULED rows", async () => {
