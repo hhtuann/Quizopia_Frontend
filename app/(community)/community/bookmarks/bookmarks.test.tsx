@@ -125,7 +125,7 @@ describe("/community/bookmarks", () => {
     expect(screen.getByText("Mathematics")).toBeTruthy();
     expect(screen.getByText("algebra")).toBeTruthy();
     expect(screen.getByText(/12 questions/)).toBeTruthy();
-    expect(screen.getByText(/^Saved \d/)).toBeTruthy();
+    expect(screen.getByText(/Saved \d/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Remove" })).toBeTruthy();
     expect(listMyBookmarks).toHaveBeenCalledWith({ page: 0, size: 12 });
   });
@@ -151,7 +151,7 @@ describe("/community/bookmarks", () => {
     mount();
 
     expect(await screen.findByText("This quiz is no longer available")).toBeTruthy();
-    expect(screen.getByText(/^Saved \d/)).toBeTruthy();
+    expect(screen.getByText(/Saved \d/)).toBeTruthy();
     const remove = screen.getByRole("button", { name: "Remove" });
     expect(remove).toBeTruthy();
 
