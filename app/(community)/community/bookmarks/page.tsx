@@ -14,6 +14,7 @@ import type { NormalizedApiError } from "@/lib/api";
 import { Badge, Button, Card, buttonVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { describeBookmarkError } from "@/components/community/community-errors";
+import { CommunitySectionNav } from "@/components/community/CommunitySectionNav";
 
 /**
  * Saved quizzes collection (P3-B1-FE, issue #46 — ADR-006 §7/§10).
@@ -116,6 +117,8 @@ export default function SavedQuizzesPage() {
           </p>
         </div>
       </div>
+
+      <CommunitySectionNav current="saved" />
 
       {notice && (
         <div

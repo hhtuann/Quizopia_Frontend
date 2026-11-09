@@ -1,37 +1,38 @@
 import { describe, expect, it } from "vitest";
-import { NAV_ITEMS, navItemsForRoles, navItemsForView } from "./navigation";
+import {
+  NAV_ITEMS,
+  isActive,
+  navItemsForRoles,
+  navItemsForView,
+} from "./navigation";
 
-/**
- * P3-B1-FE (#46) — the saved-collection entry must be reachable by BOTH
- * roles in BOTH views (one shared bookmark collection, ADR-006 §7) and must
- * never leak to anonymous users.
- */
+describe("community sidebar navigation", () => {
+  const community = NAV_ITEMS.find((item) => item.href === "/community");
 
-const saved = NAV_ITEMS.find((i) => i.href === "/community/bookmarks");
-
-describe("navigation: saved quizzes entry (#46)", () => {
-  it("declares the shared STUDENT+TEACHER item", () => {
-    expect(saved).toBeDefined();
-    expect(saved?.label).toBe("Saved quizzes");
-    expect(saved?.roles).toEqual(["STUDENT", "TEACHER"]);
-    expect(saved?.view).toBe("shared");
+  it("uses one shared Community entry rather than a second Saved quizzes item", () => {
+    expect(community).toBeDefined();
+    expect(community?.label).toBe("Community");
+    expect(community?.view).toBe("shared");
+    expect(NAV_ITEMS.some((item) => item.href === "/community/bookmarks")).toBe(false);
   });
 
-  it("is visible in every authenticated view for both roles", () => {
+  it("highlights only Community for its nested routes in either role view", () => {
     for (const roles of [["STUDENT"], ["TEACHER"], ["STUDENT", "TEACHER"]]) {
       for (const view of ["student", "teacher"] as const) {
         const items = navItemsForView(roles, view);
-        expect(items.some((i) => i.href === "/community/bookmarks")).toBe(true);
+        expect(items.filter((item) => isActive("/community/bookmarks", item)).map((item) => item.href)).toEqual(["/community"]);
+        expect(items.filter((item) => isActive("/community/quizzes/7", item)).map((item) => item.href)).toEqual(["/community"]);
+        expect(items.filter((item) => isActive("/community/mine", item)).map((item) => item.href)).toEqual(["/community"]);
       }
     }
   });
 
-  it("is filtered out for anonymous/empty roles", () => {
-    expect(
-      navItemsForRoles(null).some((i) => i.href === "/community/bookmarks")
-    ).toBe(false);
-    expect(
-      navItemsForRoles([]).some((i) => i.href === "/community/bookmarks")
-    ).toBe(false);
+  it("allows moderator-only accounts to reach the shared Community sidebar item", () => {
+    expect(navItemsForView(["COMMUNITY_MODERATOR"], "student").some((item) => item.href === "/community")).toBe(true);
+  });
+
+  it("does not show protected navigation to anonymous users", () => {
+    expect(navItemsForRoles(null).some((item) => item.href === "/community")).toBe(false);
+    expect(navItemsForRoles([]).some((item) => item.href === "/community")).toBe(false);
   });
 });
