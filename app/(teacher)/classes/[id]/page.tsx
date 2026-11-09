@@ -252,7 +252,7 @@ function DetailView({
       )}
 
       {tab === "sessions" && (
-        <ClassSessionsTab classId={classroom.id} onNotice={setNotice} />
+        <ClassSessionsTab classId={classroom.id} isArchived={classroom.status === "ARCHIVED"} onNotice={setNotice} />
       )}
 
       {editOpen && (
