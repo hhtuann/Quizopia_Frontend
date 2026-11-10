@@ -401,6 +401,42 @@ For content-rich **record/management cards**, add `.adaptive-grid--wide` to the 
 
 ---
 
+### Tabs & Segmented Controls
+
+**Canonical recipe** (reference: `app/(teacher)/classes/[id]/page.tsx` tab bar):
+```jsx
+<div
+  className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-[#E2E8F0] bg-[#F1F5F9] p-1"
+  role="tablist"
+  aria-label="Section name"
+>
+  <button
+    type="button"
+    role="tab"
+    aria-selected={selected}
+    className={cn(
+      "shrink-0 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#0052FF]",
+      selected
+        ? "bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] text-white shadow-[0_4px_14px_rgba(0,82,255,0.25)]"
+        : "text-[#64748B] hover:bg-white hover:text-[#0F172A]"
+    )}
+  >
+    {label}
+  </button>
+</div>
+```
+
+- **Sizing:** button height comes from `py-2.5` + `text-sm` (~40px inner, ~46px with container padding/border) — never a fixed `h-11` on tab buttons. Visible hit area: **minimum 36px, aim for 44px**.
+- **Long labels / mobile:** the container scrolls (`max-w-full overflow-x-auto`) and buttons never wrap or shrink (`shrink-0 whitespace-nowrap`). Spacing below the bar comes from the page (`mb-6` on hand-rolled tab containers; the shared `SegmentedControl` bakes its own `mb-4` — account for it when stacking).
+- **Semantics:** use `role="tablist"` / `role="tab"` + `aria-selected` when tabs switch major page sections (classes/[id], my-classes/[id], ExamEditor). Use `role="group"` + `aria-pressed` buttons for mode switches and status filters that don't own tabpanels — this is the shared `components/ui/SegmentedControl.tsx` (add-students methods, question-bank import modes, moderation status). `SegmentedControl` uses exactly the reference sizing above.
+- **Relation to the global 44px rule:** the blanket "minimum 44px" below applies to primary CTAs and standalone controls; dense in-content rows (tabs, chips, inline list actions) may compress the *visible* target to 36px where 44px would break the layout — keep ≥36px and prefer enlarging padding over fixed heights.
+
+**Intentionally exempt (chips/pills — not tabs):** compact `rounded-full px-3 py-1 text-xs` status filter pills (ClassSessionsTab, GradebookTab), the `h-9` Editor/Preview `PaneSwitch` in the markdown authoring header, and tag chips. These are dense inline filters/chips, not section navigation; they keep their smaller footprint.
+
+Ordinary buttons and form controls are **not** affected by this recipe — `Button.tsx` sizes and input heights (`h-11`–`h-14`) stay as defined in their own sections.
+
+---
+
 ### Section Labels (Badges)
 
 A consistent badge pattern appears at the start of each section:
@@ -516,7 +552,7 @@ The following patterns describe **marketing sections**, not mandatory structures
 - Buttons have `active:scale-[0.98]` for tactile feedback
 
 **Touch Targets:**
-- Minimum 44px height on all interactive elements
+- Minimum 44px height on all interactive elements (dense in-content rows — tabs/chips/inline actions — may compress the visible target to 36px; see Tabs & Segmented Controls)
 - Buttons use `h-12` (48px) to `h-14` (56px) for primary CTAs
 - Adequate spacing between tap targets (gap-4 minimum)
 

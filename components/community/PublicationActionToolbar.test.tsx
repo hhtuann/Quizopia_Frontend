@@ -17,7 +17,6 @@ import {
   getSocialSummary,
   putLike,
   putRating,
-  deleteRating,
   type PublicSocialSummary,
   type SocialSummary,
 } from "@/lib/api/community-social";
@@ -34,10 +33,11 @@ import type { CurrentUserResponse } from "@/lib/auth/types";
  * (guest login CTAs with returnTo + public-summary counts, STUDENT fork
  * state, TEACHER consent-dialog flow), like toggle (PUT then DELETE, count
  * refresh, in-flight disable), the #68 rate dialog hosting the REAL
- * StarRatingInput (fieldset/legend radiogroup, live aggregate + own rating,
- * Clear via the REAL deleteRating mutation), rating-value pass-through
- * into putRating, safe-DOM leak checks with poisoned fixtures, and the §7
- * wrap/target contract (flex-wrap row, 44px controls).
+ * StarRatingInput (fieldset/legend radiogroup, live aggregate, cumulative
+ * star fill, and — per #74 — NO "Your rating" badge / Clear control),
+ * rating-value pass-through into putRating, safe-DOM leak checks with
+ * poisoned fixtures, and the §7 wrap/target contract (flex-wrap row, 44px
+ * controls).
  */
 
 const push = vi.fn();
@@ -83,7 +83,6 @@ const socialMock = vi.mocked(getSocialSummary);
 const putLikeMock = vi.mocked(putLike);
 const deleteLikeMock = vi.mocked(deleteLike);
 const putRatingMock = vi.mocked(putRating);
-const deleteRatingMock = vi.mocked(deleteRating);
 const bookmarksMock = vi.mocked(listMyBookmarks);
 const forkMock = vi.mocked(forkPublication);
 
@@ -409,22 +408,19 @@ describe("publication action toolbar — authenticated (#67)", () => {
     ).toBeTruthy();
   });
 
-  it("hosts the #68 star selector in the rate dialog: radiogroup + aggregate + Clear via DELETE", async () => {
+  it("hosts the #68 star selector in the rate dialog: radiogroup + cumulative fill, no badge/Clear (#74)", async () => {
     asUser();
     socialMock.mockResolvedValue(
       socialSummary({ average: 4.25, ratingCount: 8, myRating: 4 })
     );
-    const { promise: clearPending, resolve: resolveClear } =
-      Promise.withResolvers<SocialApi.RatingState>();
-    deleteRatingMock.mockReturnValue(clearPending);
     mount();
 
     fireEvent.click(
       await screen.findByRole("button", { name: /Ratings: 4.25 of 5/ })
     );
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("4.25 / 5 · 8 ratings")).toBeTruthy();
-    expect(within(dialog).getByText("Your rating: 4")).toBeTruthy();
+    // The aggregate line appears once the auth'd summary resolves.
+    expect(await within(dialog).findByText("4.25 / 5 · 8 ratings")).toBeTruthy();
     // The accessible 1–5 radiogroup replaced the #67 seam content.
     const group = within(dialog).getByTestId("star-radiogroup");
     expect(group.getAttribute("role")).toBe("radiogroup");
@@ -432,20 +428,17 @@ describe("publication action toolbar — authenticated (#67)", () => {
     expect(
       within(dialog).getByRole("radio", { name: "4 stars" }).getAttribute("aria-checked")
     ).toBe("true");
-
-    const clear = within(dialog).getByRole("button", {
-      name: "Clear my rating",
-    }) as HTMLButtonElement;
-    fireEvent.click(clear);
-    await waitFor(() => expect(deleteRatingMock).toHaveBeenCalledWith(7));
-    expect(clear.disabled).toBe(true);
-
-    socialMock.mockResolvedValue(socialSummary({ myRating: null }));
-    resolveClear({ average: 4.5, ratingCount: 7, myRating: null });
-    // Invalidate-after-settle refreshes the twin.
-    await waitFor(() =>
-      expect(socialMock.mock.calls.length).toBeGreaterThan(1)
-    );
+    // #74: stars 1..4 render filled cumulatively; no "Your rating" badge and
+    // no Clear control — changing a rating is clicking the stars again (PUT).
+    for (let n = 1; n <= 5; n++) {
+      expect(
+        within(dialog).getByTestId(`star-${n}`).getAttribute("data-filled")
+      ).toBe(n <= 4 ? "true" : "false");
+    }
+    expect(within(dialog).queryByText(/^Your rating: \d$/)).toBeNull();
+    expect(
+      within(dialog).queryByRole("button", { name: "Clear my rating" })
+    ).toBeNull();
   });
 
   it("passes rating values through to PUT verbatim and invalidates after settle", async () => {

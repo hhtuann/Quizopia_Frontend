@@ -123,7 +123,7 @@ function MyClassDetailPageInner() {
       </header>
 
       <div
-        className="flex w-fit gap-1 rounded-xl border border-[#E2E8F0] bg-[#F1F5F9] p-1"
+        className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-[#E2E8F0] bg-[#F1F5F9] p-1"
         role="tablist"
         aria-label="Class sections"
       >
@@ -135,7 +135,7 @@ function MyClassDetailPageInner() {
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
             className={cn(
-              "rounded-lg px-4 py-2.5 text-sm font-semibold outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#0052FF]",
+              "shrink-0 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#0052FF]",
               tab === t.id
                 ? "bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] text-white shadow-[0_4px_14px_rgba(0,82,255,0.25)]"
                 : "text-[#64748B] hover:bg-white hover:text-[#0F172A]"

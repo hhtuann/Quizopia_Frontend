@@ -14,7 +14,6 @@ import type { NormalizedApiError } from "@/lib/api";
 import { Badge, Button, Card, buttonVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { describeBookmarkError } from "@/components/community/community-errors";
-import { CommunitySectionNav } from "@/components/community/CommunitySectionNav";
 
 /**
  * Saved quizzes collection (P3-B1-FE, issue #46 — ADR-006 §7/§10).
@@ -109,7 +108,7 @@ export default function SavedQuizzesPage() {
             Browse the community
           </Link>
           <h1 className="mt-3 font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
-            Saved <span className="gradient-text">quizzes</span>
+            Saved quizzes
           </h1>
           <p className="mt-2 text-sm font-medium text-[#64748B]">
             Community quizzes you saved — the same collection follows your
@@ -117,8 +116,6 @@ export default function SavedQuizzesPage() {
           </p>
         </div>
       </div>
-
-      <CommunitySectionNav current="saved" />
 
       {notice && (
         <div
@@ -318,8 +315,10 @@ function SavedCard({
         {item.allowFork && <Badge>Forkable</Badge>}
       </div>
       <h2 className="mt-3 text-lg font-semibold tracking-tight text-[#0F172A]">
+        {/* #71 — strict origin marker so the detail page's contextual Back
+            returns here (allowlisted there). */}
         <Link
-          href={`/community/quizzes/${item.publicationId}`}
+          href={`/community/quizzes/${item.publicationId}?from=saved`}
           className="rounded outline-none transition-colors hover:text-[#0052FF] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
         >
           {item.title}

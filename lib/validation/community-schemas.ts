@@ -108,9 +108,6 @@ export type ModerationNoteValues = z.infer<typeof moderationNoteFormSchema>;
 /** §3 `community_comments.body` bound — trimmed, non-blank, ≤2000 chars. */
 export const COMMUNITY_COMMENT_BODY_MAX = 2000;
 
-/** §4/§3 comment-author alias bound — 1–80 characters after trim. */
-export const COMMUNITY_COMMENT_ALIAS_MAX = 80;
-
 /** §3 `community_comment_reports.details` bound. */
 export const COMMUNITY_COMMENT_REPORT_DETAILS_MAX = 500;
 
@@ -124,20 +121,12 @@ export const communityCommentBodySchema = z
     `Comments must be ${COMMUNITY_COMMENT_BODY_MAX} characters or fewer.`
   );
 
-/** Comment-author display name (§4 consent-based pseudonym). */
-export const communityCommentAliasSchema = z
-  .string()
-  .trim()
-  .min(1, "A display name is required to comment.")
-  .max(
-    COMMUNITY_COMMENT_ALIAS_MAX,
-    `Display names must be ${COMMUNITY_COMMENT_ALIAS_MAX} characters or fewer.`
-  );
-
-/** Create-comment form — `alias` is required until the first success stores one. */
+/**
+ * Create-comment form — body only (Rev 4 / #72): the author identity and
+ * public name are the authenticated account's, resolved server-side.
+ */
 export const createCommentFormSchema = z.object({
   body: communityCommentBodySchema,
-  alias: communityCommentAliasSchema.optional(),
 });
 export type CreateCommentFormValues = z.infer<typeof createCommentFormSchema>;
 

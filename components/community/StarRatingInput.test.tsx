@@ -5,7 +5,6 @@ import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StarRatingInput } from "./StarRatingInput";
 import {
-  deleteRating,
   getSocialSummary,
   putRating,
   type SocialSummary,
@@ -13,12 +12,13 @@ import {
 import type * as SocialApi from "@/lib/api/community-social";
 
 /**
- * P3-C4 (#68) — the accessible star rating selector that replaces #67's
- * RATE_DIALOG_SEAM: radiogroup semantics (roles, names, aria-checked, roving
- * tabindex), keyboard operation (arrows/Home/End move AND submit; the ends
- * clamp — never wrap), the
- * update path (PUT on selection), Clear (DELETE), live aggregate rendering
- * (null average → "—"), and the publisher self-rating 409 informative state.
+ * P3-C4 (#68) + #74 — the accessible star rating selector that replaced
+ * #67's RATE_DIALOG_SEAM: radiogroup semantics (roles, names, aria-checked,
+ * roving tabindex), keyboard operation (arrows/Home/End move AND submit; the
+ * ends clamp — never wrap), the update path (PUT on selection), CUMULATIVE
+ * star fill 1..N with exactly one checked radio (#74), the removed
+ * badge/Clear surface (#74), live aggregate rendering (null average → "—"),
+ * and the publisher self-rating 409 informative state.
  */
 
 // Real classifiers, mocked transport only — hooks stay real so keying +
@@ -31,13 +31,11 @@ vi.mock("@/lib/api/community-social", async (importOriginal) => {
     putLike: vi.fn(),
     deleteLike: vi.fn(),
     putRating: vi.fn(),
-    deleteRating: vi.fn(),
   };
 });
 
 const socialMock = vi.mocked(getSocialSummary);
 const putRatingMock = vi.mocked(putRating);
-const deleteRatingMock = vi.mocked(deleteRating);
 
 function summary(overrides: Partial<SocialSummary> = {}): SocialSummary {
   return {
@@ -62,11 +60,22 @@ function mount() {
   );
 }
 
+/** #74 cumulative-fill probe: does star N render filled? */
+function filled(n: number): string | null {
+  return screen.getByTestId(`star-${n}`).getAttribute("data-filled");
+}
+
+/** Asserts stars 1..count filled amber and count+1..5 outlined gray. */
+function expectFill(count: number): void {
+  for (let n = 1; n <= 5; n++) {
+    expect(filled(n)).toBe(n <= count ? "true" : "false");
+  }
+}
+
 beforeEach(() => {
   vi.resetAllMocks();
   socialMock.mockResolvedValue(summary());
   putRatingMock.mockResolvedValue({ average: 4.5, ratingCount: 9, myRating: 4 });
-  deleteRatingMock.mockResolvedValue({ average: 4, ratingCount: 7, myRating: null });
 });
 afterEach(cleanup);
 
@@ -95,7 +104,11 @@ describe("star rating input — radiogroup semantics", () => {
     socialMock.mockResolvedValue(summary({ myRating: 4 }));
     mount();
 
-    await screen.findByText("Your rating: 4");
+    await waitFor(() =>
+      expect(
+        screen.getByRole("radio", { name: "4 stars" }).getAttribute("aria-checked")
+      ).toBe("true")
+    );
     const radios = [1, 2, 3, 4, 5].map((n) =>
       screen.getByRole("radio", { name: `${n} ${n === 1 ? "star" : "stars"}` })
     );
@@ -166,7 +179,7 @@ describe("star rating input — keyboard operation", () => {
   });
 });
 
-describe("star rating input — submit / update / clear", () => {
+describe("star rating input — submit / update", () => {
   it("submits PUT verbatim on click and shows the refreshed own rating", async () => {
     socialMock
       .mockResolvedValueOnce(summary({ myRating: null }))
@@ -177,8 +190,9 @@ describe("star rating input — submit / update / clear", () => {
     fireEvent.click(await screen.findByRole("radio", { name: "5 stars" }));
     await waitFor(() => expect(putRatingMock).toHaveBeenCalledWith(7, 5));
 
-    // Invalidate-after-settle refetches the twin with the fresh state.
-    expect(await screen.findByText("Your rating: 5")).toBeTruthy();
+    // Invalidate-after-settle refetches the twin with the fresh state — the
+    // cumulative fill is the visible own-rating readout (#74).
+    await waitFor(() => expectFill(5));
   });
 
   it("ignores further selections while a rating PUT is in flight (aria-busy)", async () => {
@@ -202,22 +216,85 @@ describe("star rating input — submit / update / clear", () => {
       expect((screen.getByTestId("star-radiogroup") as HTMLElement).getAttribute("aria-busy")).toBe("false")
     );
   });
+});
 
-  it("Clear calls DELETE and the own rating disappears after settle", async () => {
-    socialMock
-      .mockResolvedValueOnce(summary({ myRating: 4 }))
-      // Post-clear invalidation refetch answer (set BEFORE the click — no race).
-      .mockResolvedValue(summary({ myRating: null, ratingCount: 7 }));
+describe("star rating input — cumulative fill (#74)", () => {
+  it.each([1, 3, 5])(
+    "my rating %i fills exactly stars 1..%i amber, the rest outlined",
+    async (n) => {
+      socialMock.mockResolvedValue(summary({ myRating: n }));
+      mount();
+
+      await waitFor(() => expectFill(n));
+      // The amber class itself carries the color — not just the data hook.
+      expect(screen.getByTestId("star-1").className).toContain("text-[#F59E0B]");
+      expect(screen.getByTestId("star-5").className).toContain(
+        n === 5 ? "text-[#F59E0B]" : "text-[#94A3B8]"
+      );
+      // aria-checked lands on EXACTLY the committed star — the cumulative
+      // fill is purely visual, never a second checked radio.
+      const checkedStars = [1, 2, 3, 4, 5].filter(
+        (k) =>
+          screen.getByTestId(`star-${k}`).getAttribute("aria-checked") === "true"
+      );
+      expect(checkedStars).toEqual([n]);
+    }
+  );
+
+  it("unrated renders zero filled stars (all outlined)", async () => {
     mount();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Clear my rating" }));
-    await waitFor(() => expect(deleteRatingMock).toHaveBeenCalledWith(7));
+    await screen.findByText("4.25 / 5 · 8 ratings");
+    expectFill(0);
+  });
 
-    await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "Clear my rating" })).toBeNull()
-    );
-    const four = screen.getByRole("radio", { name: "4 stars" });
-    expect(four.getAttribute("aria-checked")).toBe("false");
+  it("hover previews the cumulative range 1..H; leaving restores the committed fill", async () => {
+    socialMock.mockResolvedValue(summary({ myRating: 2 }));
+    mount();
+    await waitFor(() => expectFill(2));
+
+    fireEvent.mouseEnter(screen.getByTestId("star-4"));
+    expectFill(4);
+    // The preview moves no checked radio.
+    expect(screen.getByTestId("star-2").getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByTestId("star-4").getAttribute("aria-checked")).toBe("false");
+
+    fireEvent.mouseLeave(screen.getByTestId("star-4"));
+    expectFill(2);
+  });
+
+  it("hover on an unrated row previews 1..H, then falls back to all gray", async () => {
+    mount();
+    await screen.findByText("4.25 / 5 · 8 ratings");
+
+    fireEvent.mouseEnter(screen.getByTestId("star-3"));
+    expectFill(3);
+    fireEvent.mouseLeave(screen.getByTestId("star-3"));
+    expectFill(0);
+  });
+
+  it("renders no 'Your rating:' badge and no Clear my rating button", async () => {
+    socialMock.mockResolvedValue(summary({ myRating: 4 }));
+    mount();
+    await waitFor(() => expectFill(4));
+
+    expect(screen.queryByText(/^Your rating: \d$/)).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Clear my rating" })
+    ).toBeNull();
+  });
+
+  it("updating 5→3 by clicking the stars again re-renders exactly 3 filled (PUT upsert)", async () => {
+    socialMock
+      .mockResolvedValueOnce(summary({ myRating: 5 }))
+      // Post-write invalidation refetch answer (set BEFORE the click — no race).
+      .mockResolvedValue(summary({ myRating: 3, ratingCount: 8 }));
+    mount();
+    await waitFor(() => expectFill(5));
+
+    fireEvent.click(screen.getByTestId("star-3"));
+    await waitFor(() => expect(putRatingMock).toHaveBeenCalledWith(7, 3));
+    await waitFor(() => expectFill(3));
   });
 });
 
