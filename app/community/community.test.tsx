@@ -112,11 +112,13 @@ describe("community explore page", () => {
     );
     mount();
 
+    // #71 — card links carry the allowlisted origin marker for the detail
+    // page's contextual Back.
     const link = await screen.findByRole("link", { name: "Algebra fundamentals" });
-    expect(link.getAttribute("href")).toBe("/community/quizzes/1");
+    expect(link.getAttribute("href")).toBe("/community/quizzes/1?from=community");
     expect(
       screen.getByRole("link", { name: "Geometry basics" }).getAttribute("href")
-    ).toBe("/community/quizzes/2");
+    ).toBe("/community/quizzes/2?from=community");
     expect(screen.getAllByText("MathWhiz").length).toBe(1);
     expect(screen.getByText("GeoGuru")).toBeTruthy();
     expect(screen.getAllByText("Mathematics").length).toBe(2); // select option + card badge
@@ -132,6 +134,36 @@ describe("community explore page", () => {
       page: 0,
       size: 12,
     });
+  });
+
+  it("#71: heading row links to Saved quizzes; title fully dark; no tab row", async () => {
+    mount();
+
+    const saved = await screen.findByRole("link", { name: "Saved quizzes" });
+    expect(saved.getAttribute("href")).toBe("/community/bookmarks");
+    // The CommunitySectionNav tab row is gone — no secondary nav remains.
+    expect(screen.queryByRole("navigation")).toBeNull();
+    // Fully dark heading: single text node in text-[#0F172A], no gradient span.
+    const h1 = screen.getByRole("heading", {
+      level: 1,
+      name: "Community quizzes",
+    });
+    expect(h1.textContent).toBe("Community quizzes");
+    expect(h1.querySelector(".gradient-text")).toBeNull();
+  });
+
+  it("#71: tag chips are compact but keep button semantics (aria-pressed + focus ring)", async () => {
+    state.query = "tags=algebra";
+    mount();
+
+    const chip = await screen.findByRole("button", { name: "algebra" });
+    expect(chip.getAttribute("aria-pressed")).toBe("true");
+    // Visible chip shrunk to ~Badge height; h-9 keeps a real ≥36px hit area
+    // (pseudo-elements cannot extend a button's clickable box) and the
+    // keyboard focus-ring class is preserved.
+    expect(chip.className).toContain("h-9");
+    expect(chip.className).toContain("focus-visible:ring-2");
+    expect(chip.className).not.toContain("h-11");
   });
 
   it("renders only the §7 allowlist — no answer/option/exam-id/PII keys in the DOM", async () => {

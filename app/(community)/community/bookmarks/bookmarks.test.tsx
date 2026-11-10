@@ -115,12 +115,30 @@ describe("/community/bookmarks", () => {
     for (const link of browse) expect(link.getAttribute("href")).toBe("/community");
   });
 
+  it("#71: keeps only the header back-link, no tab row, fully dark heading", async () => {
+    vi.mocked(listMyBookmarks).mockResolvedValue(pageOf([available()]));
+    mount();
+
+    await screen.findByRole("link", { name: "Algebra fundamentals" });
+    expect(screen.queryByRole("navigation")).toBeNull();
+    // Fully dark heading: no gradient-text span on the second word.
+    const h1 = screen.getByRole("heading", { level: 1, name: "Saved quizzes" });
+    expect(h1.textContent).toBe("Saved quizzes");
+    expect(h1.querySelector(".gradient-text")).toBeNull();
+    // The header "Browse the community" link stays the one back shortcut
+    // (the empty-state CTA only exists while the collection is empty).
+    const browse = screen.getAllByRole("link", { name: "Browse the community" });
+    expect(browse).toHaveLength(1);
+    expect(browse[0].getAttribute("href")).toBe("/community");
+  });
+
   it("renders available entries: card allowlist + savedAt + detail link + Remove", async () => {
     vi.mocked(listMyBookmarks).mockResolvedValue(pageOf([available()]));
     mount();
 
     const link = await screen.findByRole("link", { name: "Algebra fundamentals" });
-    expect(link.getAttribute("href")).toBe("/community/quizzes/7");
+    // #71 — card link carries the allowlisted saved-origin marker.
+    expect(link.getAttribute("href")).toBe("/community/quizzes/7?from=saved");
     expect(screen.getByText("MathWhiz")).toBeTruthy();
     expect(screen.getByText("Mathematics")).toBeTruthy();
     expect(screen.getByText("algebra")).toBeTruthy();

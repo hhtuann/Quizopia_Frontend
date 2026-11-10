@@ -9,31 +9,43 @@ import { parseRetryAfterSeconds } from "./community-fork";
  *
  * The public list is ANONYMOUS (fifth public GET) and carries VISIBLE
  * comments only — no tombstone rows, no `state` field, and critically NO
- * user ids: an author is identified publicly only by their consent-based
- * `authorAlias` snapshot (§2/§4). Writes are authenticated; the comment-scoped
- * owner routes (PATCH/DELETE) check existence + ownership only, and every 404
- * on a given route is byte-identical (anti-enumeration).
+ * user ids: an author is identified publicly only by their account
+ * `authorName` — the CURRENT profile `displayName`, resolved server-side
+ * (Rev 4 / #72; never client-supplied; duplicates allowed; renames are
+ * reflected on existing rows). When the request carries a valid session,
+ * each item also carries the server-computed `isMine` ownership flag;
+ * anonymous callers get `false` everywhere. Writes are authenticated;
+ * the comment-scoped owner routes (PATCH/DELETE) check existence +
+ * ownership only, and every 404 on a given route is byte-identical
+ * (anti-enumeration).
  *
  * Error classification follows the #46/#48/#67 precedent: 404 means the
- * publication (or, on owner routes, the comment) no longer qualifies ("gone"),
- * 409 `COMMUNITY_ALIAS_TAKEN` is the ci-unique alias collision (§4 — the
- * comment POST fails atomically; retry with a different name),
- * 409 `COMMUNITY_COMMENT_STATE_INVALID` is an edit against a non-VISIBLE
- * comment (delete-then-edit), 401 means the session expired after the
- * single-flight refresh retry, and 429 is the §5 comment-write window
- * (with `Retry-After`).
+ * publication (or, on owner routes, the comment) no longer qualifies
+ * ("gone"), 409 `COMMUNITY_COMMENT_STATE_INVALID` is an edit against a
+ * non-VISIBLE comment (delete-then-edit), 401 means the session expired
+ * after the single-flight refresh retry, and 429 is the §5 comment-write
+ * window (with `Retry-After`).
  */
 
 /** §5 public comment item — all VISIBLE, `state` implicit. */
 export interface CommunityComment {
   commentId: number;
-  /** §4 consent-based pseudonym snapshot — the only author identity. */
-  authorAlias: string;
+  /**
+   * Rev 4 / #72: the author's CURRENT account `displayName`, resolved
+   * server-side — the only author identity on the public surface.
+   */
+  authorName: string;
   /** Plain text, stored verbatim, rendered escaped by React. */
   body: string;
   createdAt: string;
   /** Set iff the comment was edited; `null` otherwise. */
   editedAt: string | null;
+  /**
+   * Server-computed ownership for THIS caller (true only when the
+   * authenticated viewer authored the comment; `false` when anonymous).
+   * Never derived from name text on the client.
+   */
+  isMine: boolean;
 }
 
 /**
@@ -73,16 +85,15 @@ export function listComments(
   });
 }
 
-/** §5 create body — `alias` carries the FIRST-comment capture / a change (§4). */
+/** §5 create body — `body` only; identity is the authenticated user (Rev 4 / #72). */
 export interface CreateCommentInput {
   body: string;
-  alias?: string;
 }
 
 /**
  * `POST /api/community/publications/{id}/comments` — 201 comment DTO; the
- * returned `authorAlias` is the post-upsert STORED alias (never the raw
- * request value), so the FE records it as the caller's known alias.
+ * author name is derived from the caller's account by the server (a legacy
+ * `alias` field, if sent, is ignored and can never override it).
  */
 export function createComment(
   publicationId: number,
@@ -141,13 +152,9 @@ export function reportComment(
 export type CommentErrorKind =
   /** 404 — publication no longer §4-visible / comment absent or foreign. */
   | "gone"
-  /** 409 `COMMUNITY_ALIAS_TAKEN` — the chosen display name is in use. */
-  | "aliasTaken"
-  /** 400 `COMMUNITY_ALIAS_INVALID` — charset / impersonation rules (§4). */
-  | "aliasInvalid"
   /** 409 `COMMUNITY_COMMENT_STATE_INVALID` — edit against a non-VISIBLE comment. */
   | "stateInvalid"
-  /** 400 `COMMUNITY_VALIDATION_ERROR` — body/alias bounds. */
+  /** 400 `COMMUNITY_VALIDATION_ERROR` — body bounds. */
   | "validation"
   /** 401 — session expired at AuthN after the single-flight refresh retry. */
   | "unauthenticated"
@@ -183,17 +190,11 @@ export function classifyCommentError(err: unknown): CommentErrorClassification {
     case 401:
       return { kind: "unauthenticated", retryAfterSeconds: null };
     case 400:
-      if (norm.code === "COMMUNITY_ALIAS_INVALID") {
-        return { kind: "aliasInvalid", retryAfterSeconds: null };
-      }
       if (norm.code === "COMMUNITY_VALIDATION_ERROR") {
         return { kind: "validation", retryAfterSeconds: null };
       }
       return none;
     case 409:
-      if (norm.code === "COMMUNITY_ALIAS_TAKEN") {
-        return { kind: "aliasTaken", retryAfterSeconds: null };
-      }
       if (norm.code === "COMMUNITY_COMMENT_STATE_INVALID") {
         return { kind: "stateInvalid", retryAfterSeconds: null };
       }

@@ -132,12 +132,6 @@ export function describeCommentError(
       return scope === "comment"
         ? "This comment is no longer available."
         : "This quiz is no longer available.";
-    case "aliasTaken":
-      return "That display name is already taken — try a different one.";
-    case "aliasInvalid":
-      // §4 rejects a name matching the caller's OWN email/username, ANY
-      // existing username, or the publication's author alias.
-      return "Display names can't match any username, your email, or this quiz's author. Try a different one.";
     case "stateInvalid":
       return "This comment can no longer be edited.";
     case "validation":

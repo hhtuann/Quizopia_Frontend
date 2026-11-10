@@ -14,9 +14,8 @@ import {
   useCommunityPublicationsQuery,
   useCommunityTagsQuery,
 } from "@/hooks/queries/use-community";
-import { Badge, Card, Input } from "@/components/ui";
+import { Badge, Card, Input, buttonVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
-import { CommunitySectionNav } from "@/components/community/CommunitySectionNav";
 import type { PublicPublicationCard } from "@/lib/api/community";
 import type { NormalizedApiError } from "@/lib/api";
 
@@ -155,17 +154,37 @@ function CommunityExplore() {
 
   return (
     <div>
-      <header className="mb-8 select-none">
-        <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
-          Community <span className="gradient-text">quizzes</span>
-        </h1>
-        <p className="mt-2 text-sm font-medium text-[#64748B]">
-          Browse quizzes teachers have published for everyone. No account
-          needed to explore.
-        </p>
+      <header className="mb-8 flex flex-wrap items-end justify-between gap-3">
+        <div className="select-none">
+          <h1 className="font-display text-2xl tracking-tight text-[#0F172A] sm:text-3xl">
+            Community quizzes
+          </h1>
+          <p className="mt-2 text-sm font-medium text-[#64748B]">
+            Browse quizzes teachers have published for everyone. No account
+            needed to explore.
+          </p>
+        </div>
+        {/* #71 — the section tab row is gone; a single Saved action sits on
+            the heading row (Question Banks "Create bank" pattern) and routes
+            to the auth-gated collection. */}
+        <Link
+          href="/community/bookmarks"
+          className={cn(buttonVariants({ variant: "primary" }), "gap-1.5")}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.8}
+            stroke="currentColor"
+            className="h-4 w-4"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+          </svg>
+          Saved quizzes
+        </Link>
       </header>
-
-      <CommunitySectionNav current="browse" />
 
       {/* Filters — every control commits to the URL (shareable deep links). */}
       <section aria-label="Filter community quizzes" className="mb-6 space-y-3">
@@ -220,6 +239,9 @@ function CommunityExplore() {
             {tagOptions.map((label) => {
               const selected = tags.includes(label);
               return (
+                /* #71 compact chip: ~Badge visual height with a real 36px
+                   (h-9) touch target — pseudo-elements cannot extend a
+                   button's hit area, so the height itself stays generous. */
                 <button
                   key={label}
                   type="button"
@@ -235,7 +257,7 @@ function CommunityExplore() {
                     })
                   }
                   className={cn(
-                    "inline-flex h-11 items-center rounded-full border px-4 text-xs font-semibold outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2",
+                    "inline-flex h-9 items-center rounded-full border px-3 text-xs font-semibold outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2",
                     selected
                       ? "border-[#0052FF]/30 bg-[#0052FF]/5 text-[#0052FF]"
                       : "border-[#E2E8F0] bg-white text-[#64748B] hover:border-[#0052FF]/30 hover:text-[#0F172A]"
@@ -291,8 +313,10 @@ function PublicationCard({ item }: { item: PublicPublicationCard }) {
         {item.allowFork && <Badge>Forkable</Badge>}
       </div>
       <h2 className="mt-3 text-lg font-semibold tracking-tight text-[#0F172A]">
+        {/* #71 — strict origin marker so the detail page's contextual Back
+            knows where the visit came from (allowlisted there). */}
         <Link
-          href={`/community/quizzes/${item.publicationId}`}
+          href={`/community/quizzes/${item.publicationId}?from=community`}
           className="rounded outline-none transition-colors hover:text-[#0052FF] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
         >
           {item.title}

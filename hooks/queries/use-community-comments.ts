@@ -21,23 +21,20 @@ import {
 } from "@/lib/api/community-comments";
 
 /**
- * Comment queries + mutations (P3-C4, issue #68 — ADR-007 §5/§7).
+ * Comment queries + mutations (P3-C4, issue #68 — ADR-007 §5/§7; Rev 4 / #72).
  *
  * KEY DESIGN — list prefix: the anonymous page lives under
+ * `["community","comments",id]` with `keepPreviousData` (page changes never
  * flickers). Every comment write invalidates that publication's whole
  * `["community","comments",id]` prefix AND the `["community","social",id]`
  * prefix (creates/deletes move the summary `commentCount` — §3 keeps the two
  * counts on the same VISIBLE predicate, so one settle keeps them honest).
  *
- * ALIAS KNOWLEDGE: the §5 comment DTO carries no ownership flag (an author
- * is public only as `authorAlias`), so the FE tracks the caller's own
- * aliases in a cache-only SET under `["community","comments","my-alias"]`.
- * Every successful create APPENDS the response's stored alias snapshot (the
- * post-upsert value, §4; most recent last, no duplicates), so an in-session
- * alias change never hides rows authored under the previous name. The entry
- * is a SIBLING of the per-publication list keys, so list invalidation never
- * disturbs it. See `CommentSection`/`CommentListItem` for the ownership
- * heuristic built on it.
+ * OWNERSHIP (Rev 4 / #72): each list item carries the server-computed
+ * `isMine` flag (true only for the authenticated author of that row;
+ * `false` when anonymous) — the former cache-only session alias set is
+ * deleted: name text never decided ownership (duplicate displayNames are
+ * legal) and the flag survives reloads, renames and cross-device sessions.
  *
  * Mutations are EXPLICIT-LOADING (no optimistic updates); a 404 "gone"
  * additionally invalidates the whole `["community"]` tree so the detail page
@@ -47,29 +44,6 @@ import {
 /** §5 default list size (1..50; the backend clamps to the same range). */
 export { DEFAULT_COMMENT_PAGE_SIZE };
 
-/**
- * Cache-only key holding the SET of aliases the caller has stored this
- * session (see module doc) — most recent LAST, no duplicates.
- */
-export const MY_COMMENT_ALIAS_KEY = ["community", "comments", "my-alias"] as const;
-
-/**
- * Every alias the caller has stored THIS session — append-only, most recent
- * last (the LAST entry is the current alias), `[]` before the first create.
- * Cache-only: never fetches (a forced refetch round-trips the cached
- * value), so invalidations can never clobber it.
- */
-export function useMyCommentAliasesQuery() {
-  const queryClient = useQueryClient();
-  return useQuery({
-    queryKey: MY_COMMENT_ALIAS_KEY,
-    queryFn: () =>
-      queryClient.getQueryData<readonly string[]>(MY_COMMENT_ALIAS_KEY) ?? [],
-    enabled: false,
-    staleTime: Infinity,
-    gcTime: Infinity,
-  });
-}
 
 /** Newest-first public comment page for one publication (anonymous route). */
 export function useCommunityCommentsQuery(
@@ -105,30 +79,16 @@ function useCommentInvalidation(publicationId: number) {
 }
 
 /**
- * Create a comment (§5 POST). On success the response's stored `authorAlias`
- * is APPENDED to the caller's known alias set; on 409 `COMMUNITY_ALIAS_TAKEN`
- * the editor surfaces the retry-with-another-name copy (nothing is
- * invalidated — the server aborted atomically, §4).
+ * Create a comment (§5 POST — `{body}` only; the author identity/name are
+ * derived server-side from the session). Settling invalidates the list +
+ * summary; a 404 "gone" additionally invalidates the community tree.
  */
 export function useCreateCommentMutation(publicationId: number) {
-  const queryClient = useQueryClient();
   const { invalidateComments, invalidateSocial, invalidateCommunity } =
     useCommentInvalidation(publicationId);
   return useMutation({
     mutationFn: (input: CreateCommentInput) =>
       createComment(publicationId, input),
-    onSuccess: (created) => {
-      // Append the stored snapshot to the session's alias SET (dedup, most
-      // recent last): an alias change keeps older own rows recognised, and
-      // the last entry stays the caller's current alias.
-      const known = (
-        queryClient.getQueryData<readonly string[]>(MY_COMMENT_ALIAS_KEY) ?? []
-      ).filter((alias) => alias !== created.authorAlias);
-      queryClient.setQueryData(MY_COMMENT_ALIAS_KEY, [
-        ...known,
-        created.authorAlias,
-      ]);
-    },
     onSettled: () => {
       invalidateComments();
       invalidateSocial();

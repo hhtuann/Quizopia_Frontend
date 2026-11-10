@@ -1,7 +1,8 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import {
   useCommunityPublicationQuery,
 } from "@/hooks/queries/use-community";
@@ -51,8 +52,45 @@ function formatDate(iso: string): string {
   });
 }
 
-export default function PublicationDetailPage() {
+/**
+ * #71 contextual Back — the ONLY origins the detail page may return to.
+ * Quiz cards append `?from=community` / `?from=saved`; anything else
+ * (absent, mistyped, hostile) falls back to the community default. The
+ * marker lives in the URL, so it survives refresh and new tabs, and the
+ * literal allowlist — not URL comparison — is the open-redirect guard.
+ */
+const BACK_LINKS = {
+  community: { href: "/community", label: "Back to community" },
+  saved: { href: "/community/bookmarks", label: "Back to saved quizzes" },
+} as const;
+
+type BackOrigin = keyof typeof BACK_LINKS;
+
+function isBackOrigin(value: string | null): value is BackOrigin {
+  return value === "community" || value === "saved";
+}
+
+/** Loading skeleton — shared by the Suspense fallback and the query's
+ * isPending state. */
+function DetailSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-busy="true"
+      aria-label="Loading community quiz"
+      className="space-y-4 py-2"
+    >
+      <div className="h-8 w-2/3 animate-pulse rounded-lg bg-[#F1F5F9]" />
+      <div className="h-4 w-1/3 animate-pulse rounded-lg bg-[#F1F5F9]" />
+      <div className="h-40 animate-pulse rounded-xl bg-[#F1F5F9]" />
+      <span className="sr-only">Loading…</span>
+    </div>
+  );
+}
+
+function PublicationDetail() {
   const { publicationId } = useParams<{ publicationId: string }>();
+  const searchParams = useSearchParams();
   const id = Number(publicationId);
   const validId = Number.isInteger(id) && id > 0;
   const { status } = useAuth();
@@ -75,26 +113,24 @@ export default function PublicationDetailPage() {
   const mySocial = useSocialSummaryQuery(id, validId && authenticated);
   const social = authenticated ? mySocial.data : publicSocial.data;
 
-  // `returnTo` preserves this exact URL across the login round-trip.
-  const loginHref = buildLoginRedirect(`/community/quizzes/${publicationId}`, "");
+  // #71 contextual Back — strict two-value allowlist (see BACK_LINKS).
+  const fromParam = searchParams.get("from");
+  const back = isBackOrigin(fromParam)
+    ? BACK_LINKS[fromParam]
+    : BACK_LINKS.community;
+
+  // `returnTo` preserves this exact URL across the login round-trip —
+  // including the allowlisted `?from`, so Back still knows its origin.
+  const loginHref = buildLoginRedirect(
+    `/community/quizzes/${publicationId}`,
+    isBackOrigin(fromParam) ? `?from=${fromParam}` : ""
+  );
 
   if (!validId) {
     return <NotAvailable />;
   }
   if (isPending) {
-    return (
-      <div
-        role="status"
-        aria-busy="true"
-        aria-label="Loading community quiz"
-        className="space-y-4 py-2"
-      >
-        <div className="h-8 w-2/3 animate-pulse rounded-lg bg-[#F1F5F9]" />
-        <div className="h-4 w-1/3 animate-pulse rounded-lg bg-[#F1F5F9]" />
-        <div className="h-40 animate-pulse rounded-xl bg-[#F1F5F9]" />
-        <span className="sr-only">Loading…</span>
-      </div>
-    );
+    return <DetailSkeleton />;
   }
   if (isError) {
     if (notFound) {
@@ -135,7 +171,7 @@ export default function PublicationDetailPage() {
   return (
     <div>
       <Link
-        href="/community"
+        href={back.href}
         className="inline-flex items-center gap-1.5 rounded-lg text-sm font-semibold text-[#64748B] outline-none transition-colors hover:text-[#0052FF] focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2"
       >
         <svg
@@ -149,7 +185,7 @@ export default function PublicationDetailPage() {
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
         </svg>
-        Back to community
+        {back.label}
       </Link>
 
       <Card variant="elevated" className="p-6 sm:p-10">
@@ -286,5 +322,14 @@ function NotAvailable() {
         Browse the community
       </Link>
     </div>
+  );
+}
+
+export default function PublicationDetailPage() {
+  // `useSearchParams` must sit inside a Suspense boundary for static prerender.
+  return (
+    <Suspense fallback={<DetailSkeleton />}>
+      <PublicationDetail />
+    </Suspense>
   );
 }

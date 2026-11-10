@@ -1,12 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Badge, Button } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { waitHint } from "./community-errors";
 import { classifySocialError } from "@/lib/api/community-social";
 import {
-  useDeleteRatingMutation,
   usePutRatingMutation,
   useSocialSummaryQuery,
 } from "@/hooks/queries/use-community-social";
@@ -27,6 +25,14 @@ import {
  * also CHECKS the focused radio — here selection submits immediately (the
  * §5 rating PUT is an idempotent upsert, so every selection is "the update
  * path").
+ *
+ * #74 cumulative fill: a committed rating N paints stars 1..N amber
+ * (`#F59E0B`) while `aria-checked` still marks EXACTLY the Nth radio — the
+ * fill is visual, the checked state singular. Hover previews the same
+ * cumulative range 1..H and falls back to the committed fill on leave
+ * (unrated → all gray). #74 also removed the "Your rating" badge and the
+ * Clear (DELETE) control: changing a rating is just clicking the stars
+ * again (the PUT upsert).
  *
  * Publisher self-rating: the §5 PUT answers 409
  * `COMMUNITY_SELF_RATING_NOT_ALLOWED` — rendered as the informative state
@@ -102,19 +108,13 @@ export function describeRatingError(err: unknown): string {
   }
 }
 
-/** Accent inline spinner — same ring geometry as the auth loader. */
-function Spinner() {
-  return (
-    <span
-      aria-hidden="true"
-      className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-    />
-  );
-}
-
 const STAR_VALUES = [1, 2, 3, 4, 5] as const;
 
-/** Accessible radiogroup: roving tabindex, arrows/Home/End check + submit (arrows clamp at the ends). */
+/**
+ * Accessible radiogroup: roving tabindex, arrows/Home/End check + submit
+ * (arrows clamp at the ends). Visual fill is CUMULATIVE 1..N (#74) with a
+ * coherent 1..H hover preview; aria-checked stays on exactly one radio.
+ */
 function StarRadioGroup({
   value,
   busy,
@@ -129,7 +129,13 @@ function StarRadioGroup({
   // Roving tabindex home: the checked radio when one exists, else the last
   // arrow-visited radio (starts at "1 star").
   const [focusIndex, setFocusIndex] = useState(0);
+  // #74 hover preview: the star under the pointer highlights the cumulative
+  // range 1..H; null (pointer left) restores the committed cumulative fill.
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const activeIndex = value != null ? value - 1 : focusIndex;
+  // Cumulative fill count: preview 1..H while hovering, else the committed
+  // 1..N (unrated → 0, i.e. all gray).
+  const fillCount = hoverIndex != null ? hoverIndex + 1 : (value ?? 0);
 
   const move = (index: number) => {
     setFocusIndex(index);
@@ -147,6 +153,7 @@ function StarRadioGroup({
     >
       {STAR_VALUES.map((n, i) => {
         const checked = value === n;
+        const filled = i < fillCount;
         return (
           <button
             key={n}
@@ -160,6 +167,9 @@ function StarRadioGroup({
             aria-disabled={busy}
             tabIndex={i === activeIndex ? 0 : -1}
             data-testid={`star-${n}`}
+            data-filled={filled}
+            onMouseEnter={() => setHoverIndex(i)}
+            onMouseLeave={() => setHoverIndex(null)}
             onClick={() => {
               setFocusIndex(i);
               if (!busy) onSelect(n);
@@ -186,10 +196,10 @@ function StarRadioGroup({
             className={cn(
               "flex h-11 w-11 items-center justify-center rounded-lg outline-none transition-colors",
               "focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2",
-              checked ? "text-[#F59E0B]" : "text-[#94A3B8] hover:text-[#F59E0B]"
+              filled ? "text-[#F59E0B]" : "text-[#94A3B8] hover:text-[#F59E0B]"
             )}
           >
-            <StarIcon filled={checked} className="h-6 w-6" />
+            <StarIcon filled={filled} className="h-6 w-6" />
           </button>
         );
       })}
@@ -199,27 +209,24 @@ function StarRadioGroup({
 
 /**
  * The rate-dialog body: live aggregate (average + count, guest-safe `—`),
- * own rating, submit-on-selection radiogroup and Clear (§5 DELETE), with the
- * publisher self-rating 409 as an informative state.
+ * own rating and the submit-on-selection radiogroup, with the publisher
+ * self-rating 409 as an informative state. #74: no "Your rating" badge and
+ * no Clear (DELETE) control — a rating is changed by clicking the stars
+ * again (the §5 PUT upsert).
  */
 export function StarRatingInput({ publicationId }: { publicationId: number }) {
   // Shares the toolbar's cache entry (`["community","social",id]`) — no extra
   // request beyond the normal observer-driven refetch.
   const summary = useSocialSummaryQuery(publicationId, true);
   const putMut = usePutRatingMutation(publicationId);
-  const clearMut = useDeleteRatingMutation(publicationId);
-  const busy = putMut.isPending || clearMut.isPending;
+  const busy = putMut.isPending;
 
   const onSelect = (rating: number) => {
     putMut.mutate(rating);
   };
 
-  const onClear = () => {
-    clearMut.mutate();
-  };
-
   const myRating = summary.data?.myRating ?? null;
-  const ratingError = putMut.error ?? clearMut.error;
+  const ratingError = putMut.error;
   const selfBlocked = classifySocialError(ratingError).kind === "selfRating";
 
   return (
@@ -247,25 +254,6 @@ export function StarRatingInput({ publicationId }: { publicationId: number }) {
             </legend>
             <StarRadioGroup value={myRating} busy={busy} onSelect={onSelect} />
           </fieldset>
-          {myRating != null && (
-            <div className="space-y-2">
-              <Badge variant="accent">Your rating: {myRating}</Badge>
-              <div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-11"
-                  disabled={clearMut.isPending}
-                  aria-busy={clearMut.isPending}
-                  onClick={onClear}
-                >
-                  {clearMut.isPending ? <Spinner /> : null}
-                  Clear my rating
-                </Button>
-              </div>
-            </div>
-          )}
           {ratingError != null && (
             <p role="alert" className="text-sm font-medium text-[#EF4444]">
               {describeRatingError(ratingError)}

@@ -18,20 +18,20 @@ import { useAuth } from "@/hooks/useAuth";
 import type { CurrentUserResponse } from "@/lib/auth/types";
 
 /**
- * P3-C4 (#68) — the community discussion section. List render + pagination
- * + empty/error/retry, the create flow (char-count bounds, disabled states,
- * first-comment alias capture + §4 consent copy, alias-taken 409 copy,
- * collapse after the first success), own edit/delete vs foreign-report
- * (alias-set heuristic — an in-session alias change keeps older own rows
- * editable), the report dialog's validation, and poisoned-
- * fixture leak checks — the §5 DTO renders authorAlias/body only, never any
- * user identity.
+ * #73 (Epic #70 F4–F6; ADR-007 Rev 4) — the community discussion
+ * surface. List render + pagination + empty/error/retry, the compact
+ * composer (account displayName shown automatically — no name input, no
+ * consent gate, no everyday Cancel; char-count bounds; body-only
+ * create), server-backed ownership (isMine flag — duplicate author
+ * names never grant cross-user controls), inline edit/delete, the
+ * report dialog's validation, and poisoned-fixture leak checks — the
+ * §5 DTO renders authorName/body only, never any identity.
  */
 
 vi.mock("@/hooks/useAuth", () => ({ useAuth: vi.fn() }));
 
-// Real classifiers/aliases, mocked transport only — the hooks stay real so
-// keying, invalidation and the cache-only alias entry are exercised.
+// Real classifiers, mocked transport only — the hooks stay real so
+// keying and invalidation are exercised.
 vi.mock("@/lib/api/community-comments", async (importOriginal) => {
   const actual = await importOriginal<typeof CommentsApi>();
   return {
@@ -55,10 +55,11 @@ const LOGIN_HREF = "/login?returnTo=%2Fcommunity%2Fquizzes%2F7";
 function comment(overrides: Partial<CommunityComment> = {}): CommunityComment {
   return {
     commentId: 11,
-    authorAlias: "MathWhiz",
+    authorName: "MathWhiz",
     body: "Great quiz — the section on fractions is spot on.",
     createdAt: "2026-11-01T10:00:00Z",
     editedAt: null,
+    isMine: false,
     ...overrides,
   };
 }
@@ -120,7 +121,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   asGuest();
   listMock.mockResolvedValue(page([comment()]));
-  createMock.mockResolvedValue(comment({ authorAlias: "Ada" }));
+  createMock.mockResolvedValue(comment({ authorName: "Ada Lovelace", isMine: true }));
   updateMock.mockResolvedValue(comment());
   deleteMock.mockResolvedValue(undefined);
   reportMock.mockResolvedValue(undefined);
@@ -128,18 +129,18 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("comment section — list states", () => {
-  it("renders newest-first items (alias, timestamp, edited marker, body) for guests with a login CTA, no actions", async () => {
+  it("renders newest-first items (author name, timestamp, Edited marker, body) for guests with a login CTA, no actions", async () => {
     listMock.mockResolvedValue(
       page([
         comment({
           commentId: 11,
-          authorAlias: "MathWhiz",
+          authorName: "MathWhiz",
           body: "Newest take.",
           createdAt: "2026-11-02T10:00:00Z",
         }),
         comment({
           commentId: 10,
-          authorAlias: "Bob",
+          authorName: "Bob",
           body: "Great quiz — the section on fractions is spot on.",
           editedAt: "2026-11-03T09:00:00Z",
           createdAt: "2026-11-01T10:00:00Z",
@@ -151,10 +152,13 @@ describe("comment section — list states", () => {
     const section = await screen.findByTestId("comment-section");
     expect(await within(section).findByText("MathWhiz")).toBeTruthy();
     expect(within(section).getByText("Bob")).toBeTruthy();
-    expect(within(section).getByText("(edited)")).toBeTruthy();
+    expect(within(section).getByText("Edited")).toBeTruthy();
     expect(
       within(section).getByText("Great quiz — the section on fractions is spot on.")
     ).toBeTruthy();
+    // Bounded bubble present on each row.
+    expect(within(section).getByTestId("comment-bubble-10")).toBeTruthy();
+    expect(within(section).getByTestId("comment-bubble-11")).toBeTruthy();
 
     // Guests: readable list, sign-in CTA, and no per-item actions at all.
     const cta = within(section).getByTestId("sign-in-to-comment");
@@ -208,7 +212,7 @@ describe("comment section — list states", () => {
 describe("comment section — pagination", () => {
   it("pages with disabled bounds and an aria-live indicator; the fetch follows the page", async () => {
     listMock.mockResolvedValue(
-      page([comment({ commentId: 21, authorAlias: "P2" })], 2)
+      page([comment({ commentId: 21, authorName: "P2" })], 2)
     );
     mount();
 
@@ -218,37 +222,28 @@ describe("comment section — pagination", () => {
     expect((prev as HTMLButtonElement).disabled).toBe(true);
     expect(within(nav).getByText("Page 1 of 2")).toBeTruthy();
 
-    listMock.mockResolvedValue(page([comment({ commentId: 1, authorAlias: "P1" })], 2));
+    listMock.mockResolvedValue(page([comment({ commentId: 1, authorName: "P1" })], 2));
     fireEvent.click(next);
     await waitFor(() =>
       expect(listMock).toHaveBeenLastCalledWith(7, { page: 1, size: 20 })
     );
-    expect(await screen.findByText("P1")).toBeTruthy();
+    expect((await screen.findAllByText("P1")).length).toBeGreaterThan(0);
     expect(within(nav).getByText("Page 2 of 2")).toBeTruthy();
 
-    listMock.mockResolvedValue(page([comment({ commentId: 21, authorAlias: "P2" })], 2));
+    listMock.mockResolvedValue(page([comment({ commentId: 21, authorName: "P2" })], 2));
     fireEvent.click(prev);
     await waitFor(() =>
       expect(listMock).toHaveBeenLastCalledWith(7, { page: 0, size: 20 })
     );
-    expect(await screen.findByText("P2")).toBeTruthy();
+    expect((await screen.findAllByText("P2")).length).toBeGreaterThan(0);
   });
 
   it("clamps back to the last page when a delete empties the trailing page", async () => {
     listMock.mockResolvedValue(
-      page([comment({ commentId: 11, authorAlias: "MathWhiz" })], 2)
+      page([comment({ commentId: 11, isMine: true })], 2)
     );
     asUser();
-    // Seed the alias so the item is the caller's own (deletable).
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    qc.setQueryData(["community", "comments", "my-alias"], ["MathWhiz"]);
-    render(
-      <StrictMode>
-        <QueryClientProvider client={qc}>
-          <CommentSection publicationId={7} loginHref={LOGIN_HREF} />
-        </QueryClientProvider>
-      </StrictMode>
-    );
+    mount();
 
     fireEvent.click(await screen.findByRole("button", { name: "Next" }));
     await waitFor(() =>
@@ -257,7 +252,7 @@ describe("comment section — pagination", () => {
 
     // The refetch after this delete reports a single remaining page — the
     // clamp steps the fetch back to page 0.
-    listMock.mockResolvedValue(page([comment({ commentId: 1, authorAlias: "Root" })], 1));
+    listMock.mockResolvedValue(page([comment({ commentId: 1, authorName: "Root" })], 1));
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
     await waitFor(() => expect(deleteMock).toHaveBeenCalledWith(11));
     await waitFor(() =>
@@ -269,18 +264,30 @@ describe("comment section — pagination", () => {
   });
 });
 
-describe("comment section — create flow + alias capture", () => {
-  it("captures the alias on the first comment with the §4 consent copy", async () => {
+describe("comment section — composer (Rev 4: displayName, no alias capture)", () => {
+  it("shows the account displayName automatically — no name field, no consent gate, no Cancel; posts body only", async () => {
     asUser();
     mount();
 
     const editor = await screen.findByTestId("comment-editor");
-    expect(within(editor).getByLabelText("Display name")).toBeTruthy();
+    // The signed-in account name, bold, next to the initials avatar.
     expect(
-      within(editor).getByText("This name is publicly visible next to your comments.")
+      within(editor).getByTestId("composer-author-name").textContent
+    ).toBe("Ada Lovelace");
+    // Informative disclosure only — never a confirmation gate.
+    expect(
+      within(editor).getByText(
+        "Your display name is publicly visible next to your comments."
+      )
     ).toBeTruthy();
+    // NO alias/display-name input, NO alias consent copy, NO Cancel.
+    expect(within(editor).queryByLabelText("Display name")).toBeNull();
+    expect(within(editor).queryByTestId("alias-consent")).toBeNull();
+    expect(
+      within(editor).queryByRole("button", { name: "Cancel" })
+    ).toBeNull();
 
-    // Under-bound: blank body/alias keep submit disabled.
+    // Under-bound: blank body keeps submit disabled.
     const submit = within(editor).getByRole("button", {
       name: "Post comment",
     }) as HTMLButtonElement;
@@ -289,15 +296,11 @@ describe("comment section — create flow + alias capture", () => {
     fireEvent.change(within(editor).getByLabelText("Comment"), {
       target: { value: "First!" },
     });
-    fireEvent.change(within(editor).getByLabelText("Display name"), {
-      target: { value: "Ada" },
-    });
     expect(submit.disabled).toBe(false);
 
     fireEvent.click(submit);
-    await waitFor(() =>
-      expect(createMock).toHaveBeenCalledWith(7, { body: "First!", alias: "Ada" })
-    );
+    // Rev 4 contract: the create payload is BODY ONLY.
+    await waitFor(() => expect(createMock).toHaveBeenCalledWith(7, { body: "First!" }));
   });
 
   it("disables submit over the 2000-char bound and shows the live count", async () => {
@@ -305,9 +308,6 @@ describe("comment section — create flow + alias capture", () => {
     mount();
 
     const editor = await screen.findByTestId("comment-editor");
-    fireEvent.change(within(editor).getByLabelText("Display name"), {
-      target: { value: "Ada" },
-    });
     const body = within(editor).getByLabelText("Comment");
     fireEvent.change(body, { target: { value: "x".repeat(2001) } });
 
@@ -322,67 +322,47 @@ describe("comment section — create flow + alias capture", () => {
     ).toBe(true);
   });
 
-  it("collapses the alias field after the first success and re-shows consent on change", async () => {
+  it("clears the composer and announces the posted notice after a success", async () => {
     asUser();
     mount();
 
     const editor = await screen.findByTestId("comment-editor");
-    fireEvent.change(within(editor).getByLabelText("Display name"), {
-      target: { value: "Ada" },
+    fireEvent.change(within(editor).getByLabelText("Comment"), {
+      target: { value: "First!" },
     });
-    const body = within(editor).getByLabelText("Comment");
-    fireEvent.change(body, { target: { value: "First!" } });
     fireEvent.click(within(editor).getByRole("button", { name: "Post comment" }));
     await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
 
-    // Success: notice + collapsed capture ("Posting as …", no consent copy).
     expect(await within(editor).findByText("Comment posted.")).toBeTruthy();
-    expect(await within(editor).findByText("Posting as")).toBeTruthy();
-    expect(within(editor).queryByLabelText("Display name")).toBeNull();
+    // The composer still shows the account name — nothing to re-capture.
     expect(
-      within(editor).queryByText("This name is publicly visible next to your comments.")
-    ).toBeNull();
-
-    // §4 re-consent: changing the name re-opens the field + consent copy.
-    fireEvent.click(within(editor).getByRole("button", { name: "Change" }));
-    const aliasField = within(editor).getByLabelText("Display name");
+      within(editor).getByTestId("composer-author-name").textContent
+    ).toBe("Ada Lovelace");
     expect(
-      within(editor).queryByText("This name is publicly visible next to your comments.")
-    ).toBeNull(); // identical value ⇒ no change ⇒ no consent copy
-    fireEvent.change(aliasField, { target: { value: "Ada Lovelace" } });
-    expect(
-      within(editor).getByText("This name is publicly visible next to your comments.")
-    ).toBeTruthy();
+      (within(editor).getByLabelText("Comment") as HTMLTextAreaElement).value
+    ).toBe("");
   });
 
-  it("surfaces the alias-taken 409 copy and keeps the typed values for a retry", async () => {
+  it("keeps the typed body for a retry when the server rejects with 400 validation", async () => {
     asUser();
     createMock.mockRejectedValue({
       kind: "api",
-      status: 409,
-      code: "COMMUNITY_ALIAS_TAKEN",
-      message: "Alias taken",
+      status: 400,
+      code: "COMMUNITY_VALIDATION_ERROR",
+      message: "Validation failed",
       raw: {},
     });
     mount();
 
     const editor = await screen.findByTestId("comment-editor");
-    fireEvent.change(within(editor).getByLabelText("Display name"), {
-      target: { value: "MathWhiz" },
-    });
     fireEvent.change(within(editor).getByLabelText("Comment"), {
       target: { value: "First!" },
     });
     fireEvent.click(within(editor).getByRole("button", { name: "Post comment" }));
 
     expect(
-      await within(editor).findByText(
-        "That display name is already taken — try a different one."
-      )
+      await within(editor).findByText("Comments must be 2000 characters or fewer.")
     ).toBeTruthy();
-    expect(
-      (within(editor).getByLabelText("Display name") as HTMLInputElement).value
-    ).toBe("MathWhiz");
     expect(
       (within(editor).getByLabelText("Comment") as HTMLTextAreaElement).value
     ).toBe("First!");
@@ -400,9 +380,6 @@ describe("comment section — create flow + alias capture", () => {
     mount();
 
     const editor = await screen.findByTestId("comment-editor");
-    fireEvent.change(within(editor).getByLabelText("Display name"), {
-      target: { value: "Ada" },
-    });
     fireEvent.change(within(editor).getByLabelText("Comment"), {
       target: { value: "First!" },
     });
@@ -418,30 +395,16 @@ describe("comment section — create flow + alias capture", () => {
   });
 });
 
-describe("comment section — own edit/delete vs foreign report", () => {
-  function mountAuthedWithAlias(alias: string | null) {
-    asUser();
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    if (alias != null) {
-      qc.setQueryData(["community", "comments", "my-alias"], [alias]);
-    }
-    return render(
-      <StrictMode>
-        <QueryClientProvider client={qc}>
-          <CommentSection publicationId={7} loginHref={LOGIN_HREF} />
-        </QueryClientProvider>
-      </StrictMode>
-    );
-  }
-
-  it("shows Edit/Delete on own comments (alias match) and never Report; foreign rows the inverse", async () => {
+describe("comment section — server-backed ownership (isMine)", () => {
+  it("shows Edit/Delete on own comments (isMine) and never Report; foreign rows the inverse", async () => {
     listMock.mockResolvedValue(
       page([
-        comment({ commentId: 11, authorAlias: "Ada" }),
-        comment({ commentId: 12, authorAlias: "Bob" }),
+        comment({ commentId: 11, authorName: "Ada Lovelace", isMine: true }),
+        comment({ commentId: 12, authorName: "Bob", isMine: false }),
       ])
     );
-    mountAuthedWithAlias("Ada");
+    asUser();
+    mount();
 
     const own = await screen.findByTestId("comment-11");
     expect(within(own).getByRole("button", { name: "Edit" })).toBeTruthy();
@@ -454,19 +417,32 @@ describe("comment section — own edit/delete vs foreign report", () => {
     expect(within(foreign).getByRole("button", { name: "Report" })).toBeTruthy();
   });
 
-  it("without a known alias nothing is treated as own (server remains the truth)", async () => {
-    listMock.mockResolvedValue(page([comment({ commentId: 11, authorAlias: "Ada" })]));
-    mountAuthedWithAlias(null);
+  it("duplicate author names never grant cross-user controls — ownership is the flag, not the text", async () => {
+    // Two rows with the IDENTICAL authorName; only the flagged one is own.
+    listMock.mockResolvedValue(
+      page([
+        comment({ commentId: 11, authorName: "Twin Name", isMine: true }),
+        comment({ commentId: 12, authorName: "Twin Name", isMine: false }),
+      ])
+    );
+    asUser();
+    mount();
 
-    const row = await screen.findByTestId("comment-11");
-    expect(within(row).queryByRole("button", { name: "Edit" })).toBeNull();
-    expect(within(row).queryByRole("button", { name: "Delete" })).toBeNull();
-    expect(within(row).getByRole("button", { name: "Report" })).toBeTruthy();
+    const own = await screen.findByTestId("comment-11");
+    expect(within(own).getByRole("button", { name: "Edit" })).toBeTruthy();
+    const foreign = screen.getByTestId("comment-12");
+    expect(within(foreign).queryByRole("button", { name: "Edit" })).toBeNull();
+    expect(within(foreign).queryByRole("button", { name: "Delete" })).toBeNull();
+    expect(within(foreign).getByRole("button", { name: "Report" })).toBeTruthy();
+    // Both rows still display the same public name.
+    expect(within(own).getByText("Twin Name")).toBeTruthy();
+    expect(within(foreign).getByText("Twin Name")).toBeTruthy();
   });
 
   it("edits inline: pre-filled editor, PATCH on Save, edit mode exits after settle", async () => {
-    listMock.mockResolvedValue(page([comment({ commentId: 11, authorAlias: "Ada" })]));
-    mountAuthedWithAlias("Ada");
+    listMock.mockResolvedValue(page([comment({ commentId: 11, isMine: true })]));
+    asUser();
+    mount();
 
     fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
     const editor = screen.getByTestId("comment-11");
@@ -483,77 +459,29 @@ describe("comment section — own edit/delete vs foreign report", () => {
     );
   });
 
-  it("cancel exits the inline editor without traffic", async () => {
-    listMock.mockResolvedValue(page([comment({ commentId: 11, authorAlias: "Ada" })]));
-    mountAuthedWithAlias("Ada");
+  it("cancel exits the inline editor without traffic (edit-specific Cancel stays)", async () => {
+    listMock.mockResolvedValue(page([comment({ commentId: 11, isMine: true })]));
+    asUser();
+    mount();
 
     fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
     const row = screen.getByTestId("comment-11");
-    // The create editor's Cancel stays distinct — scope to the row.
     fireEvent.click(within(row).getByRole("button", { name: "Cancel" }));
     expect(within(row).queryByRole("button", { name: "Save" })).toBeNull();
     expect(updateMock).not.toHaveBeenCalled();
   });
 
   it("deletes an own comment via the idempotent DELETE", async () => {
-    listMock.mockResolvedValue(page([comment({ commentId: 11, authorAlias: "Ada" })]));
-    mountAuthedWithAlias("Ada");
+    listMock.mockResolvedValue(page([comment({ commentId: 11, isMine: true })]));
+    asUser();
+    mount();
 
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
     await waitFor(() => expect(deleteMock).toHaveBeenCalledWith(11));
   });
 
-  it("alias SET: an in-session alias change keeps older own rows editable", async () => {
-    asUser();
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    qc.setQueryData(["community", "comments", "my-alias"], ["Ada"]);
-    listMock.mockResolvedValue(page([comment({ commentId: 11, authorAlias: "Ada" })]));
-    render(
-      <StrictMode>
-        <QueryClientProvider client={qc}>
-          <CommentSection publicationId={7} loginHref={LOGIN_HREF} />
-        </QueryClientProvider>
-      </StrictMode>
-    );
-
-    // Own row under the previously stored alias.
-    const older = await screen.findByTestId("comment-11");
-    expect(within(older).getByRole("button", { name: "Edit" })).toBeTruthy();
-
-    // §4 alias change: post once under a new name — the create APPENDS the
-    // stored snapshot to the set (it must not replace the older entry).
-    createMock.mockResolvedValue(comment({ commentId: 13, authorAlias: "Grace" }));
-    listMock.mockResolvedValue(
-      page([
-        comment({ commentId: 13, authorAlias: "Grace" }),
-        comment({ commentId: 11, authorAlias: "Ada" }),
-      ])
-    );
-    const editor = screen.getByTestId("comment-editor");
-    fireEvent.click(within(editor).getByRole("button", { name: "Change" }));
-    fireEvent.change(within(editor).getByLabelText("Display name"), {
-      target: { value: "Grace" },
-    });
-    fireEvent.change(within(editor).getByLabelText("Comment"), {
-      target: { value: "New name, same me." },
-    });
-    fireEvent.click(within(editor).getByRole("button", { name: "Post comment" }));
-    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
-
-    // After the settle-refetch BOTH aliases are recognised as own — the
-    // older row keeps Edit/Delete instead of falling back to Report — and
-    // the editor credits the CURRENT (last-appended) alias.
-    const olderRow = await screen.findByTestId("comment-11");
-    expect(within(olderRow).getByRole("button", { name: "Edit" })).toBeTruthy();
-    expect(within(olderRow).getByRole("button", { name: "Delete" })).toBeTruthy();
-    expect(within(olderRow).queryByRole("button", { name: "Report" })).toBeNull();
-    const newRow = screen.getByTestId("comment-13");
-    expect(within(newRow).getByRole("button", { name: "Edit" })).toBeTruthy();
-    expect(within(editor).getByText("Grace")).toBeTruthy();
-  });
-
   it("surfaces the comment-scoped gone copy when a delete hits a 404", async () => {
-    listMock.mockResolvedValue(page([comment({ commentId: 11, authorAlias: "Ada" })]));
+    listMock.mockResolvedValue(page([comment({ commentId: 11, isMine: true })]));
     deleteMock.mockRejectedValue({
       kind: "api",
       status: 404,
@@ -561,7 +489,8 @@ describe("comment section — own edit/delete vs foreign report", () => {
       message: "Not found",
       raw: {},
     });
-    mountAuthedWithAlias("Ada");
+    asUser();
+    mount();
 
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
     // The DELETE addresses the COMMENT row — not the quiz copy.
@@ -576,15 +505,11 @@ describe("comment section — own edit/delete vs foreign report", () => {
 
 describe("comment section — report dialog", () => {
   async function openReport() {
-    asUser();
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(
-      <StrictMode>
-        <QueryClientProvider client={qc}>
-          <CommentSection publicationId={7} loginHref={LOGIN_HREF} />
-        </QueryClientProvider>
-      </StrictMode>
+    listMock.mockResolvedValue(
+      page([comment({ commentId: 11, authorName: "MathWhiz", isMine: false })])
     );
+    asUser();
+    mount();
     fireEvent.click(await screen.findByRole("button", { name: "Report" }));
     return screen.findByRole("dialog");
   }
@@ -640,9 +565,10 @@ describe("comment section — safe rendering", () => {
       page([
         comment({
           commentId: 11,
-          authorAlias: "MathWhiz",
+          authorName: "MathWhiz",
           body: "plain text <img src=x onerror=alert(1)> & ${jndi:ldap://x}",
           // Poisoned extras that MUST NOT render:
+          authorAlias: "LegacyAlias",
           authorUserId: 42,
           authorEmail: "secret@example.com",
           authorUsername: "ada",
@@ -659,6 +585,8 @@ describe("comment section — safe rendering", () => {
       "authorEmail",
       "secret@example.com",
       "authorUsername",
+      "authorAlias",
+      "LegacyAlias",
       "userId",
     ]) {
       expect(html).not.toContain(forbidden);

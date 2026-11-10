@@ -41,13 +41,13 @@ import type { CurrentUserResponse } from "@/lib/auth/types";
  * PublicationActionToolbar.test.tsx and publication-detail-fork.test.tsx.
  */
 
-const { state } = vi.hoisted(() => ({ state: { id: "7" } }));
+const { state } = vi.hoisted(() => ({ state: { id: "7", query: "" } }));
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ publicationId: state.id }),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   usePathname: () => "/community",
-  useSearchParams: () => new URLSearchParams(""),
+  useSearchParams: () => new URLSearchParams(state.query),
 }));
 
 vi.mock("@/lib/api/community", () => ({
@@ -191,18 +191,22 @@ function mount() {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
+  const tree = (
     <StrictMode>
       <QueryClientProvider client={qc}>
         <PublicationDetailPage />
       </QueryClientProvider>
     </StrictMode>
   );
+  const view = render(tree);
+  // Refresh/new-tab simulation: rerender with the same URL-derived state.
+  return { rerender: () => view.rerender(tree) };
 }
 
 beforeEach(() => {
   vi.resetAllMocks();
   state.id = "7";
+  state.query = "";
   asGuest();
   vi.mocked(getPublicSocialSummary).mockResolvedValue(socialSummary());
   vi.mocked(getSocialSummary).mockResolvedValue({
@@ -342,6 +346,76 @@ describe("community publication detail page — guests (#43)", () => {
     mount();
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Network error");
+  });
+});
+
+describe("community publication detail page — contextual back (#71)", () => {
+  it("returns to the community catalog when ?from=community", async () => {
+    state.query = "from=community";
+    vi.mocked(getPublicPublication).mockResolvedValue(detail());
+    mount();
+
+    const back = await screen.findByRole("link", { name: "Back to community" });
+    expect(back.getAttribute("href")).toBe("/community");
+  });
+
+  it("returns to the saved collection when ?from=saved", async () => {
+    state.query = "from=saved";
+    vi.mocked(getPublicPublication).mockResolvedValue(detail());
+    mount();
+
+    const back = await screen.findByRole("link", {
+      name: "Back to saved quizzes",
+    });
+    expect(back.getAttribute("href")).toBe("/community/bookmarks");
+  });
+
+  it("defaults to the community catalog when ?from is absent", async () => {
+    vi.mocked(getPublicPublication).mockResolvedValue(detail());
+    mount();
+
+    const back = await screen.findByRole("link", { name: "Back to community" });
+    expect(back.getAttribute("href")).toBe("/community");
+  });
+
+  it("treats a non-allowlisted ?from as the default (the allowlist is the guard)", async () => {
+    state.query = "from=evil";
+    vi.mocked(getPublicPublication).mockResolvedValue(detail());
+    mount();
+
+    const back = await screen.findByRole("link", { name: "Back to community" });
+    expect(back.getAttribute("href")).toBe("/community");
+    // The hostile value is never echoed into any href or login redirect.
+    expect(document.body.innerHTML).not.toContain("from=evil");
+  });
+
+  it("keeps the origin across a refresh/new tab (the marker lives in the URL)", async () => {
+    state.query = "from=saved";
+    vi.mocked(getPublicPublication).mockResolvedValue(detail());
+    const { rerender } = mount();
+
+    const first = await screen.findByRole("link", {
+      name: "Back to saved quizzes",
+    });
+    expect(first.getAttribute("href")).toBe("/community/bookmarks");
+
+    rerender();
+    const second = screen.getByRole("link", { name: "Back to saved quizzes" });
+    expect(second.getAttribute("href")).toBe("/community/bookmarks");
+  });
+
+  it("carries the allowlisted origin through the login returnTo", async () => {
+    state.query = "from=saved";
+    vi.mocked(getPublicPublication).mockResolvedValue(detail());
+    mount();
+
+    const cta = await screen.findByRole("link", { name: "Sign in to save" });
+    const href = cta.getAttribute("href") ?? "";
+    expect(href.startsWith("/login?returnTo=")).toBe(true);
+    const returnTo = sanitizeReturnTo(
+      new URLSearchParams(href.slice("/login".length)).get("returnTo")
+    );
+    expect(returnTo).toBe("/community/quizzes/7?from=saved");
   });
 });
 
