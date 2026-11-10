@@ -1,4 +1,5 @@
 import type { NormalizedApiError } from "@/lib/api";
+import { classifyCommentError } from "@/lib/api/community-comments";
 import { classifyBookmarkError } from "@/lib/api/community-bookmarks";
 
 /**
@@ -103,3 +104,66 @@ export function describeBookmarkError(err: unknown): string {
       return "Couldn't update your saved quizzes. Please try again.";
   }
 }
+
+/** Which §5 row a comment-action 404 landed on — selects the gone copy. */
+export type CommentErrorScope = "publication" | "comment";
+
+/**
+ * Comment-action copy (P3-C4, #68, ADR-007 §4/§5). Distinct from the
+ * bookmark/fork/social copy because the failure classes differ: 409
+ * `COMMUNITY_ALIAS_TAKEN` is the ci-unique alias collision (retry with a
+ * different name — the server aborted atomically, nothing partial landed),
+ * 400 `COMMUNITY_ALIAS_INVALID` is the §4 charset/impersonation rejection,
+ * 409 `COMMUNITY_COMMENT_STATE_INVALID` is an edit against a comment that
+ * is no longer VISIBLE, and 404 means the publication/comment is gone.
+ * Classification lives in `lib/api/community-comments` (single source).
+ *
+ * The 404 line is SCOPE-SPLIT: the create POST addresses the PUBLICATION
+ * (quiz gone), while the PATCH/DELETE/report routes address the COMMENT row
+ * itself (comment gone) — `scope` picks the copy.
+ */
+export function describeCommentError(
+  err: unknown,
+  scope: CommentErrorScope = "publication"
+): string {
+  const { kind, retryAfterSeconds } = classifyCommentError(err);
+  switch (kind) {
+    case "gone":
+      return scope === "comment"
+        ? "This comment is no longer available."
+        : "This quiz is no longer available.";
+    case "aliasTaken":
+      return "That display name is already taken — try a different one.";
+    case "aliasInvalid":
+      // §4 rejects a name matching the caller's OWN email/username, ANY
+      // existing username, or the publication's author alias.
+      return "Display names can't match any username, your email, or this quiz's author. Try a different one.";
+    case "stateInvalid":
+      return "This comment can no longer be edited.";
+    case "validation":
+      return "Comments must be 2000 characters or fewer.";
+    case "unauthenticated":
+      return "Your session has expired — please sign in again.";
+    case "rateLimited":
+      return `Too many requests — ${waitHint(retryAfterSeconds)}.`;
+    case "network":
+      return "Network error — check your connection and try again.";
+    default:
+      return "Couldn't update the discussion. Please try again.";
+  }
+}
+
+/**
+ * Humanize a `Retry-After` wait for the 429 copy (#67 `waitHint`) — the
+ * single shared helper every community action surface consumes (toolbar,
+ * star selector, comment editor).
+ */
+export function waitHint(seconds: number | null): string {
+  if (seconds == null) return "please wait a moment and try again";
+  if (seconds < 60) {
+    return `wait about ${seconds} second${seconds === 1 ? "" : "s"} and try again`;
+  }
+  const minutes = Math.ceil(seconds / 60);
+  return `wait about ${minutes} minute${minutes === 1 ? "" : "s"} and try again`;
+}
+

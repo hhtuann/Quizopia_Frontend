@@ -15,18 +15,30 @@ import {
   type BookmarkPage,
 } from "@/lib/api/community-bookmarks";
 import type * as BookmarksApi from "@/lib/api/community-bookmarks";
+import {
+  getPublicSocialSummary,
+  getSocialSummary,
+  putLike,
+  type PublicSocialSummary,
+} from "@/lib/api/community-social";
+import type * as SocialApi from "@/lib/api/community-social";
+import { listComments } from "@/lib/api/community-comments";
+import type * as CommentsApi from "@/lib/api/community-comments";
 import { useAuth } from "@/hooks/useAuth";
 import { sanitizeReturnTo } from "@/lib/auth/redirect";
 import type { CurrentUserResponse } from "@/lib/auth/types";
 
 /**
- * P3-A-FE1 (#43) + P3-B1-FE (#46) — public quiz detail. Anonymous
- * (AuthProvider-less tree), safe-DOM assertions for the §7 allowlist, 404
- * anti-enumeration state, the guest "Sign in to save" CTA carrying
- * `returnTo` with ZERO bookmark API traffic, and the authenticated
- * explicit-loading Save/Remove toggle: idempotent double-click (disabled
- * while in flight), invalidation refetch of the shared bookmark keys
- * (cross-page/cross-tab consistency), 404-on-save and 429 copy.
+ * P3-A-FE1 (#43) + P3-B1-FE (#46) + P3-C3 (#67) — public quiz detail.
+ * Anonymous (AuthProvider-less tree), safe-DOM assertions for the §7
+ * allowlist, 404 anti-enumeration state, the guest login CTAs carrying
+ * `returnTo` with ZERO authenticated traffic, the guest-visible rating
+ * aggregate + discussion heading fed by the ANONYMOUS social-summary, and
+ * the authenticated explicit-loading Save/Remove toggle (now in the compact
+ * toolbar): idempotent double-click (disabled while in flight),
+ * invalidation refetch of the shared bookmark keys, 404-on-save and 429
+ * copy. The like/rate/fork matrices live in
+ * PublicationActionToolbar.test.tsx and publication-detail-fork.test.tsx.
  */
 
 const { state } = vi.hoisted(() => ({ state: { id: "7" } }));
@@ -57,6 +69,32 @@ vi.mock("@/lib/api/community-bookmarks", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/api/community-social", async (importOriginal) => {
+  const actual = await importOriginal<typeof SocialApi>();
+  return {
+    ...actual,
+    getPublicSocialSummary: vi.fn(),
+    getSocialSummary: vi.fn(),
+    putLike: vi.fn(),
+    deleteLike: vi.fn(),
+    putRating: vi.fn(),
+    deleteRating: vi.fn(),
+  };
+});
+
+// #68 discussion body — mocked transport (empty page) so the shared-suite
+// assertions stay about the detail surface, not the comment list.
+vi.mock("@/lib/api/community-comments", async (importOriginal) => {
+  const actual = await importOriginal<typeof CommentsApi>();
+  return {
+    ...actual,
+    listComments: vi.fn(),
+    createComment: vi.fn(),
+    updateComment: vi.fn(),
+    deleteComment: vi.fn(),
+    reportComment: vi.fn(),
+  };
+});
 vi.mock("@/hooks/useAuth", () => ({ useAuth: vi.fn() }));
 
 function detail(
@@ -103,6 +141,18 @@ function savedPage(ids: number[] = []): BookmarkPage {
     size: 50,
     totalElements: ids.length,
     totalPages: 1,
+  };
+}
+
+function socialSummary(
+  overrides: Partial<PublicSocialSummary> = {}
+): PublicSocialSummary {
+  return {
+    likeCount: 12,
+    average: 4.5,
+    ratingCount: 8,
+    commentCount: 3,
+    ...overrides,
   };
 }
 
@@ -154,6 +204,20 @@ beforeEach(() => {
   vi.resetAllMocks();
   state.id = "7";
   asGuest();
+  vi.mocked(getPublicSocialSummary).mockResolvedValue(socialSummary());
+  vi.mocked(getSocialSummary).mockResolvedValue({
+    ...socialSummary(),
+    liked: false,
+    myRating: null,
+  });
+  vi.mocked(listComments).mockResolvedValue({
+    items: [],
+    page: 0,
+    size: 20,
+    totalElements: 0,
+    totalPages: 0,
+    sort: "createdAt: DESC",
+  });
 });
 afterEach(cleanup);
 
@@ -169,15 +233,16 @@ describe("community publication detail page — guests (#43)", () => {
     expect(screen.getByText("Mathematics")).toBeTruthy();
     expect(screen.getByText("algebra")).toBeTruthy();
     expect(screen.getByText("grade-10")).toBeTruthy();
-    expect(screen.getByText("12")).toBeTruthy();
-    expect(screen.getByText("3")).toBeTruthy();
+    // "12"/"3" also appear as toolbar chips (#67) — assert presence, not count.
+    expect(screen.getAllByText("12").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("3").length).toBeGreaterThan(0);
     expect(screen.getByText(/30 min/)).toBeTruthy();
     expect(screen.getByText(/Published/)).toBeTruthy();
     expect(screen.getByText(/Updated/)).toBeTruthy();
     expect(getPublicPublication).toHaveBeenCalledWith(7);
   });
 
-  it("keeps the login CTA's returnTo pointing back at this page and fires NO bookmark calls", async () => {
+  it("keeps the login CTAs' returnTo pointing back at this page and fires NO bookmark/social-auth calls", async () => {
     vi.mocked(getPublicPublication).mockResolvedValue(detail());
     mount();
 
@@ -188,11 +253,13 @@ describe("community publication detail page — guests (#43)", () => {
       new URLSearchParams(href.slice("/login".length)).get("returnTo")
     );
     expect(returnTo).toBe("/community/quizzes/7");
-    // #46: guests never touch the authenticated bookmark routes.
+    // #46/#67: guests never touch the authenticated bookmark/social routes.
     expect(listMyBookmarks).not.toHaveBeenCalled();
     expect(putBookmark).not.toHaveBeenCalled();
     expect(deleteBookmark).not.toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: /Save to my collection/ })).toBeNull();
+    expect(getSocialSummary).not.toHaveBeenCalled();
+    expect(putLike).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
   });
 
   it("renders only the §7 allowlist — no answer/option/exam-id/PII keys in the DOM", async () => {
@@ -278,6 +345,55 @@ describe("community publication detail page — guests (#43)", () => {
   });
 });
 
+describe("community publication detail page — social aggregates (#67)", () => {
+  it("renders the guest-visible rating aggregate from the ANONYMOUS summary", async () => {
+    vi.mocked(getPublicPublication).mockResolvedValue(detail());
+    mount();
+
+    expect(
+      await screen.findByText("4.5 / 5 · 8 ratings")
+    ).toBeTruthy();
+    expect(getPublicSocialSummary).toHaveBeenCalledWith(7);
+    expect(getSocialSummary).not.toHaveBeenCalled();
+  });
+
+  it("renders '—' for a null average (zero ratings) with the live count", async () => {
+    vi.mocked(getPublicPublication).mockResolvedValue(detail());
+    vi.mocked(getPublicSocialSummary).mockResolvedValue(
+      socialSummary({ average: null, ratingCount: 0, likeCount: 0, commentCount: 0 })
+    );
+    mount();
+
+    expect(await screen.findByText("— / 5 · 0 ratings")).toBeTruthy();
+  });
+
+  it("feeds the discussion heading the live comment count via the #discussion anchor", async () => {
+    vi.mocked(getPublicPublication).mockResolvedValue(detail());
+    mount();
+
+    const heading = await screen.findByRole("heading", {
+      level: 2,
+      name: "Community Discussion (3)",
+    });
+    expect(heading.closest("section")?.id).toBe("discussion");
+  });
+
+  it("serves signed-in users the authenticated twin for aggregates", async () => {
+    asUser();
+    vi.mocked(getPublicPublication).mockResolvedValue(detail());
+    vi.mocked(getSocialSummary).mockResolvedValue({
+      ...socialSummary({ average: 4.25 }),
+      liked: true,
+      myRating: 4,
+    });
+    mount();
+
+    expect(await screen.findByText("4.25 / 5 · 8 ratings")).toBeTruthy();
+    expect(getPublicSocialSummary).not.toHaveBeenCalled();
+    expect(getSocialSummary).toHaveBeenCalledWith(7);
+  });
+});
+
 describe("community publication detail page — save/unsave toggle (#46)", () => {
   it("derives the save-state from the newest-first probe (same key family as the collection page)", async () => {
     asUser();
@@ -285,9 +401,10 @@ describe("community publication detail page — save/unsave toggle (#46)", () =>
     vi.mocked(listMyBookmarks).mockResolvedValue(savedPage([7]));
     mount();
 
-    expect(
-      await screen.findByRole("button", { name: "Remove from saved" })
-    ).toBeTruthy();
+    const saved = (await screen.findByRole("button", {
+      name: "Saved",
+    })) as HTMLButtonElement;
+    expect(saved.getAttribute("aria-pressed")).toBe("true");
     expect(listMyBookmarks).toHaveBeenCalledWith({ page: 0, size: 50 });
   });
 
@@ -299,7 +416,7 @@ describe("community publication detail page — save/unsave toggle (#46)", () =>
       vi.mocked(listMyBookmarks).mockResolvedValue(savedPage([7]));
       mount();
       expect(
-        await screen.findByRole("button", { name: "Remove from saved" })
+        await screen.findByRole("button", { name: "Saved" })
       ).toBeTruthy();
     }
   });
@@ -328,9 +445,7 @@ describe("community publication detail page — save/unsave toggle (#46)", () =>
     vi.mocked(putBookmark).mockReturnValue(putPending);
     mount();
 
-    const save = await screen.findByRole("button", {
-      name: "Save to my collection",
-    });
+    const save = await screen.findByRole("button", { name: "Save" });
     fireEvent.click(save);
 
     // In-flight: disabled + labelled, so the second click is a no-op (and the
@@ -366,9 +481,7 @@ describe("community publication detail page — save/unsave toggle (#46)", () =>
     vi.mocked(deleteBookmark).mockReturnValue(deletePending);
     mount();
 
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Remove from saved" })
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "Saved" }));
 
     const busy = (await screen.findByRole("button", {
       name: /Removing…/,
@@ -400,9 +513,7 @@ describe("community publication detail page — save/unsave toggle (#46)", () =>
     });
     mount();
 
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Save to my collection" })
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "Save" }));
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("no longer available");
@@ -421,9 +532,7 @@ describe("community publication detail page — save/unsave toggle (#46)", () =>
     });
     mount();
 
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Save to my collection" })
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "Save" }));
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Too many requests");
@@ -440,9 +549,7 @@ describe("community publication detail page — save/unsave toggle (#46)", () =>
     });
     mount();
 
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Save to my collection" })
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "Save" }));
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Network error");
