@@ -19,12 +19,12 @@ import { COMMUNITY_COMMENT_BODY_MAX, communityCommentBodySchema } from "@/lib/va
  * create; a legacy `alias` field would be ignored server-side). The small
  * informative line states that the name is public — it is a disclosure,
  * never a confirmation gate. No everyday Cancel button: an empty composer
- * has nothing to cancel; the posted/error notices clear on the next
- * keystroke.
+ * has nothing to cancel.
  *
  * Body bounds (§3): plain text ≤2000 chars, non-blank; the live count
  * disables submit over/under the bounds. Duplicate submits are impossible
- * while pending (`isPending` disables the action).
+ * while pending (`isPending` disables the action); the posted notice
+ * clears on the next keystroke, error copy on the next submit attempt.
  */
 
 /** Live-count textarea shared by the composer and the inline edit form. */
@@ -141,7 +141,9 @@ export function CommentEditor({ publicationId }: { publicationId: number }) {
         />
         {tried && !bodyOk && (
           <p role="alert" className="text-sm font-medium text-[#EF4444]">
-            Write a comment before posting.
+            {body.trim().length === 0
+              ? "Write a comment before posting."
+              : `Comments must be ${COMMUNITY_COMMENT_BODY_MAX} characters or fewer.`}
           </p>
         )}
 

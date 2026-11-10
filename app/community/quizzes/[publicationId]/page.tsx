@@ -24,7 +24,7 @@ import type { NormalizedApiError } from "@/lib/api";
  * social toolbar per ADR-007 §7, issue #67).
  *
  * Anonymous, safe-by-construction: renders ONLY the `PublicPublicationDetail`
- * allowlist (title, alias credit, category, tags, counts, duration, dates) as
+ * allowlist (title, author name, category, tags, counts, duration, dates) as
  * React text — no question/option/answer content, no exam ids, no PII exist in
  * the consumed type, and nothing is ever rendered as HTML/markdown.
  *
@@ -38,8 +38,8 @@ import type { NormalizedApiError } from "@/lib/api";
  * into the metadata area — rendered for guests too, fed by the ANONYMOUS
  * social-summary — and the Comment button anchor-scrolls to the labelled
  * `#discussion` section below the toolbar, whose body (#68) is the paginated
- * discussion: newest-first plain-text comments with the alias-consent editor,
- * own edit/delete, report dialog and star-rating selector.
+ * discussion: newest-first plain-text comments with the account-name
+ * composer (#73), own edit/delete, report dialog and star-rating selector.
  */
 
 function formatDate(iso: string): string {

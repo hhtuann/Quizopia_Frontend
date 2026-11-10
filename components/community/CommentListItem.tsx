@@ -162,7 +162,7 @@ export function CommentListItem({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-7 px-2 text-xs"
+                        className="px-2.5"
                         onClick={startEdit}
                       >
                         Edit
@@ -171,7 +171,7 @@ export function CommentListItem({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-7 px-2 text-xs"
+                        className="px-2.5"
                         aria-busy={deleteMut.isPending}
                         disabled={deleteMut.isPending}
                         onClick={() => deleteMut.mutate(comment.commentId)}
@@ -191,7 +191,7 @@ export function CommentListItem({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-7 px-2 text-xs"
+                      className="px-2.5"
                       onClick={() => setReportOpen(true)}
                     >
                       Report

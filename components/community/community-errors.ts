@@ -109,13 +109,11 @@ export function describeBookmarkError(err: unknown): string {
 export type CommentErrorScope = "publication" | "comment";
 
 /**
- * Comment-action copy (P3-C4, #68, ADR-007 §4/§5). Distinct from the
+ * Comment-action copy (#73 — ADR-007 Rev 4). Distinct from the
  * bookmark/fork/social copy because the failure classes differ: 409
- * `COMMUNITY_ALIAS_TAKEN` is the ci-unique alias collision (retry with a
- * different name — the server aborted atomically, nothing partial landed),
- * 400 `COMMUNITY_ALIAS_INVALID` is the §4 charset/impersonation rejection,
- * 409 `COMMUNITY_COMMENT_STATE_INVALID` is an edit against a comment that
- * is no longer VISIBLE, and 404 means the publication/comment is gone.
+ * `COMMUNITY_COMMENT_STATE_INVALID` is an edit against a comment that
+ * is no longer VISIBLE, 400 `COMMUNITY_VALIDATION_ERROR` is a body-
+ * bounds rejection, and 404 means the publication/comment is gone.
  * Classification lives in `lib/api/community-comments` (single source).
  *
  * The 404 line is SCOPE-SPLIT: the create POST addresses the PUBLICATION

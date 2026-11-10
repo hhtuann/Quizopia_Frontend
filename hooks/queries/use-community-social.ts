@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   classifySocialError,
   deleteLike,
-  deleteRating,
   getPublicSocialSummary,
   getSocialSummary,
   putLike,
@@ -118,15 +117,3 @@ export function usePutRatingMutation(publicationId: number) {
   });
 }
 
-/** Clear rating (DELETE) — idempotent; invalidates the social prefix after settle. */
-export function useDeleteRatingMutation(publicationId: number) {
-  const { invalidateSocial, invalidateCommunity } =
-    useSocialInvalidation(publicationId);
-  return useMutation({
-    mutationFn: () => deleteRating(publicationId),
-    onSettled: invalidateSocial,
-    onError: (error) => {
-      if (classifySocialError(error).kind === "gone") invalidateCommunity();
-    },
-  });
-}
