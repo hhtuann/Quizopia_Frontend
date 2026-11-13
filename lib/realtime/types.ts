@@ -17,7 +17,9 @@ export type RealtimeEventType =
   | "ATTEMPT_STARTED"
   | "ATTEMPT_SUBMITTED"
   | "ACTIVE_COUNT_CHANGED"
-  | "SERVER_TIME_SYNC";
+  | "SERVER_TIME_SYNC"
+  /** P4-A4: a durable activity event landed — refetch the timeline via REST. */
+  | "ATTEMPT_ACTIVITY";
 
 export interface RealtimeEventEnvelope {
   eventId: string;
@@ -31,6 +33,14 @@ export interface RealtimeEventEnvelope {
   occurredAt: string;
   serverTime: string;
   activeCount?: number | null;
+  /**
+   * P4-A4 `ATTEMPT_ACTIVITY` only: the durable event's type (e.g.
+   * "TAB_HIDDEN" | "ANSWER_ACCEPTED"), its source and client timestamp.
+   * Absent on every other envelope (@JsonInclude NON_NULL).
+   */
+  activityType?: string | null;
+  activitySource?: "CLIENT" | "SERVER" | null;
+  clientOccurredAt?: string | null;
 }
 
 /**

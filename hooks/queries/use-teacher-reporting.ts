@@ -2,6 +2,7 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
+  fetchAllSessionResults,
   getSessionResults,
   getSessionStatistics,
   type SessionResultsParams,
@@ -16,6 +17,18 @@ export function useSessionResultsQuery(
     queryKey: ["exam-sessions", sessionId, "results", params],
     queryFn: () => getSessionResults(sessionId, params),
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * ALL session-result rows (paged through server-side; capped at 20 pages ×
+ * 200). Used by the Activity panel's attempt picker so every participant —
+ * not just the first 200 — resolves their best attempt id.
+ */
+export function useAllSessionResultsQuery(sessionId: number) {
+  return useQuery({
+    queryKey: ["exam-sessions", sessionId, "results", "all"],
+    queryFn: () => fetchAllSessionResults(sessionId),
   });
 }
 

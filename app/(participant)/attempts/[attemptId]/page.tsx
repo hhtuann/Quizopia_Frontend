@@ -16,8 +16,9 @@ import { Button, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { useAutosaveAnswers, type AutosaveStatus } from "@/lib/attempt/use-autosave";
 import { useAnswerStore } from "@/lib/attempt/answer-store";
-import { saveAnswer, type SaveAnswerRequest } from "@/lib/api/student-attempt";
+import { useAttemptTelemetry } from "@/lib/attempt/use-attempt-telemetry";
 import { useStompConnection } from "@/lib/realtime/use-stomp-connection";
+import { saveAnswer, type SaveAnswerRequest } from "@/lib/api/student-attempt";
 import { useServerTimeSync } from "@/lib/realtime/use-server-time-sync";
 import type {
   AttemptDetailResponse,
@@ -72,14 +73,22 @@ function InProgressShell({
   attemptId: number;
   studentName?: string;
 }) {
-  const autosaveStatus = useAutosaveAnswers(attemptId, new Date(detail.deadlineAt).getTime());
   const submitMut = useSubmitAttemptMutation(attemptId);
   const router = useRouter();
   const { user: shellUser } = useAuth();
   const historyRedirect = participantHistoryHref(shellUser?.roles);
   const queryClient = useQueryClient();
   const backRedirect = participantBackHref(shellUser?.roles);
-
+  const autosaveStatus = useAutosaveAnswers(attemptId, new Date(detail.deadlineAt).getTime());
+  // P4-A telemetry: one stable clientInstanceId per page load; the emitter
+  // lives at module scope (never re-created on re-render). Signals map
+  // STOMP/autosave transitions to CONNECTION_* / AUTOSAVE_FAILED events.
+  const [clientInstanceId] = useState(
+    () =>
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `cid-${Date.now()}`
+  );
   // WebSocket: mount only for IN_PROGRESS attempts (InProgressShell is only
   // rendered for IN_PROGRESS — see AttemptPage :45). Connects, subscribes to
   // /user/queue/attempt, and receives SERVER_TIME_SYNC for live timer sync.
@@ -94,6 +103,10 @@ function InProgressShell({
       });
     }
   );
+  const telemetry = useAttemptTelemetry(attemptId, clientInstanceId, {
+    wsStatus,
+    autosaveStatus,
+  });
 
   // Subscribe to any-dirty state (re-renders when dirty flags change).
   const anyDirty = useAnswerStore((s) =>
@@ -276,6 +289,9 @@ function InProgressShell({
         liveServerTime={liveServerTime}
         wsStatus={wsStatus}
         onExpire={handleAutoSubmit}
+        onQuestionNavigated={(qid) =>
+          telemetry.track("QUESTION_NAVIGATED", { questionId: qid })
+        }
       />
       <ConfirmDialog
         open={confirmOpen}

@@ -1,4 +1,5 @@
 import { http } from "./http-client";
+import type { MonitoringPolicyPayload, MonitoringPolicyResponse } from "./monitoring";
 import type { PageResponse } from "./question-banks";
 
 /**
@@ -42,7 +43,7 @@ export interface ExamSessionListItem {
   createdAt: string;
 }
 
-/** Backend record `ExamSessionDetailResponse`. `version` is the @Version optimistic token. `durationMinutes` is always set now. */
+/** Backend record `ExamSessionDetailResponse`. `version` is the @Version optimistic token. `durationMinutes` is always set now. P4-A adds the derived `monitoring` policy block. */
 export interface ExamSessionDetailResponse {
   id: number;
   examId: number;
@@ -60,6 +61,8 @@ export interface ExamSessionDetailResponse {
   version: number | null;
   createdAt: string;
   visibility: SessionVisibility;
+  /** Monitoring policy (P4-A). Server always sends it; kept optional for older cached payloads. */
+  monitoring?: MonitoringPolicyResponse;
 }
 
 export interface ExamSessionListParams {
@@ -88,6 +91,8 @@ export interface CreateExamSessionRequest {
   visibility?: SessionVisibility;
   /** Classrooms assigned when CLASS_RESTRICTED. Ignored when PUBLIC. */
   classroomIds?: number[];
+  /** Monitoring policy block (P4-A). Absent = all flags OFF. */
+  monitoring?: MonitoringPolicyPayload;
 }
 
 /** `GET /api/exams/{examId}/sessions` — sessions of ONE exam (canonical nested route). */
@@ -184,6 +189,12 @@ export interface UpdateExamSessionRequest {
   startsAt: string;
   endsAt: string;
   maxAttempts: number;
+  /**
+   * Monitoring policy block (P4-A): NULL/absent = NO CHANGE (legacy
+   * title-only edits keep working); non-null replaces the whole block —
+   * the config form always sends every flag.
+   */
+  monitoring?: MonitoringPolicyPayload | null;
 }
 
 /** `PUT /api/exam-sessions/{sessionId}` → 200 updated detail (config edit; DRAFT/SCHEDULED only). */

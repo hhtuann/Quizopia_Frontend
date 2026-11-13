@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -9,14 +9,23 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useExamSessionDetailQuery,
   useSessionActionMutation,
+  useSessionClassesQuery,
   useUpdateSessionMutation,
 } from "@/hooks/queries/use-exam-sessions";
 import type {
   ExamSessionDetailResponse,
   ExamSessionStatus,
   SessionLifecycleAction,
-  UpdateExamSessionRequest,
 } from "@/lib/api/exam-sessions";
+import { MonitoringSection } from "@/components/monitoring/MonitoringSection";
+import { TeacherActivityPanel } from "@/components/monitoring/TeacherActivityPanel";
+import {
+  monitoringConfigFromPolicy,
+  monitoringEligibility,
+  normalizeMonitoringConfig,
+  type MonitoringConfigState,
+} from "@/lib/monitoring/gating";
+import { buildUpdateSessionPayload } from "@/lib/exam-sessions/session-payloads";
 import { updateSessionSchema, type UpdateSessionValues } from "@/lib/validation/exam-session-schemas";
 import { Badge, Button, Input, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
@@ -26,6 +35,7 @@ import { LiveMonitor } from "@/components/teacher/LiveMonitor";
 import { ReportingSection } from "@/components/teacher/reporting/ReportingSection";
 import { SessionShareCard } from "@/components/teacher/SessionShareCard";
 import type { NormalizedApiError } from "@/lib/api";
+import type { RealtimeEventEnvelope } from "@/lib/realtime/types";
 
 const EDITABLE_STATES: ExamSessionStatus[] = ["DRAFT", "SCHEDULED"];
 
@@ -80,6 +90,10 @@ function describeConfigError(err: unknown): { field?: "endsAt"; conflict?: boole
         return { message: "You don't have permission to edit this session." };
       case "EXAM_VALIDATION_ERROR":
         return { message: norm.message || "Please check the highlighted fields." };
+      case "EXAM_SESSION_MONITORING_FROZEN":
+        return { conflict: true, message: "Monitoring configuration is frozen — the session has opened, started, or has attempts." };
+      case "EXAM_SESSION_MONITORING_INVALID":
+        return { message: "Monitoring requires a class-restricted session with at least one class, and each option needs its prerequisite enabled." };
       default:
         return { message: norm.message || "Could not save the configuration." };
     }
@@ -141,8 +155,6 @@ function DetailView({ data, backHref }: { data: ExamSessionDetailResponse; backH
     return () => clearTimeout(t);
   }, [notice]);
 
-  const editable = EDITABLE_STATES.includes(data.status);
-
   const runAction = async (action: SessionLifecycleAction) => {
     setConfirmAction(null);
     setNotice(null);
@@ -168,10 +180,44 @@ function DetailView({ data, backHref }: { data: ExamSessionDetailResponse; backH
     { label: "Duration", value: data.durationMinutes === 0 ? "Unlimited" : `${data.durationMinutes} min` },
     { label: "Opened at", value: formatDateTime(data.openedAt) },
     { label: "Closed at", value: formatDateTime(data.closedAt) },
-    { label: "Participants", value: String(data.participantCount) },
     { label: "Version token", value: data.version != null ? String(data.version) : "—" },
     { label: "Created", value: formatDateTime(data.createdAt) },
   ];
+
+  const editable = EDITABLE_STATES.includes(data.status);
+
+
+  // P4-A4: teacher Activity panel — the selected attempt whose timeline is
+  // shown. A ref mirrors it into the stable LiveMonitor callback so live
+  // ATTEMPT_ACTIVITY envelopes invalidate the right timeline query.
+  const [activityAttemptId, setActivityAttemptId] = useState<number | null>(null);
+  const activityAttemptRef = useRef<number | null>(null);
+  const selectActivityAttempt = useCallback((attemptId: number | null) => {
+    activityAttemptRef.current = attemptId;
+    setActivityAttemptId(attemptId);
+  }, []);
+  const onAttemptActivity = useCallback(
+    (ev: RealtimeEventEnvelope) => {
+      const selected = activityAttemptRef.current;
+      if (selected == null || ev.attemptId !== selected) return;
+      // Durable event landed → refetch the visible timeline pages (REST is
+      // the source of truth; the envelope itself is only a notification).
+      void queryClient.invalidateQueries({
+        queryKey: ["attempts", selected, "timeline"],
+      });
+    },
+    [queryClient]
+  );
+
+  // P4-A4 backfill: on WS reconnect, refetch the SELECTED attempt's timeline
+  // (durable events that landed while the socket was down; REST = truth).
+  const backfillSelectedTimeline = useCallback(() => {
+    const selected = activityAttemptRef.current;
+    if (selected == null) return;
+    void queryClient.invalidateQueries({
+      queryKey: ["attempts", selected, "timeline"],
+    });
+  }, [queryClient]);
 
   return (
     <div>
@@ -283,6 +329,15 @@ function DetailView({ data, backHref }: { data: ExamSessionDetailResponse; backH
           submittedCount: 0,
           sessionStatus: data.status,
         }}
+        onAttemptActivity={onAttemptActivity}
+        onReconnect={backfillSelectedTimeline}
+      />
+
+      {/* P4-A4: per-participant activity timeline (attempt picker + live refetch). */}
+      <TeacherActivityPanel
+        sessionId={data.id}
+        selectedAttemptId={activityAttemptId}
+        onSelectAttempt={selectActivityAttempt}
       />
 
       {/* Results & statistics */}
@@ -318,6 +373,16 @@ function ConfigForm({ session }: { session: ExamSessionDetailResponse }) {
   const updateMut = useUpdateSessionMutation(session.id);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
+  // P4-A: monitoring flags (init from the server policy; the form always
+  // sends the full block on save).
+  const [monitoringConfig, setMonitoringConfig] = useState<MonitoringConfigState>(() =>
+    monitoringConfigFromPolicy(session.monitoring)
+  );
+  const { data: classesData } = useSessionClassesQuery(session.id);
+  const monitoringGate = monitoringEligibility(
+    session.visibility,
+    classesData?.items.length ?? 0
+  );
 
   useEffect(() => {
     if (!formSuccess) return;
@@ -343,14 +408,12 @@ function ConfigForm({ session }: { session: ExamSessionDetailResponse }) {
   const onSubmit = async (values: UpdateSessionValues) => {
     setFormError(null);
     setFormSuccess(null);
-    const req: UpdateExamSessionRequest = {
-      expectedVersion: session.version ?? 0, // JPA @Version optimistic token.
-      title: values.title.trim(),
-      // datetime-local (local) → ISO UTC. Submit handler, not render.
-      startsAt: new Date(values.startsAt).toISOString(),
-      endsAt: new Date(values.endsAt).toISOString(),
-      maxAttempts: values.maxAttempts,
-    };
+    const req = buildUpdateSessionPayload(
+      values,
+      session.version ?? 0, // JPA @Version optimistic token.
+      monitoringConfig,
+      session.monitoring?.configurationFrozen ?? false
+    );
     try {
       await updateMut.mutateAsync(req);
       setFormSuccess("Configuration saved.");
@@ -411,6 +474,17 @@ function ConfigForm({ session }: { session: ExamSessionDetailResponse }) {
           <Input id="cfg-maxAttempts" type="number" min={1} step={1} aria-invalid={!!errors.maxAttempts} aria-describedby={errors.maxAttempts ? "cfg-maxAttempts-error" : undefined} className={cn(errors.maxAttempts && "border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]")} {...register("maxAttempts", { valueAsNumber: true })} />
           <FieldError id="cfg-maxAttempts-error" message={errors.maxAttempts?.message} />
         </div>
+
+        {/* Exam monitoring (P4-A) — frozen after open/start/attempts. */}
+        <MonitoringSection
+          config={monitoringConfig}
+          onConfigChange={(next) =>
+            setMonitoringConfig(normalizeMonitoringConfig(next))
+          }
+          unavailableReason={monitoringGate.reason}
+          frozen={session.monitoring?.configurationFrozen ?? false}
+          policy={session.monitoring}
+        />
       </div>
     </form>
   );

@@ -5,18 +5,26 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useExamQuery } from "@/hooks/queries/use-exams";
 import { useCreateExamSessionMutation } from "@/hooks/queries/use-exam-sessions";
+import { useExamQuery } from "@/hooks/queries/use-exams";
 import { useMyClassroomsQuery } from "@/hooks/queries/use-classrooms";
 import { createSessionSchema, type CreateSessionValues } from "@/lib/validation/exam-session-schemas";
-import type { CreateExamSessionRequest, SessionVisibility } from "@/lib/api/exam-sessions";
+import type { SessionVisibility } from "@/lib/api/exam-sessions";
+import { MonitoringSection } from "@/components/monitoring/MonitoringSection";
+import {
+  DEFAULT_MONITORING_CONFIG,
+  monitoringEligibility,
+  normalizeMonitoringConfig,
+  type MonitoringConfigState,
+} from "@/lib/monitoring/gating";
+import { buildCreateSessionPayload } from "@/lib/exam-sessions/session-payloads";
 import { Badge, Button, Input, buttonVariants, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { NormalizedApiError } from "@/lib/api";
 
 const labelClass = "mb-2 block pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]";
 
-function describeCreateError(err: unknown): { field?: "endsAt"; message: string } {
+export function describeCreateError(err: unknown): { field?: "endsAt"; message: string } {
   const norm = err as NormalizedApiError | undefined;
   if (norm?.kind === "api") {
     switch (norm.code) {
@@ -33,6 +41,10 @@ function describeCreateError(err: unknown): { field?: "endsAt"; message: string 
         return { message: "You don't have permission to create an exam session." };
       case "EXAM_VALIDATION_ERROR":
         return { message: norm.message || "Please check the highlighted fields." };
+      case "EXAM_SESSION_MONITORING_INVALID":
+        return { message: "Monitoring requires a class-restricted session with at least one class, and each option needs its prerequisite enabled." };
+      case "EXAM_SESSION_MONITORING_FROZEN":
+        return { message: "Monitoring configuration is locked for this session." };
       default:
         return { message: norm.message || "Could not create the session." };
     }
@@ -79,6 +91,10 @@ export default function NewExamSessionPage() {
   const classrooms = classroomsData?.items ?? [];
   const [selectedClassIds, setSelectedClassIds] = useState<number[]>([]);
   const visibility: SessionVisibility = useWatch({ control, name: "visibility" }) ?? "CLASS_RESTRICTED";
+  const [monitoringConfig, setMonitoringConfig] =
+    useState<MonitoringConfigState>(DEFAULT_MONITORING_CONFIG);
+
+  const monitoringGate = monitoringEligibility(visibility, selectedClassIds.length);
 
   const mutation = useCreateExamSessionMutation(examIdNum);
 
@@ -88,16 +104,12 @@ export default function NewExamSessionPage() {
       setFormError("Select at least one class for a class-restricted session, or choose Public visibility.");
       return;
     }
-    const req: Omit<CreateExamSessionRequest, "examId"> = {
-      title: values.title.trim(),
-      // datetime-local (local) → ISO UTC. Runs in the submit handler, not render.
-      startsAt: new Date(values.startsAt).toISOString(),
-      endsAt: new Date(values.endsAt).toISOString(),
-      maxAttempts: values.maxAttempts,
-      durationMinutes: values.durationMinutes,
-      visibility: values.visibility,
-      classroomIds: values.visibility === "CLASS_RESTRICTED" ? selectedClassIds : [],
-    };
+    const req = buildCreateSessionPayload(
+      values,
+      selectedClassIds,
+      monitoringConfig,
+      monitoringGate.available
+    );
     try {
       await mutation.mutateAsync(req);
       router.replace(`/exams/${examIdNum}?tab=sessions`);
@@ -275,6 +287,14 @@ export default function NewExamSessionPage() {
                   )}
                 </fieldset>
               )}
+              {/* Exam monitoring (P4-A) — gated by visibility + selected classes. */}
+              <MonitoringSection
+                config={monitoringConfig}
+                onConfigChange={(next) =>
+                  setMonitoringConfig(normalizeMonitoringConfig(next))
+                }
+                unavailableReason={monitoringGate.reason}
+              />
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
                 <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Creating…" : "Create session"}</Button>
