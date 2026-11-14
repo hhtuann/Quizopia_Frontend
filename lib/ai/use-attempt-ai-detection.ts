@@ -186,6 +186,8 @@ export function useAttemptAiDetection(
       setState((prev) => ({ ...prev, status: next }));
     };
 
+    const MAX_LOCAL_RECORDS = 50;
+
     const recordSent = (batch: AiDetectionItem[]): void => {
       for (const item of batch) {
         sentRecords.push({
@@ -195,6 +197,9 @@ export function useAttemptAiDetection(
           simulated,
           observedAt: item.observedAt,
         });
+      }
+      if (sentRecords.length > MAX_LOCAL_RECORDS) {
+        sentRecords.splice(0, sentRecords.length - MAX_LOCAL_RECORDS);
       }
       publishAiSentEvents([...sentRecords]);
     };
@@ -224,6 +229,12 @@ export function useAttemptAiDetection(
       }
     };
 
+    // P2-5 (review): per-type client suppression so sustained detections
+    // stay WELL under the server's 6 batches/min rate limit. Server-side
+    // cooldowns (20s/45s) still aggregate; this only paces the wire.
+    const lastQueuedAt: Record<string, number> = {};
+    const EVENT_SUPPRESS_MS = 10_000;
+
     const handleFrame = (frame: DetectionFrame): void => {
       publishAiFrameSample({
         processingMs: frame.processingMs,
@@ -237,7 +248,11 @@ export function useAttemptAiDetection(
       const decision = decideDetectionEvents(frame.detections, counters);
       counters = decision.counters;
       const observedAt = new Date(frame.capturedAt).toISOString();
+      const now = Date.now();
       for (const event of decision.events) {
+        const last = lastQueuedAt[event.eventType] ?? 0;
+        if (now - last < EVENT_SUPPRESS_MS) continue; // suppressed, not lost truth
+        lastQueuedAt[event.eventType] = now;
         sequence += 1;
         queue.push({
           eventId: newEventId(sequence),
@@ -347,6 +362,10 @@ export function useAttemptAiDetection(
         onFrame: (frame) => {
           handleFrame(frame);
           publishAiDroppedFrames(scheduler?.droppedFrames ?? 0);
+        },
+        onStatus: (st) => {
+          // P3-11 (review): keep the pill's FPS honest — mirror budget changes.
+          setState((prev) => (prev.fps === st.fps ? prev : { ...prev, fps: st.fps }));
         },
       });
       scheduler.start();

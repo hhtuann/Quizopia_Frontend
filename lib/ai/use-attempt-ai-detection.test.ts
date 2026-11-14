@@ -253,7 +253,9 @@ describe("useAttemptAiDetection", () => {
     consoleError.mockRestore();
 
     // Later batches succeed → back to 'running' (detection never stopped).
-    await settle(TICK_MS * 8 + FLUSH_MS * 2);
+    // P2-5 pacing: a type suppressed for 10s — advance past the window so a
+    // fresh PERSON_NOT_OBSERVED is queued, flushed and succeeds.
+    await settle(TICK_MS * 20 + FLUSH_MS * 2);
     expect(statusOf()).toBe("running");
   });
 

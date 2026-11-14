@@ -151,7 +151,7 @@ test.describe("Scenario H — AI detections (SIMULATED detector)", () => {
       {
         method: "POST",
         body: JSON.stringify({
-          events: [{
+          detections: [{
             eventId: first.eventId,
             eventType: first.eventType,
             observedAt: first.observedAt,
@@ -198,7 +198,7 @@ test.describe("Scenario H — AI detections (SIMULATED detector)", () => {
       {
         method: "POST",
         body: JSON.stringify({
-          events: [{
+          detections: [{
             eventId: crypto.randomUUID(),
             eventType: "PHONE_OBSERVED",
             observedAt: new Date().toISOString(),

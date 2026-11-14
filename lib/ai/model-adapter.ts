@@ -208,14 +208,21 @@ interface OrtModuleLike {
 
 let ortModulePromise: Promise<OrtModuleLike> | null = null;
 
-/** Load onnxruntime-web exactly once (wasm paths pinned before any session). */
+/** Load onnxruntime-web once; a transient failure does NOT poison the cache
+ *  (the next createDetector() retries the import). */
 async function loadOrt(): Promise<OrtModuleLike> {
   if (!ortModulePromise) {
-    ortModulePromise = import("onnxruntime-web").then((mod) => {
-      const ort = mod as unknown as OrtModuleLike;
-      ort.env.wasm.wasmPaths = ORT_WASM_PATHS;
-      return ort;
-    });
+    ortModulePromise = import("onnxruntime-web").then(
+      (mod) => {
+        const ort = mod as unknown as OrtModuleLike;
+        ort.env.wasm.wasmPaths = ORT_WASM_PATHS;
+        return ort;
+      },
+      (err) => {
+        ortModulePromise = null; // allow retry on the next call
+        throw err;
+      }
+    );
   }
   return ortModulePromise;
 }
@@ -304,6 +311,10 @@ export async function createDetector(): Promise<Detector> {
       const srcH = video.videoHeight;
       if (srcW <= 0 || srcH <= 0) return null; // no decoded frame yet
 
+      // Wall-clock epoch ms at capture — the ingest sanity window requires a
+      // real timestamp; performance.now() is page-relative (1970 epoch). For
+      // the measured duration below, a monotonic high-res clock is used.
+      const capturedWallMs = Date.now();
       const t0 =
         typeof performance !== "undefined" ? performance.now() : Date.now();
       const ctx = canvas.getContext("2d");
@@ -340,7 +351,7 @@ export async function createDetector(): Promise<Detector> {
         frameWidth: srcW,
         frameHeight: srcH,
         processingMs: Math.max(0, Math.round(t1 - t0)),
-        capturedAt: t0,
+        capturedAt: capturedWallMs,
         runtime,
       };
     },

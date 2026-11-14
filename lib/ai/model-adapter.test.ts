@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   MODEL,
   letterboxGeometry,
@@ -177,5 +178,101 @@ describe("MODEL card constant", () => {
       67: "cell phone",
     });
     expect(MODEL.license).toBe("AGPL-3.0");
+  });
+});
+
+
+/* ------------------------------------------------------------------ */
+/* detect() contract — mocked ort module (never loads real wasm).       */
+/* The P0-2 regression: capturedAt MUST be wall-clock epoch ms so the   */
+/* backend sanity window accepts it (performance.now() gave 1970 dates  */
+/* — masked by every earlier fake because they hand-built frames).      */
+/* ------------------------------------------------------------------ */
+// vi.mock factories are hoisted into their own module scope and CANNOT
+// close over test-scope variables — shared state must go through vi.hoisted.
+const ortMock = vi.hoisted(() => {
+  const state = { executionProviders: [] as string[] };
+  return { state };
+});
+
+vi.mock("onnxruntime-web", () => ({
+  InferenceSession: {
+    create: async (_bytes: unknown, opts?: { executionProviders?: string[] }) => {
+      ortMock.state.executionProviders = opts?.executionProviders ?? [];
+      return {
+        run: async () => ({
+          output0: { dims: [1, 300, 6], data: new Float32Array(300 * 6) },
+        }),
+        release: async () => undefined,
+      };
+    },
+  },
+  Tensor: class {
+    constructor(
+      public type: string,
+      public data: Float32Array,
+      public dims: number[]
+    ) {}
+  },
+  env: { wasm: { wasmPaths: "" } },
+}));
+
+describe("createDetector().detect (mocked ort)", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      arrayBuffer: async () => new ArrayBuffer(8),
+    })));
+    // jsdom canvas: 2d context + pixel readback stubs.
+    const ctx = {
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      getImageData: (_x: number, _y: number, w: number, h: number) => ({
+        data: new Uint8ClampedArray(w * h * 4),
+      }),
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      ctx as unknown as CanvasRenderingContext2D
+    );
+    // Feeder video decodes 640×480 (srcObject stamp pattern).
+    Object.defineProperty(HTMLVideoElement.prototype, "srcObject", {
+      configurable: true,
+      set(stream: unknown) {
+        (this as HTMLVideoElement & { __s?: unknown }).__s = stream;
+        Object.defineProperty(this, "videoWidth", { configurable: true, value: 640 });
+        Object.defineProperty(this, "videoHeight", { configurable: true, value: 480 });
+        Object.defineProperty(this, "readyState", { configurable: true, value: 2 });
+      },
+      get() {
+        return (this as HTMLVideoElement & { __s?: unknown }).__s ?? null;
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    vi.resetModules();
+  });
+
+  it("returns a REAL wall-clock capturedAt (P0-2: never performance.now epoch)", async () => {
+    const { createDetector } = await import("./model-adapter");
+    const det = await createDetector();
+    expect(det.status).toBe("running");
+    expect(det.runtime).toBe("ORT_WEB_WASM"); // jsdom: no navigator.gpu
+
+    const video = document.createElement("video");
+    // jsdom has no MediaStream; the srcObject stamp is enough — detect()
+    // only reads the stamped videoWidth/videoHeight/readyState.
+    video.srcObject = null;
+    const frame = await det.detect(video);
+    expect(frame).not.toBeNull();
+    // The ingest sanity window demands a plausible epoch — anything before
+    // 2020 means someone reintroduced performance.now() as the capture clock.
+    expect(new Date(frame!.capturedAt).getFullYear()).toBeGreaterThanOrEqual(2020);
+    expect(frame!.frameWidth).toBe(640);
+    expect(frame!.frameHeight).toBe(480);
+    expect(frame!.detections).toEqual([]);
+    await det.release();
   });
 });

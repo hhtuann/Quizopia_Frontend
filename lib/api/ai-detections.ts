@@ -59,7 +59,8 @@ export function ingestAiDetections(
   attemptId: number,
   items: AiDetectionItem[]
 ): Promise<{ results: AiDetectionIngestResult[] }> {
-  return http.post(`/api/attempts/${attemptId}/ai-detections`, { items });
+  // Wire key MUST match the backend DTO field name (`detections`).
+  return http.post(`/api/attempts/${attemptId}/ai-detections`, { detections: items });
 }
 
 /* ------------------------------------------------------------------ */
@@ -80,7 +81,7 @@ export interface AiAlertItem {
   studentUserId: number;
   studentName: string | null;
   alertType: AiAlertType;
-  status: "OPEN";
+  status: "OPEN" | "CLOSED";
   firstDetectedAt: string;
   lastDetectedAt: string;
   detectionCount: number;
