@@ -18,7 +18,7 @@ vi.mock("@/lib/api/media", () => ({
 }));
 
 vi.mock("./camera-fallback", () => ({
-  createCameraFallbackTrack: vi.fn(() => null),
+  createCameraFallbackTrack: vi.fn(async () => null),
 }));
 
 vi.mock("livekit-client", () => {
@@ -161,7 +161,7 @@ beforeEach(() => {
   livekitInternals.__rooms.length = 0;
   livekitInternals.__log.length = 0;
    createMock.mockReset().mockResolvedValue(preflightResponse());
-  fallbackMock.mockReset().mockReturnValue(null);
+  fallbackMock.mockReset().mockResolvedValue(null);
    verifyMock.mockReset().mockResolvedValue({ state: "NOT_PUBLISHED" });
   gum = vi.fn();
   Object.defineProperty(navigator, "mediaDevices", {
@@ -358,7 +358,7 @@ describe("useCameraPreflight cleanup", () => {
   });
 });
 
-describe("useCameraPreflight rotated-sensor canvas fallback", () => {
+describe("useCameraPreflight aspect-preserving canvas fallback", () => {
 
   async function runToVerifying(): Promise<void> {
     render(createElement(Harness));
@@ -373,7 +373,7 @@ describe("useCameraPreflight rotated-sensor canvas fallback", () => {
     await runToVerifying();
     const fbTrack = { stop: vi.fn(), readyState: "live" } as unknown as MediaStreamTrack;
     const fbStop = vi.fn();
-    fallbackMock.mockReturnValue({ track: fbTrack, stop: fbStop });
+    fallbackMock.mockResolvedValue({ track: fbTrack, stop: fbStop });
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(3 * 2_000);
@@ -407,7 +407,7 @@ describe("useCameraPreflight rotated-sensor canvas fallback", () => {
   it("teardown stops BOTH the canvas fallback and the camera track", async () => {
     const fbTrack = { stop: vi.fn(), readyState: "live" } as unknown as MediaStreamTrack;
     const fbStop = vi.fn();
-    fallbackMock.mockReturnValue({ track: fbTrack, stop: fbStop });
+    fallbackMock.mockResolvedValue({ track: fbTrack, stop: fbStop });
 
     const { unmount } = render(createElement(Harness));
     await clickStart();

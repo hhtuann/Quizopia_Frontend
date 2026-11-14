@@ -311,6 +311,23 @@ async function main() {
     return null;
   });
   results.attemptPublishedLabel = attemptTrack;
+  // Which path published: direct or canvas fallback (track name)?
+  const pubInfo = await page.evaluate(() => {
+    const media = (window as { __quizopiaMedia?: { getRoom?: (s: string) => unknown } }).__quizopiaMedia;
+    const room = media?.getRoom?.("attempt") ?? media?.getRoom?.("preflight");
+    if (!room || typeof room !== "object") return null;
+    const lp = (room as { localParticipant?: { trackPublications?: Map<string, unknown> } }).localParticipant;
+    const out: Array<Record<string, unknown>> = [];
+    for (const pub of lp?.trackPublications?.values() ?? []) {
+      if (typeof pub === "object" && pub !== null) {
+        const p = pub as { trackName?: string; trackSid?: string; kind?: string; source?: unknown };
+        out.push({ name: p.trackName, sid: p.trackSid, kind: p.kind });
+      }
+    }
+    return out;
+  });
+  console.log("ATTEMPT-PUBLICATIONS", JSON.stringify(pubInfo));
+  results.attemptPublications = pubInfo;
 
   // --- Teacher Grid: real feed visible to the owner.
   const teacherCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -339,6 +356,22 @@ async function main() {
       }
       return { readyState: el.readyState, videoWidth: el.videoWidth, videoHeight: el.videoHeight };
     });
+    const recvTrack = await teacherPage.evaluate(() => {
+      const media = (window as { __quizopiaMedia?: { getRoom?: (s: string) => unknown } }).__quizopiaMedia;
+      const room = media?.getRoom?.("teacher");
+      if (!room || typeof room !== "object") return null;
+      for (const p of (room as { remoteParticipants?: Map<string, { trackPublications?: Map<string, unknown> }> })
+        .remoteParticipants?.values() ?? []) {
+        for (const pub of p.trackPublications?.values() ?? []) {
+          if (typeof pub === "object" && pub !== null) {
+            const t = (pub as { track?: { dimensions?: { width?: number; height?: number } } }).track;
+            if (t?.dimensions) return t.dimensions;
+          }
+        }
+      }
+      return null;
+    });
+    console.log("TEACHER-RECV-TRACK-DIMS", JSON.stringify(recvTrack));
     if (frames.readyState >= 2 && frames.videoWidth > 0) break;
     await new Promise((r) => setTimeout(r, 2000));
   }

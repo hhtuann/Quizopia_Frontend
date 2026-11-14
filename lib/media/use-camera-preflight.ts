@@ -42,7 +42,7 @@ import {
  *   NOT_PUBLISHED keeps polling, READY stores the lease and KEEPS the room
  *   connected (no disconnect — the attempt page takes it over).
  *   Rotated-sensor fallback: after 3 consecutive NOT_PUBLISHED polls the
- *   live camera track is re-encoded through a landscape canvas
+ *   live camera track is re-encoded through an aspect-preserving canvas
  *   (./camera-fallback.ts) and THAT track is published (name
  *   "camera-fallback") — same room, same preflight, run not restarted. If
  *   the fallback also stays NOT_PUBLISHED through the poll budget →
@@ -70,8 +70,8 @@ export type CameraPreflightFailure = "denied" | "unavailable" | "infra" | "timeo
 const VERIFY_INTERVAL_MS = 2_000;
 const VERIFY_MAX_TRIES = 10;
 /**
- * Consecutive NOT_PUBLISHED polls (≈6s) before switching to the canvas
- * re-encode fallback for rotated/portrait camera sensors whose raw track
+ * Consecutive NOT_PUBLISHED polls (≈6s) before switching to the
+ * aspect-preserving canvas re-encode fallback for sensors whose raw track
  * never publishes server-side (see ./camera-fallback.ts).
  */
 const FALLBACK_AFTER_NOT_PUBLISHED = 3;
@@ -230,7 +230,7 @@ export function useCameraPreflight({
       const room = roomRef.current;
       // Only re-encode a still-live camera; an ended track feeds nothing.
       if (!room || !camera || camera.readyState !== "live") return;
-      const fallback = createCameraFallbackTrack(camera);
+      const fallback = await createCameraFallbackTrack(camera);
       if (!fallback) return;
       fallbackRef.current = fallback;
       // Drop the publication that never reached the server. stopOnUnpublish
