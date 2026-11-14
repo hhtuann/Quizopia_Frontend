@@ -1,15 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useExamSessionDetailQuery,
   useSessionActionMutation,
   useSessionClassesQuery,
+  useSessionRosterQuery,
   useUpdateSessionMutation,
 } from "@/hooks/queries/use-exam-sessions";
 import type {
@@ -35,7 +36,10 @@ import { LiveMonitor } from "@/components/teacher/LiveMonitor";
 import { ReportingSection } from "@/components/teacher/reporting/ReportingSection";
 import { SessionShareCard } from "@/components/teacher/SessionShareCard";
 import type { NormalizedApiError } from "@/lib/api";
-import type { RealtimeEventEnvelope } from "@/lib/realtime/types";
+import { buildParticipantIndex, type RealtimeEventEnvelope } from "@/lib/realtime/types";
+import { getCameraStatus, type CameraParticipantStatus } from "@/lib/api/media";
+import { isCameraGridActivity } from "@/lib/media/use-camera-grid";
+import { CameraGridCard } from "@/components/teacher/CameraGridCard";
 
 const EDITABLE_STATES: ExamSessionStatus[] = ["DRAFT", "SCHEDULED"];
 
@@ -198,6 +202,14 @@ function DetailView({ data, backHref }: { data: ExamSessionDetailResponse; backH
   }, []);
   const onAttemptActivity = useCallback(
     (ev: RealtimeEventEnvelope) => {
+      // P4-B: CAMERA_*/MONITORING_GAP activity (webhook-driven, SERVER) →
+      // refetch the camera grid roster — REST is the source of truth for
+      // tile states; the envelope itself is only a notification.
+      if (isCameraGridActivity(ev)) {
+        void queryClient.invalidateQueries({
+          queryKey: ["exam-sessions", data.id, "camera-status"],
+        });
+      }
       const selected = activityAttemptRef.current;
       if (selected == null || ev.attemptId !== selected) return;
       // Durable event landed → refetch the visible timeline pages (REST is
@@ -206,18 +218,43 @@ function DetailView({ data, backHref }: { data: ExamSessionDetailResponse; backH
         queryKey: ["attempts", selected, "timeline"],
       });
     },
-    [queryClient]
+    [queryClient, data.id]
   );
 
   // P4-A4 backfill: on WS reconnect, refetch the SELECTED attempt's timeline
   // (durable events that landed while the socket was down; REST = truth).
+  // P4-B: the camera grid roster backfills the same way.
   const backfillSelectedTimeline = useCallback(() => {
     const selected = activityAttemptRef.current;
-    if (selected == null) return;
+    if (selected != null) {
+      void queryClient.invalidateQueries({
+        queryKey: ["attempts", selected, "timeline"],
+      });
+    }
     void queryClient.invalidateQueries({
-      queryKey: ["attempts", selected, "timeline"],
+      queryKey: ["exam-sessions", data.id, "camera-status"],
     });
-  }, [queryClient]);
+  }, [queryClient, data.id]);
+
+  // P4-B: teacher camera grid — mounted only for monitored sessions. The
+  // card joins the session's media room (subscribe-only, LOW layer); tile
+  // roster/state comes from camera-status with roster display names merged
+  // in (camera-status names are null for profile-less PUBLIC learners).
+  const monitored = data.monitoring?.monitoringEnabled === true;
+  const { data: cameraStatusData } = useQuery({
+    queryKey: ["exam-sessions", data.id, "camera-status"],
+    queryFn: () => getCameraStatus(data.id),
+    enabled: monitored,
+  });
+  const { data: cameraRoster } = useSessionRosterQuery(data.id, monitored);
+  const cameraParticipants = useMemo<CameraParticipantStatus[]>(() => {
+    const index = buildParticipantIndex(cameraRoster ?? []);
+    return (cameraStatusData?.participants ?? []).map((participant) => ({
+      ...participant,
+      displayName:
+        participant.displayName ?? index.byUser.get(participant.userId)?.displayName ?? null,
+    }));
+  }, [cameraStatusData, cameraRoster]);
 
   return (
     <div>
@@ -332,6 +369,11 @@ function DetailView({ data, backHref }: { data: ExamSessionDetailResponse; backH
         onAttemptActivity={onAttemptActivity}
         onReconnect={backfillSelectedTimeline}
       />
+
+      {/* P4-B: teacher camera grid — monitored sessions only. */}
+      {monitored && (
+        <CameraGridCard sessionId={data.id} participants={cameraParticipants} />
+      )}
 
       {/* P4-A4: per-participant activity timeline (attempt picker + live refetch). */}
       <TeacherActivityPanel

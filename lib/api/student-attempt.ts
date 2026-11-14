@@ -24,6 +24,12 @@ export interface AttemptOptionView {
 
 export interface StartAttemptRequest {
   clientInstanceId?: string | null;
+  /**
+   * P4-B: camera readiness lease from a verified monitoring preflight.
+   * Required for monitored sessions (409 MONITORING_PREFLIGHT_REQUIRED
+   * without it); ignored for unmonitored/legacy sessions.
+   */
+  monitoringReadinessLease?: string | null;
 }
 
 export interface StartQuestionView {

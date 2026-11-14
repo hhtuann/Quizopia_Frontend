@@ -19,8 +19,10 @@ import { useAnswerStore } from "@/lib/attempt/answer-store";
 import { useAttemptTelemetry } from "@/lib/attempt/use-attempt-telemetry";
 import { useStompConnection } from "@/lib/realtime/use-stomp-connection";
 import { saveAnswer, type SaveAnswerRequest } from "@/lib/api/student-attempt";
-import { useServerTimeSync } from "@/lib/realtime/use-server-time-sync";
-import type {
+ import { useServerTimeSync } from "@/lib/realtime/use-server-time-sync";
+import { useAttemptCamera } from "@/lib/media/use-attempt-camera";
+import { CameraStatusPill } from "@/components/student/CameraStatusPill";
+ import type {
   AttemptDetailResponse,
   SubmitResponse,
 } from "@/lib/api/student-attempt";
@@ -93,6 +95,10 @@ function InProgressShell({
   // rendered for IN_PROGRESS — see AttemptPage :45). Connects, subscribes to
   // /user/queue/attempt, and receives SERVER_TIME_SYNC for live timer sync.
   const { status: wsStatus, client: wsClient } = useStompConnection(true);
+  // P4-B camera: maintained for the attempt's lifetime; informational only —
+  // camera state NEVER blocks answering. No-ops (inactive) when the attempt
+  // is unmonitored (renewal answers 409 NOT_APPLICABLE).
+  const camera = useAttemptCamera(attemptId);
   const { serverTime: liveServerTime } = useServerTimeSync(
     wsClient,
     wsStatus,
@@ -288,6 +294,7 @@ function InProgressShell({
         ) : submitSlot}
         liveServerTime={liveServerTime}
         wsStatus={wsStatus}
+        cameraSlot={<CameraStatusPill status={camera.status} />}
         onExpire={handleAutoSubmit}
         onQuestionNavigated={(qid) =>
           telemetry.track("QUESTION_NAVIGATED", { questionId: qid })

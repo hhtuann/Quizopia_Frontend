@@ -26,6 +26,16 @@ export default defineConfig({
     trace: "off",
     actionTimeout: 20_000,
     viewport: { width: 1440, height: 900 },
+    // P4-B camera tests use Chromium's synthetic camera (fake device +
+    // auto-granted permission). This is SIMULATED media — evidence reports
+    // must label it as such (issue #84/QUALITY_GATES §10).
+    launchOptions: {
+      args: [
+        "--use-fake-ui-for-media-stream",
+        "--use-fake-device-for-media-stream",
+      ],
+    },
+    permissions: ["camera"],
   },
   outputDir: "../e2e-results",
   globalSetup: require.resolve("./global-setup.ts"),

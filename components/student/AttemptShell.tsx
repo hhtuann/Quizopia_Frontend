@@ -80,6 +80,7 @@ export function AttemptShell({
   submitSlot,
   liveServerTime,
   wsStatus,
+  cameraSlot,
   onExpire,
   studentName,
   onQuestionNavigated,
@@ -89,6 +90,8 @@ export function AttemptShell({
   submitSlot?: ReactNode;
   liveServerTime?: string | null;
   wsStatus?: "connecting" | "connected" | "disconnected";
+  /** P4-B: camera status pill rendered beside the WS indicator. */
+  cameraSlot?: ReactNode;
   onExpire?: () => void;
   studentName?: string;
   /** P4-A telemetry: fired when the student jumps to a question (navigator). */
@@ -198,6 +201,7 @@ export function AttemptShell({
               <div className="flex items-center justify-end gap-2">
                 {autosaveStatus && <AutosaveIndicator status={autosaveStatus} />}
                 {wsStatus && <WsIndicator status={wsStatus} />}
+                {cameraSlot}
               </div>
             </div>
             {/* Submit */}
