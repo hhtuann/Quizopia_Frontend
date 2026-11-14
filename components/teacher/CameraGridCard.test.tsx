@@ -11,8 +11,11 @@ import type { CameraParticipantStatus } from "@/lib/api/media";
 
 const { selectForFullscreen, invalidateQueries, revokeCameraParticipant, gridState } =
   vi.hoisted(() => {
-    const tiles: Map<string, { track: { attach: () => void; detach: () => void } }> = new Map();
-    tiles.set("media-1", { track: { attach: vi.fn(), detach: vi.fn() } });
+    const tiles: Map<
+      string,
+      { track: { attach: () => void; detach: () => void }; muted: boolean }
+    > = new Map();
+    tiles.set("media-1", { track: { attach: vi.fn(), detach: vi.fn() }, muted: false });
     return {
       selectForFullscreen: vi.fn(),
       invalidateQueries: vi.fn(),
@@ -77,6 +80,7 @@ beforeEach(() => {
   invalidateQueries.mockReset();
   revokeCameraParticipant.mockReset().mockResolvedValue(undefined);
   gridState.fullscreenIdentity = null;
+  gridState.tiles.set("media-1", { ...gridState.tiles.get("media-1")!, muted: false });
 });
 
 afterEach(cleanup);
@@ -118,6 +122,18 @@ describe("CameraGridCard", () => {
     render(<CameraGridCard sessionId={5} participants={[status({})]} />);
     const tile = document.querySelector('[data-media-identity="media-1"]');
     expect(tile?.className).toContain("ring");
+  });
+
+  it("surfaces the live muted flag as the tile's frozen-frame overlay", () => {
+    gridState.tiles.set("media-1", { ...gridState.tiles.get("media-1")!, muted: true });
+    render(<CameraGridCard sessionId={5} participants={[status({})]} />);
+    expect(screen.getByText("Camera off (muted)")).toBeDefined();
+  });
+
+  it("wires the live camera track into the tile video element", () => {
+    render(<CameraGridCard sessionId={5} participants={[status({})]} />);
+    expect(document.querySelector('[data-media-identity="media-1"] video')).not.toBeNull();
+    expect(screen.queryByText("Camera off (muted)")).toBeNull();
   });
 
   it("delegates fullscreen to the grid hook (single HIGH layer)", () => {

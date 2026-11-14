@@ -22,13 +22,13 @@ import {
  * session's Start unlocks, and the connected publisher Room + camera track
  * survive until the attempt page adopts them (see ./active-room.ts).
  *
- *   idle → permission → preview → connecting → verifying → ready
+ *   idle → permission → connecting → verifying → ready
  *   any step ⤳ denied | unavailable | infra | timeout | error
  *
  * - permission: `getUserMedia({video:{640×480}, audio:false})`
- *   (NotAllowedError → denied, NotFoundError-family → unavailable)
- * - preview: the SAME MediaStreamTrack is attached to `previewRef` and later
- *   published — never re-acquired between preview and publish.
+ *   (NotAllowedError → denied, NotFoundError-family → unavailable); the
+ *   SAME MediaStreamTrack is attached to `previewRef` for local preview and
+ *   later published — never re-acquired between preview and publish.
  * - connecting: createCameraPreflight → Room.connect(autoSubscribe:false) →
  *   publishTrack(camera).
  * - verifying: poll verifyCameraPreflight every 2s, max 10 tries;
@@ -41,7 +41,6 @@ import {
 export type CameraPreflightStatus =
   | "idle"
   | "permission"
-  | "preview"
   | "connecting"
   | "verifying"
   | "ready"
@@ -144,7 +143,11 @@ export function useCameraPreflight({
     setStatus(next);
   }, []);
 
-  /** Cancel any in-flight run and release room/track. Never touches `status`. */
+  /**
+   * Cancel any in-flight run and release room/track. Never touches `status`.
+   * A room handed off to the attempt page keeps BOTH the connection and the
+   * published camera track alive — ownership moved, we only drop references.
+   */
   const teardown = useCallback(() => {
     runRef.current += 1;
     if (pollTimerRef.current) {
@@ -152,12 +155,12 @@ export function useCameraPreflight({
       pollTimerRef.current = null;
     }
     const room = roomRef.current;
-    if (room && !isTransferredPublisherRoom(room)) {
-      void disconnectRoom(room).catch(() => undefined);
-    }
+    const track = trackRef.current;
     roomRef.current = null;
-    trackRef.current?.stop();
     trackRef.current = null;
+    if (room && isTransferredPublisherRoom(room)) return;
+    if (room) void disconnectRoom(room).catch(() => undefined);
+    track?.stop();
     setHasTrack(false);
   }, []);
 
@@ -172,7 +175,7 @@ export function useCameraPreflight({
     [teardown, enter]
   );
 
-  /** Full run: permission → preview → connecting → verifying → ready. */
+  /** Full run: permission → connecting → verifying → ready. */
   const beginRun = useCallback(() => {
     teardown();
     setLease(null);
@@ -228,7 +231,6 @@ export function useCameraPreflight({
         }
         trackRef.current = track;
         setHasTrack(true);
-        enter("preview");
         enter("connecting");
         return createCameraPreflight(sid)
           .then(async (preflight: PreflightResponse) => {
@@ -258,14 +260,14 @@ export function useCameraPreflight({
   const start = useCallback(() => {
     const s = statusRef.current;
     const inFlight =
-      s === "permission" || s === "preview" || s === "connecting" || s === "verifying" || s === "ready";
+      s === "permission" || s === "connecting" || s === "verifying" || s === "ready";
     if (inFlight) return;
     beginRun();
   }, [beginRun]);
 
   const retry = useCallback(() => {
     const s = statusRef.current;
-    if (s === "permission" || s === "preview" || s === "connecting") return;
+    if (s === "permission" || s === "connecting") return;
     beginRun();
   }, [beginRun]);
 

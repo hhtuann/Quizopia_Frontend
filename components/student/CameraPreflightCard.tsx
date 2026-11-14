@@ -23,12 +23,11 @@ import type { Room } from "@/lib/media/livekit";
 
 type ProgressStatus = Extract<
   CameraPreflightStatus,
-  "permission" | "preview" | "connecting" | "verifying" | "ready"
+  "permission" | "connecting" | "verifying" | "ready"
 >;
 
 const STAGE_COPY: Record<ProgressStatus, { title: string; detail?: string }> = {
   permission: { title: "Requesting camera access…" },
-  preview: { title: "Camera preview ready" },
   connecting: { title: "Connecting your camera…" },
   verifying: {
     title: "Verifying your camera…",
@@ -43,7 +42,6 @@ const STAGE_COPY: Record<ProgressStatus, { title: string; detail?: string }> = {
 const FAILURE_INFO: Record<CameraPreflightStatus, { title: string; detail: string } | null> = {
   idle: null,
   permission: null,
-  preview: null,
   connecting: null,
   verifying: null,
   ready: null,
@@ -114,14 +112,13 @@ export function CameraPreflightCard({
   const failure = FAILURE_INFO[status];
   const stage: ProgressStatus | null =
     status === "permission" ||
-    status === "preview" ||
     status === "connecting" ||
     status === "verifying" ||
     status === "ready"
       ? status
       : null;
   const showVideo =
-    stage === "preview" || stage === "connecting" || stage === "verifying" || stage === "ready";
+    stage === "connecting" || stage === "verifying" || stage === "ready";
 
   return (
     <div
@@ -168,7 +165,7 @@ export function CameraPreflightCard({
           className={cn(
             "mt-3 text-sm font-semibold",
             stage === "ready" ? "text-[#10B981]" : "text-[#0F172A]",
-            stage !== "ready" && stage !== "permission" && stage !== "preview" && "animate-pulse"
+            stage !== "ready" && stage !== "permission" && "animate-pulse"
           )}
         >
           {stage === "ready" && "✓ "}

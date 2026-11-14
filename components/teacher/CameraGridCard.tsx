@@ -102,6 +102,7 @@ export function CameraGridCard({
                 connectedSince={participant.connectedSince}
                 lastVerifiedAt={participant.lastVerifiedAt}
                 track={media?.track ?? null}
+                muted={media?.muted ?? false}
                 connectionQuality={media?.connectionQuality ?? ConnectionQuality.Unknown}
                 isFullscreen={fullscreenIdentity === participant.mediaIdentity}
                 onFullscreen={selectForFullscreen}

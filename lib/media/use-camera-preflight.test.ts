@@ -301,7 +301,10 @@ describe("useCameraPreflight cleanup", () => {
     expect(track.stop).toHaveBeenCalled();
   });
 
-  it("does NOT disconnect a room handed off to the attempt page", async () => {
+  it("keeps a handed-off room's connection AND published track alive", async () => {
+    // The track published into the room is the one getUserMedia returned.
+    const track = fakeTrack();
+    gum.mockResolvedValue(streamOf(track));
     const { unmount } = render(createElement(Harness));
     await clickStart();
     await act(async () => {
@@ -313,6 +316,7 @@ describe("useCameraPreflight cleanup", () => {
     });
     expect(statusOf()).toBe("ready");
     const room = livekitInternals.__rooms[0];
+    expect(room.localParticipant.publishTrack).toHaveBeenCalledWith(track, expect.anything());
     // Simulate the parent transferring the room on start success.
     setActivePublisherRoom(room as never);
     unmount();
@@ -320,5 +324,6 @@ describe("useCameraPreflight cleanup", () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(room.disconnect).not.toHaveBeenCalled();
+    expect(track.stop).not.toHaveBeenCalled();
   });
 });

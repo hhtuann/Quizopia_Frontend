@@ -26,6 +26,7 @@ function participant(overrides: Partial<Parameters<typeof CameraTile>[0]> = {}) 
     lastVerifiedAt: "2026-11-14T09:05:00Z",
     track: track(),
     connectionQuality: ConnectionQuality.Good,
+    muted: false,
     isFullscreen: false,
     onFullscreen: vi.fn(),
     onExitFullscreen: vi.fn(),
@@ -35,16 +36,21 @@ function participant(overrides: Partial<Parameters<typeof CameraTile>[0]> = {}) 
 }
 
 const realRequestFullscreen = HTMLElement.prototype.requestFullscreen;
+const realExitFullscreen = document.exitFullscreen;
 let requestFullscreenSpy: ReturnType<typeof vi.fn>;
+let exitFullscreenSpy: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
-  // jsdom has no Fullscreen API — stub the entry path (restored after).
+  // jsdom has no Fullscreen API — stub both paths (restored after).
   requestFullscreenSpy = vi.fn(() => Promise.resolve(undefined));
   HTMLElement.prototype.requestFullscreen = requestFullscreenSpy;
+  exitFullscreenSpy = vi.fn(() => Promise.resolve(undefined));
+  document.exitFullscreen = exitFullscreenSpy;
 });
 
 afterEach(() => {
   HTMLElement.prototype.requestFullscreen = realRequestFullscreen;
+  document.exitFullscreen = realExitFullscreen;
   cleanup();
 });
 
@@ -106,6 +112,40 @@ describe("CameraTile", () => {
     fireEvent.click(screen.getByRole("button", { name: "Fullscreen Alice Nguyen" }));
     expect(onFullscreen).toHaveBeenCalledWith("media-abc");
     expect(requestFullscreenSpy).toHaveBeenCalledTimes(1);
+    expect(exitFullscreenSpy).not.toHaveBeenCalled();
+  });
+
+  it("exits fullscreen from the in-fullscreen button (toggle)", () => {
+    const onFullscreen = vi.fn();
+    const onExitFullscreen = vi.fn();
+    render(
+      <CameraTile
+        {...participant({ isFullscreen: true, onFullscreen, onExitFullscreen })}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Exit fullscreen" }));
+    expect(onExitFullscreen).toHaveBeenCalledTimes(1);
+    expect(exitFullscreenSpy).toHaveBeenCalledTimes(1);
+    expect(onFullscreen).not.toHaveBeenCalled();
+    expect(requestFullscreenSpy).not.toHaveBeenCalled();
+  });
+
+  it("flags a muted publisher with a distinct overlay (frozen frame ≠ live)", () => {
+    const { rerender } = render(<CameraTile {...participant({ muted: true })} />);
+    expect(screen.getByText("Camera off (muted)")).toBeDefined();
+    expect(document.querySelector('[data-camera-muted="true"]')).not.toBeNull();
+    rerender(<CameraTile {...participant({ muted: false })} />);
+    expect(screen.queryByText("Camera off (muted)")).toBeNull();
+  });
+
+  it("keeps the placeholder (not the muted overlay) for track-less tiles", () => {
+    render(
+      <CameraTile
+        {...participant({ muted: true, track: null, lastVerifiedAt: null, connectedSince: null })}
+      />
+    );
+    expect(screen.queryByText("Camera off (muted)")).toBeNull();
+    expect(screen.getByText(/Waiting for camera/)).toBeDefined();
   });
 
   it("deselects on fullscreenchange exit (Esc / browser chrome)", () => {

@@ -27,6 +27,7 @@ export const TIMELINE_TYPE_LABEL: Record<string, string> = {
   ATTEMPT_STARTED: "Attempt started",
   ATTEMPT_RESUMED: "Attempt resumed",
   ATTEMPT_SUBMITTED: "Attempt submitted",
+  ATTEMPT_TIMED_OUT: "Attempt timed out",
   ANSWER_ACCEPTED: "Answer accepted",
   // SERVER (P4-B camera — webhook/reconcile driven, server-only)
   CAMERA_CONNECTED: "Camera connected",

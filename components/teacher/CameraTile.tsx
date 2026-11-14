@@ -46,6 +46,7 @@ export function CameraTile({
   lastVerifiedAt,
   track,
   connectionQuality,
+  muted = false,
   isFullscreen,
   onFullscreen,
   onExitFullscreen,
@@ -61,6 +62,8 @@ export function CameraTile({
   lastVerifiedAt: string | null;
   track: RemoteVideoTrack | null;
   connectionQuality: ConnectionQuality;
+  /** Publisher muted the camera (OS-level) — last frame may be frozen. */
+  muted?: boolean;
   isFullscreen: boolean;
   onFullscreen: (identity: string) => void;
   onExitFullscreen: () => void;
@@ -91,7 +94,16 @@ export function CameraTile({
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, [onExitFullscreen]);
 
-  const enterFullscreen = () => {
+  const toggleFullscreen = () => {
+    if (isFullscreen) {
+      // Exit affordance while fullscreen: deselect (demotes to LOW layer)
+      // and leave the browser fullscreen element.
+      onExitFullscreen();
+      if (typeof document.exitFullscreen === "function") {
+        void document.exitFullscreen().catch(() => {});
+      }
+      return;
+    }
     onFullscreen(identity);
     const el = containerRef.current;
     // jsdom/test builds have no Fullscreen API — the hook still selects HIGH.
@@ -139,6 +151,22 @@ export function CameraTile({
           </div>
         )}
 
+        {/* Muted publisher: the last frame is frozen — flag it explicitly. */}
+        {muted && track && (
+          <div
+            data-camera-muted="true"
+            className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#0F172A]/75 text-center"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-10 w-10 text-white" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="m3 3 18 18" />
+            </svg>
+            <p className="text-xs font-semibold uppercase tracking-wider text-white">
+              Camera off (muted)
+            </p>
+          </div>
+        )}
+
         {/* Top overlay: identity + tile actions. */}
         <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2">
           <span className="max-w-[60%] truncate rounded-md bg-[#0F172A]/70 px-2 py-1 text-xs font-semibold text-white">
@@ -147,14 +175,20 @@ export function CameraTile({
           <div className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"
-              aria-label={`Fullscreen ${name}`}
-              title={`Fullscreen ${name}`}
-              onClick={enterFullscreen}
+              aria-label={isFullscreen ? "Exit fullscreen" : `Fullscreen ${name}`}
+              title={isFullscreen ? "Exit fullscreen" : `Fullscreen ${name}`}
+              onClick={toggleFullscreen}
               className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#0F172A]/70 text-white outline-none transition-colors hover:bg-[#0F172A]/90 focus-visible:ring-2 focus-visible:ring-[#4D7CFF]"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-              </svg>
+              {isFullscreen ? (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9 3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5 5.25 5.25" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                </svg>
+              )}
             </button>
             {state !== "REVOKED" && (
               <Button

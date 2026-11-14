@@ -103,7 +103,9 @@ test.describe("Scenario F — camera grid", () => {
     });
     expect(remoteVideos.roomConnected).toBe(true);
     expect(remoteVideos.remoteCount).toBe(0); // canSubscribe=false — nobody else
-    expect(remoteVideos.videoElements).toBe(1); // own preview only
+    // The attempt page shows a text-only status pill — no self-view video,
+    // and certainly no remote videos.
+    expect(remoteVideos.videoElements).toBe(0);
 
     // Teacher grid.
     const teacherCtx = await browser.newContext();
@@ -135,10 +137,10 @@ test.describe("Scenario F — camera grid", () => {
         .__quizopiaMedia?.getRoom?.("teacher");
       if (!room) return null;
       const out: Record<string, string> = {};
-      for (const [, p] of (room as { remoteParticipants: Map<string, { publications?: Array<{ trackSid?: string; videoQuality?: string; source?: string }> }> })
+      for (const [, p] of (room as { remoteParticipants: Map<string, { trackPublications?: Map<string, { trackSid?: string; videoQuality?: string; source?: string }> }> })
         .remoteParticipants) {
-        for (const pub of p.publications ?? []) {
-          if (pub.trackSid && pub.source === "camera" as unknown) {
+        for (const pub of p.trackPublications?.values() ?? []) {
+          if (pub.trackSid && (pub as { source?: string }).source === "camera") {
             out[pub.trackSid] = String((pub as { videoQuality?: string }).videoQuality ?? "unknown");
           }
         }
@@ -155,16 +157,16 @@ test.describe("Scenario F — camera grid", () => {
     const firstTile = tiles.first();
     const tileName = await firstTile.getAttribute("data-media-identity");
     await firstTile.getByRole("button", { name: /^Fullscreen/ }).click();
-    await teacherPage.waitForTimeout(2_000);
+    await teacherPage.waitForTimeout(2_500); // layer switch is async
     await teacherPage.screenshot({ path: `${__dirname}/evidence/F1-fullscreen.png` });
     const layersAfter = await teacherPage.evaluate(() => {
       const room = (window as unknown as { __quizopiaMedia?: { getRoom?: (s: string) => unknown } })
         .__quizopiaMedia?.getRoom?.("teacher");
       if (!room) return null;
       const out: Record<string, string> = {};
-      for (const [, p] of (room as { remoteParticipants: Map<string, { publications?: Array<{ trackSid?: string; videoQuality?: string; source?: string }> }> })
+      for (const [, p] of (room as { remoteParticipants: Map<string, { trackPublications?: Map<string, { trackSid?: string; videoQuality?: string; source?: string }> }> })
         .remoteParticipants) {
-        for (const pub of p.publications ?? []) {
+        for (const pub of p.trackPublications?.values() ?? []) {
           if (pub.trackSid && (pub as { source?: string }).source === "camera") {
             out[pub.trackSid] = String((pub as { videoQuality?: string }).videoQuality ?? "unknown");
           }

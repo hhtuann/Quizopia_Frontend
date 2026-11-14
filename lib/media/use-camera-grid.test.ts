@@ -173,6 +173,16 @@ describe("useCameraGrid (teacher viewer)", () => {
     expect(pub.setVideoQuality).toHaveBeenCalledWith(VIDEO_QUALITY.LOW);
     expect(gridResult?.tiles.get("stu-1")?.track).toBe(track);
     expect(gridResult?.status).toBe("live");
+
+    // OS-level camera mute/unmute is surfaced per tile (frozen-frame flag).
+    act(() => {
+      room.emit("trackMuted", pub, { identity: "stu-1" });
+    });
+    expect(gridResult?.tiles.get("stu-1")?.muted).toBe(true);
+    act(() => {
+      room.emit("trackUnmuted", pub, { identity: "stu-1" });
+    });
+    expect(gridResult?.tiles.get("stu-1")?.muted).toBe(false);
   });
 
   it("never subscribes non-camera publications", async () => {
