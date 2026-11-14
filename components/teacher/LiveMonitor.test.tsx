@@ -57,6 +57,12 @@ vi.mock("./ParticipantModeration", () => ({
   ParticipantModeration: () => null,
 }));
 
+vi.mock("./AiAlertFeed", () => ({
+  AiAlertFeed: () => null,
+  isAiAlertActivity: (ev: { activityType?: string | null }) =>
+    ev.activityType != null && ev.activityType.startsWith("AI_ALERT_"),
+}));
+
 beforeEach(() => {
   invalidateQueries.mockReset();
 });

@@ -21,7 +21,9 @@ import { useStompConnection } from "@/lib/realtime/use-stomp-connection";
 import { saveAnswer, type SaveAnswerRequest } from "@/lib/api/student-attempt";
  import { useServerTimeSync } from "@/lib/realtime/use-server-time-sync";
 import { useAttemptCamera } from "@/lib/media/use-attempt-camera";
+import { useAttemptAiDetection } from "@/lib/ai/use-attempt-ai-detection";
 import { CameraStatusPill } from "@/components/student/CameraStatusPill";
+import { AiStatusPill } from "@/components/student/AiStatusPill";
  import type {
   AttemptDetailResponse,
   SubmitResponse,
@@ -99,6 +101,10 @@ function InProgressShell({
   // camera state NEVER blocks answering. No-ops (inactive) when the attempt
   // is unmonitored (renewal answers 409 NOT_APPLICABLE).
   const camera = useAttemptCamera(attemptId);
+  // P4-C AI proctoring: analyzes the published camera track on the student's
+  // own machine; NEVER blocks answering (degrades to a status pill only).
+  // Hidden for unmonitored attempts, exactly like the camera pill.
+  const ai = useAttemptAiDetection(attemptId, camera.status !== "inactive");
   const { serverTime: liveServerTime } = useServerTimeSync(
     wsClient,
     wsStatus,
@@ -294,7 +300,7 @@ function InProgressShell({
         ) : submitSlot}
         liveServerTime={liveServerTime}
         wsStatus={wsStatus}
-        cameraSlot={<CameraStatusPill status={camera.status} />}
+        cameraSlot={<><CameraStatusPill status={camera.status} />{camera.status !== "inactive" && <AiStatusPill state={ai} />}</>}
         onExpire={handleAutoSubmit}
         onQuestionNavigated={(qid) =>
           telemetry.track("QUESTION_NAVIGATED", { questionId: qid })
