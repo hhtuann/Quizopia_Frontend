@@ -26,6 +26,7 @@ import {
 import {
   getFakeDetector,
   publishAiDroppedFrames,
+  publishAiFrameSample,
   publishAiSentEvents,
   publishAiStatus,
   type SentAiEventRecord,
@@ -224,6 +225,15 @@ export function useAttemptAiDetection(
     };
 
     const handleFrame = (frame: DetectionFrame): void => {
+      publishAiFrameSample({
+        processingMs: frame.processingMs,
+        frameWidth: frame.frameWidth,
+        frameHeight: frame.frameHeight,
+        runtime: frame.runtime,
+        simulated: frame.simulated ?? false,
+        at: frame.capturedAt,
+        detectionCount: frame.detections.length,
+      });
       const decision = decideDetectionEvents(frame.detections, counters);
       counters = decision.counters;
       const observedAt = new Date(frame.capturedAt).toISOString();

@@ -1,4 +1,5 @@
 import type { DetectionFrame } from "./model-adapter";
+import type { Detector } from "./model-adapter";
 
 /**
  * P4-C AI test hooks (mirrors lib/media/test-hooks.ts). e2e (Playwright) and
@@ -35,14 +36,36 @@ export interface QuizopiaAiTestHooks {
   getDroppedFrames(): number;
   /** Event batches actually sent (last 50) — most recent last. */
   getSentEvents(): SentAiEventRecord[];
+  /** Per-analyzed-frame telemetry (last 500) — benchmark surface. */
+  getFrameSamples(): AiFrameSample[];
+  /**
+   * The REAL detector factory (dynamic ort-web load) — benchmark surface
+   * for driving the real model against any video element. Never returns a
+   * fake; output is real-model output.
+   */
+  createRealDetector(): Promise<Detector>;
+}
+
+/** One analyzed frame's honest telemetry (benchmark + debugging). */
+export interface AiFrameSample {
+  processingMs: number;
+  frameWidth: number;
+  frameHeight: number;
+  runtime: string;
+  simulated: boolean;
+  at: number;
+  /** Detections above threshold this frame (count only). */
+  detectionCount: number;
 }
 
 const MAX_SENT_RECORDS = 50;
+const MAX_FRAME_SAMPLES = 500;
 
 let fakeDetector: FakeDetectorFn | null = null;
 let status = "idle";
 let droppedFrames = 0;
 let sentEvents: SentAiEventRecord[] = [];
+let frameSamples: AiFrameSample[] = [];
 
 declare global {
   var __quizopiaAi: QuizopiaAiTestHooks | undefined;
@@ -58,6 +81,14 @@ function exposeHooks(): void {
       getStatus: () => status,
       getDroppedFrames: () => droppedFrames,
       getSentEvents: () => [...sentEvents],
+      getFrameSamples: () => [...frameSamples],
+      createRealDetector: async () => {
+        // Local dynamic import: keeps ort-web out of the page bundle until
+        // a benchmark explicitly requests the real detector (runtime-selected
+        // module — static import would ship 30MB of wasm to every visitor).
+        const mod = await import("./model-adapter");
+        return mod.createDetector();
+      },
     };
   }
 }
@@ -66,6 +97,10 @@ function exposeHooks(): void {
 export function getFakeDetector(): FakeDetectorFn | null {
   return fakeDetector;
 }
+
+// Dev/test builds expose the (empty) registry at module load so the e2e
+// benchmark can drive the REAL detector from any page without an attempt.
+if (process.env.NODE_ENV !== "production") exposeHooks();
 
 /** Unit-test seam (vitest) — same registry the global writes. */
 export function setFakeDetectorForTest(fn: FakeDetectorFn | null): void {
@@ -89,10 +124,18 @@ export function publishAiSentEvents(records: SentAiEventRecord[]): void {
   sentEvents = records.slice(-MAX_SENT_RECORDS);
 }
 
+/** Internal (hook → hooks): one analyzed frame's telemetry. No-op in prod. */
+export function publishAiFrameSample(sample: AiFrameSample): void {
+  if (process.env.NODE_ENV === "production") return;
+  frameSamples = [...frameSamples.slice(-(MAX_FRAME_SAMPLES - 1)), sample];
+  exposeHooks();
+}
+
 /** Unit-test seam: reset the module registries between cases. */
 export function resetAiTestHooks(): void {
   fakeDetector = null;
   status = "idle";
   droppedFrames = 0;
   sentEvents = [];
+  frameSamples = [];
 }
