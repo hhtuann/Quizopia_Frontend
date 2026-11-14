@@ -8,6 +8,8 @@ import { useStartAttemptMutation } from "@/hooks/queries/use-student-attempt";
 import { SessionLandingCard, describeStartError } from "@/components/student/SessionLandingCard";
 import { useAuth } from "@/hooks/useAuth";
 import { participantBackHref, participantHistoryHref } from "@/lib/auth/participant-links";
+import { setActivePublisherRoom } from "@/lib/media/active-room";
+import type { Room } from "@/lib/media/livekit";
 import type { NormalizedApiError } from "@/lib/api";
 
 /**
@@ -32,7 +34,14 @@ export default function SessionLandingPage() {
   const { data, isPending, isError, error } = useSessionEligibilityQuery(sessionIdNum, validId);
   const startMutation = useStartAttemptMutation();
   const [startError, setStartError] = useState<string | null>(null);
-
+  // P4-B: stable telemetry instance id for the started attempt (mirrors the
+  // attempt page's clientInstanceId).
+  const [clientInstanceId] = useState(
+    () =>
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `cid-${Date.now()}`
+  );
   if (!validId) {
     return <NotFoundState backHref={backHref} />;
   }
@@ -84,12 +93,24 @@ export default function SessionLandingPage() {
     return <NotFoundState backHref={backHref} />;
   }
 
-  const onStart = () => {
+  const onStart = ({ lease, adoptCameraRoom }: { lease: string | null; adoptCameraRoom: () => Room | null }) => {
     setStartError(null);
     startMutation.mutate(
-      { sessionId: sessionIdNum },
       {
-        onSuccess: (res) => router.push(`/attempts/${res.attemptId}`),
+        sessionId: sessionIdNum,
+        req: {
+          clientInstanceId,
+          monitoringReadinessLease: lease ?? undefined,
+        },
+      },
+      {
+        onSuccess: (res) => {
+          // Hand the connected publisher room to the attempt page so it
+          // never connects (and publishes) a second time.
+          const room = adoptCameraRoom();
+          if (room) setActivePublisherRoom(room);
+          router.push(`/attempts/${res.attemptId}`);
+        },
         onError: (err) => setStartError(describeStartError(err)),
       }
     );

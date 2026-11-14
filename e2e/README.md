@@ -57,3 +57,30 @@ committed to Git.
 
 Evidence (screenshots per key step) lands in `e2e/evidence/`; results JSON in
 `e2e-results/` — both gitignored.
+
+## P4-B camera scenarios (E/F/G)
+
+Additional environment on top of the P4-A contract:
+
+- **LiveKit stack up** (System repo root):
+  `docker compose --env-file .env.livekit -f docker-compose.livekit.yml up -d`
+  (health: `docker ps | grep quizopia_livekit` → healthy; `curl http://localhost:7880` → OK).
+- **Backend** runs with the media env from `.env.smoke` at the System root:
+  `QUIZOPIA_LIVEKIT_ENABLED=true`, `QUIZOPIA_LIVEKIT_API_KEY/SECRET` matching
+  `.env.livekit`, `QUIZOPIA_LIVEKIT_HTTP_URL=http://localhost:7880`,
+  `QUIZOPIA_LIVEKIT_WS_URL=ws://localhost:7880`. The SFU must reach the
+  backend at host.docker.internal:8080 for signed webhooks.
+- **Chromium synthetic cameras**: `playwright.config.ts` launches browsers
+  with `--use-fake-ui-for-media-stream --use-fake-device-for-media-stream`
+  and `permissions: ["camera"]`. All published tracks are SIMULATED media —
+  every evidence artifact/report must label them as such (issue #84
+  acceptance distinguishes real vs simulated).
+- Ordering: A→B→C→D→E→F→G (workers=1, same worker process for F+G). F closes
+  all five publisher contexts at its end (deterministic disconnects) and
+  records session/attempt/student credentials in `.smoke-camera-f.json`;
+  G re-opens its own publisher pages (itself the token-renewal recovery
+  path). G restarts the `quizopia_livekit` container (requires a docker
+  socket on the host).
+
+State files: `.smoke-camera-e.json` (E), `.smoke-camera-f.json` (F, consumed
+by G). Evidence: `evidence/E3-*`, `F1-*`, `G3-*`.

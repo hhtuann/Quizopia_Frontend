@@ -29,7 +29,13 @@ export const TIMELINE_TYPE_LABEL: Record<string, string> = {
   ATTEMPT_SUBMITTED: "Attempt submitted",
   ATTEMPT_TIMED_OUT: "Attempt timed out",
   ANSWER_ACCEPTED: "Answer accepted",
-};
+  // SERVER (P4-B camera — webhook/reconcile driven, server-only)
+  CAMERA_CONNECTED: "Camera connected",
+  CAMERA_DISCONNECTED: "Camera disconnected",
+  CAMERA_RECONNECTED: "Camera reconnected",
+  CAMERA_REVOKED: "Camera access revoked",
+  MONITORING_GAP: "Monitoring gap",
+}
 
 export type TimelineGroupValue =
   | "ALL"
@@ -85,6 +91,11 @@ export const TIMELINE_GROUPS: readonly TimelineGroup[] = [
       "CONNECTION_LOST",
       "CONNECTION_RESTORED",
       "AUTOSAVE_FAILED",
+      "CAMERA_CONNECTED",
+      "CAMERA_DISCONNECTED",
+      "CAMERA_RECONNECTED",
+      "CAMERA_REVOKED",
+      "MONITORING_GAP",
     ],
   },
   {

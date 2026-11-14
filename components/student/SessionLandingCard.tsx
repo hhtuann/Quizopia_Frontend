@@ -1,9 +1,12 @@
 "use client";
+import { useCallback, useRef, useState } from "react";
 import { Badge, Button, cardVariants } from "@/components/ui";
 import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
 import type { SessionEligibility } from "@/lib/api/student-attempts";
 import type { NormalizedApiError } from "@/lib/api";
+import { CameraPreflightCard } from "./CameraPreflightCard";
+import type { Room } from "@/lib/media/livekit";
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -29,6 +32,17 @@ export function describeStartError(err: unknown): string {
         return "You don't have access to this session.";
       case "ATTEMPT_MONITORING_START_UNAVAILABLE":
         return "This session is monitored and camera verification is not available yet — you cannot start a new attempt right now.";
+      case "MONITORING_PREFLIGHT_REQUIRED":
+        return "Camera verification is required — complete the camera check and try again.";
+      case "MONITORING_PREFLIGHT_EXPIRED":
+      case "MONITORING_PREFLIGHT_INVALID":
+        return "Camera check expired — verify again.";
+      case "MONITORING_PREFLIGHT_USED":
+        return "This camera check was already used — verify again.";
+      case "MONITORING_CAMERA_REVOKED":
+        return "Your camera access was revoked by the teacher.";
+      case "MONITORING_INFRA_UNAVAILABLE":
+        return "Camera verification is unavailable — try again shortly.";
       case "AUTH_ACCESS_TOKEN_INVALID":
         return "Your session has expired — please sign in again.";
       default:
@@ -58,6 +72,11 @@ const STATE_COPY: Record<
  * server-authorized eligibility state for a shared session link with a
  * Start/Resume action. Server state is the single source of truth — the card
  * never guesses eligibility from the clock.
+ *
+ * P4-B: monitored sessions replace the P4-A fail-closed Start with a live
+ * camera preflight (CameraPreflightCard). Start unlocks only when the check
+ * reaches READY; the lease and the connected publisher room are handed to
+ * the attempt page via the start intent.
  */
 export function SessionLandingCard({
   eligibility,
@@ -66,7 +85,12 @@ export function SessionLandingCard({
   historyHref = "/attempts",
 }: {
   eligibility: SessionEligibility;
-  onStart: () => void;
+  /**
+   * Start intent: `lease` is the monitoring readiness lease (null until the
+   * camera preflight passes); `adoptCameraRoom` hands the connected
+   * publisher room to the attempt page on start success (no double connect).
+   */
+  onStart: (intent: { lease: string | null; adoptCameraRoom: () => Room | null }) => void;
   starting: boolean;
   /** Where the ENDED card links for history (role-aware, N1). */
   historyHref?: string;
@@ -74,10 +98,25 @@ export function SessionLandingCard({
   const copy = STATE_COPY[eligibility.state];
   const unlimited = eligibility.maxAttempts === 0;
   const actionable = eligibility.state === "CAN_START" || eligibility.state === "CAN_RESUME";
-  // P4-A: monitored sessions are fail-closed for NEW attempts until camera
-  // verification arrives (next milestone). Resume keeps working.
   const monitored = eligibility.monitoring?.monitoringEnabled === true;
-  const startBlocked = monitored && eligibility.state === "CAN_START";
+  // P4-B: monitored NEW attempts unlock only after a verified camera
+  // preflight (ADR-08). Resume never requires the camera (ADR-08 D8).
+  const [cameraLease, setCameraLease] = useState<string | null>(null);
+  const cameraRoomRef = useRef<(() => Room | null) | null>(null);
+  const handleCameraReady = useCallback(
+    (lease: string | null, keepAlive: () => Room | null) => {
+      setCameraLease(lease);
+      cameraRoomRef.current = lease ? keepAlive : null;
+    },
+    []
+  );
+  const startBlocked = monitored && eligibility.state === "CAN_START" && cameraLease === null;
+  const handleStart = () => {
+    onStart({
+      lease: cameraLease,
+      adoptCameraRoom: () => cameraRoomRef.current?.() ?? null,
+    });
+  };
   return (
     <div className={cn(cardVariants({ variant: "elevated" }), "mx-auto max-w-2xl p-6")}>
       <p className="font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
@@ -183,11 +222,12 @@ export function SessionLandingCard({
           <p className="mt-1.5 text-xs font-medium text-[#64748B]">
             Activity is retained for 90 days; camera evidence for 30 days.
           </p>
-          {startBlocked && (
-            <p className="mt-2 text-sm font-semibold text-[#0F172A]">
-              Camera verification is not available yet (it arrives in the next
-              milestone) — you cannot start a new attempt yet.
-            </p>
+          {eligibility.state === "CAN_START" && (
+            <CameraPreflightCard
+              sessionId={eligibility.sessionId}
+              cameraRequired={eligibility.monitoring?.cameraRequired ?? true}
+              onReady={handleCameraReady}
+            />
           )}
         </div>
       )}
@@ -196,7 +236,7 @@ export function SessionLandingCard({
         <div className="mt-6">
           <Button
             type="button"
-            onClick={onStart}
+            onClick={handleStart}
             disabled={starting || startBlocked}
             aria-label={
               eligibility.state === "CAN_RESUME" ? "Resume your attempt" : "Start the attempt"
@@ -213,7 +253,7 @@ export function SessionLandingCard({
           </Button>
           {startBlocked && (
             <p id="monitored-start-blocked" role="status" className="mt-2 text-xs font-semibold text-[#F59E0B]">
-              Start is unavailable until camera verification is enabled for monitored sessions.
+              Complete the camera check above to start the attempt.
             </p>
           )}
         </div>
