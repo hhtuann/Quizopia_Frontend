@@ -112,6 +112,12 @@ export interface SessionEligibility {
   canStartNow: boolean;
   canResume: boolean;
   serverTime: string;
+  /**
+   * Monitoring notice (P4-A): for a monitored session `canStartNow` is
+   * always false (fail-closed until camera verification arrives). Optional
+   * for older payloads/test fixtures.
+   */
+  monitoring?: { monitoringEnabled: boolean; cameraRequired: boolean };
 }
 
 /** `GET /api/exam-sessions/{sessionId}/eligibility` — shared-link pre-flight. */

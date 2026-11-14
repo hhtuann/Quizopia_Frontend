@@ -22,9 +22,14 @@ export interface AnswerEntry {
 
 interface AnswerStoreState {
   answers: Record<number, AnswerEntry>;
+  /**
+   * Increments on every hydrate() — subscribers (telemetry) compare it to
+   * detect wholesale replacement (re-fetch/refocus) vs user edits, so a
+   * re-hydration never fabricates UNFLAGGED/CLEARED/CHANGED events.
+   */
+  hydrateGeneration: number;
   /** Question ids the student flagged for review. */
   flagged: Record<number, true>;
-  /** Initialise from the server detail's savedAnswer data. Called on attempt page load. */
   hydrate: (questions: DetailQuestionView[]) => void;
   /** Set/update an answer payload for one question. Marks dirty. */
   setAnswer: (attemptQuestionId: number, payload: AnswerPayload) => void;
@@ -40,8 +45,8 @@ interface AnswerStoreState {
 
 export const useAnswerStore = create<AnswerStoreState>((set) => ({
   answers: {},
+  hydrateGeneration: 0,
   flagged: {},
-
   hydrate: (questions) => {
     const next: Record<number, AnswerEntry> = {};
     for (const q of questions) {
@@ -51,7 +56,11 @@ export const useAnswerStore = create<AnswerStoreState>((set) => ({
         dirty: false,
       };
     }
-    set({ answers: next, flagged: {} });
+    set((state) => ({
+      answers: next,
+      flagged: {},
+      hydrateGeneration: state.hydrateGeneration + 1,
+    }));
   },
 
   toggleFlag: (qid) =>
@@ -105,7 +114,7 @@ export const useAnswerStore = create<AnswerStoreState>((set) => ({
     }),
 }));
 
-/** Shallow JSON compare for AnswerPayload (null, or plain objects with primitives/arrays). */
-function payloadEqual(a: AnswerPayload, b: AnswerPayload): boolean {
+/** Shallow JSON compare for AnswerPayload (null, or plain objects with primitives/arrays). Exported for the telemetry store-diff (same equality semantics as markSaved). */
+export function payloadEqual(a: AnswerPayload, b: AnswerPayload): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }

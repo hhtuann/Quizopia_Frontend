@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useAttemptDetailQuery } from "@/hooks/queries/use-student-attempt";
 import { useAttemptResultQuery } from "@/hooks/queries/use-student-results";
 import { AttemptResultView } from "@/components/student/AttemptResultView";
+import { StudentActivitySection } from "@/components/monitoring/StudentActivitySection";
 import type { NormalizedApiError } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { participantHistoryHref } from "@/lib/auth/participant-links";
@@ -50,6 +51,13 @@ export default function AttemptResultPage() {
       <AttemptResultView
         result={resultQuery.data}
         detail={detailQuery.data ?? null}
+      />
+
+      {/* P4-A: transparency — the student's own activity timeline (client
+          observations + server-confirmed events) and accepted answer versions. */}
+      <StudentActivitySection
+        attemptId={id}
+        questions={detailQuery.data?.questions ?? []}
       />
     </div>
   );

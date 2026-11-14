@@ -27,6 +27,8 @@ export function describeStartError(err: unknown): string {
         return "Your previous attempt's time is over.";
       case "ATTEMPT_NOT_ELIGIBLE":
         return "You don't have access to this session.";
+      case "ATTEMPT_MONITORING_START_UNAVAILABLE":
+        return "This session is monitored and camera verification is not available yet — you cannot start a new attempt right now.";
       case "AUTH_ACCESS_TOKEN_INVALID":
         return "Your session has expired — please sign in again.";
       default:
@@ -72,7 +74,10 @@ export function SessionLandingCard({
   const copy = STATE_COPY[eligibility.state];
   const unlimited = eligibility.maxAttempts === 0;
   const actionable = eligibility.state === "CAN_START" || eligibility.state === "CAN_RESUME";
-
+  // P4-A: monitored sessions are fail-closed for NEW attempts until camera
+  // verification arrives (next milestone). Resume keeps working.
+  const monitored = eligibility.monitoring?.monitoringEnabled === true;
+  const startBlocked = monitored && eligibility.state === "CAN_START";
   return (
     <div className={cn(cardVariants({ variant: "elevated" }), "mx-auto max-w-2xl p-6")}>
       <p className="font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
@@ -158,15 +163,45 @@ export function SessionLandingCard({
         </p>
       )}
 
+      {monitored && (
+        <div
+          role="status"
+          className="mt-6 rounded-lg border border-[#0052FF]/30 bg-[#0052FF]/5 p-4"
+        >
+          <p className="flex items-center gap-2 text-sm font-bold text-[#0052FF]">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4 shrink-0" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+            </svg>
+            Camera required — monitored session
+          </p>
+          <p className="mt-2 text-sm font-medium text-[#0F172A]">
+            This exam is monitored: your activity during the attempt (tab and
+            window focus, question navigation, answers) is recorded for
+            review, and camera verification is required to start. Starting
+            here means you consent to this monitoring.
+          </p>
+          <p className="mt-1.5 text-xs font-medium text-[#64748B]">
+            Activity is retained for 90 days; camera evidence for 30 days.
+          </p>
+          {startBlocked && (
+            <p className="mt-2 text-sm font-semibold text-[#0F172A]">
+              Camera verification is not available yet (it arrives in the next
+              milestone) — you cannot start a new attempt yet.
+            </p>
+          )}
+        </div>
+      )}
+
       {actionable && (
         <div className="mt-6">
           <Button
             type="button"
             onClick={onStart}
-            disabled={starting}
+            disabled={starting || startBlocked}
             aria-label={
               eligibility.state === "CAN_RESUME" ? "Resume your attempt" : "Start the attempt"
             }
+            aria-describedby={startBlocked ? "monitored-start-blocked" : undefined}
           >
             {starting
               ? eligibility.state === "CAN_RESUME"
@@ -176,6 +211,11 @@ export function SessionLandingCard({
                 ? "Resume attempt"
                 : "Start attempt"}
           </Button>
+          {startBlocked && (
+            <p id="monitored-start-blocked" role="status" className="mt-2 text-xs font-semibold text-[#F59E0B]">
+              Start is unavailable until camera verification is enabled for monitored sessions.
+            </p>
+          )}
         </div>
       )}
     </div>

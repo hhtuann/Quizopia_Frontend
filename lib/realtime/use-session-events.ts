@@ -32,12 +32,18 @@ const MAX_FEED = 20;
  * P0-R5): the roster must be refetched so profile-less PUBLIC learners —
  * who only appear in the roster once they actually start — become
  * resolvable in the event feed immediately, not just after a reconnect.
+ *
+ * P4-A4: `ATTEMPT_ACTIVITY` envelopes (one per durable activity event) are
+ * high-frequency; they are NOT pushed into `recentEvents` — the session
+ * detail's Activity panel subscribes via `onAttemptActivity` and refetches
+ * the timeline from REST (source of truth).
  */
 export function useSessionEvents(
   sessionId: number,
   initial: SessionMetrics,
   onReconnect?: () => void,
-  onParticipantStarted?: (ev: RealtimeEventEnvelope) => void
+  onParticipantStarted?: (ev: RealtimeEventEnvelope) => void,
+  onAttemptActivity?: (ev: RealtimeEventEnvelope) => void
 ): {
   status: WsStatus;
   metrics: SessionMetrics;
@@ -63,7 +69,20 @@ export function useSessionEvents(
     onParticipantStartedRef.current = onParticipantStarted;
   }, [onParticipantStarted]);
 
+  // Stable onAttemptActivity ref (P4-A4).
+  const onAttemptActivityRef = useRef(onAttemptActivity);
+  useEffect(() => {
+    onAttemptActivityRef.current = onAttemptActivity;
+  }, [onAttemptActivity]);
+
   const handleEvent = useCallback((envelope: RealtimeEventEnvelope) => {
+    // P4-A4: activity deltas go to the dedicated subscriber (REST refetch),
+    // never into the capped lifecycle feed.
+    if (envelope.eventType === "ATTEMPT_ACTIVITY") {
+      onAttemptActivityRef.current?.(envelope);
+      return;
+    }
+
     setRecentEvents((prev) => [envelope, ...prev].slice(0, MAX_FEED));
 
     // Roster refresh on first-time participants (P0-R5): the user only

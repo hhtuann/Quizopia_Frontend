@@ -82,6 +82,7 @@ export function AttemptShell({
   wsStatus,
   onExpire,
   studentName,
+  onQuestionNavigated,
 }: {
   detail: AttemptDetailResponse;
   autosaveStatus?: AutosaveStatus;
@@ -90,6 +91,8 @@ export function AttemptShell({
   wsStatus?: "connecting" | "connected" | "disconnected";
   onExpire?: () => void;
   studentName?: string;
+  /** P4-A telemetry: fired when the student jumps to a question (navigator). */
+  onQuestionNavigated?: (attemptQuestionId: number, questionIndex: number) => void;
 }) {
   const hydrate = useAnswerStore((s) => s.hydrate);
   const flagged = useAnswerStore((s) => s.flagged);
@@ -149,6 +152,11 @@ export function AttemptShell({
 
   const scrollToQuestion = (index: number) => {
     document.getElementById(`attempt-q-${index}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // P4-A telemetry — QUESTION_NAVIGATED (only when the target exists;
+    // sorted is stable for the attempt's lifetime).
+    if (index >= 0 && index < sorted.length) {
+      onQuestionNavigated?.(sorted[index].attemptQuestionId, index);
+    }
   };
 
   return (

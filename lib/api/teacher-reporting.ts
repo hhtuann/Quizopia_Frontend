@@ -102,6 +102,30 @@ export function getSessionResults(
   );
 }
 
+/**
+ * Follow ALL results pages (200 per page, capped at 20) — used where every
+ * participant matters (Activity panel attempt picker), not just the first
+ * page. The page fetcher is injectable for tests.
+ */
+export async function fetchAllSessionResults(
+  sessionId: number,
+  fetchPage: (
+    sessionId: number,
+    params: SessionResultsParams
+  ) => Promise<SessionResultsPage> = getSessionResults
+): Promise<SessionResultItem[]> {
+  const items: SessionResultItem[] = [];
+  let page = 0;
+  let totalPages = 1;
+  while (page < totalPages && page < 20) {
+    const res = await fetchPage(sessionId, { page, size: 200 });
+    items.push(...res.items);
+    totalPages = res.totalPages;
+    page += 1;
+  }
+  return items;
+}
+
 /** `GET /api/exam-sessions/{sessionId}/statistics` → BEST-based aggregates. */
 export function getSessionStatistics(
   sessionId: number

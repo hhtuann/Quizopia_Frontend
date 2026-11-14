@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useSessionEvents,
@@ -52,11 +52,27 @@ function formatTime(iso: string): string {
 export function LiveMonitor({
   sessionId,
   initial,
+  onAttemptActivity,
+  onReconnect,
 }: {
   sessionId: number;
   initial: SessionMetrics;
+  /** P4-A4: forwarded to the Activity panel's live timeline refetch. */
+  onAttemptActivity?: (ev: RealtimeEventEnvelope) => void;
+  /**
+   * P4-A4: invoked AFTER LiveMonitor's own reconnect invalidations — the
+   * session detail uses it to backfill the selected attempt's timeline
+   * (events missed while the socket was down; REST is the source of truth).
+   */
+  onReconnect?: () => void;
 }) {
   const queryClient = useQueryClient();
+
+  // Stable ref so the reconnect callback never re-subscribes the socket.
+  const onReconnectRef = useRef(onReconnect);
+  useEffect(() => {
+    onReconnectRef.current = onReconnect;
+  }, [onReconnect]);
 
   const { status, metrics, recentEvents } = useSessionEvents(
     sessionId,
@@ -69,6 +85,9 @@ export function LiveMonitor({
       void queryClient.invalidateQueries({
         queryKey: ["exam-sessions", sessionId, "participants"],
       });
+      // P4-A4: caller backfills the selected attempt's timeline (missed
+      // events while the socket was down — REST is the source of truth).
+      onReconnectRef.current?.();
     },
     () => {
       // New ATTEMPT_STARTED (issue #4 P0-R5): refetch the roster so a
@@ -78,7 +97,13 @@ export function LiveMonitor({
       void queryClient.invalidateQueries({
         queryKey: ["exam-sessions", sessionId, "roster"],
       });
-    }
+      // P4-A4 review: the Activity-panel picker's attempts list must see
+      // attempts that start while the teacher is already watching.
+      void queryClient.invalidateQueries({
+        queryKey: ["exam-sessions", sessionId, "attempts"],
+      });
+    },
+    onAttemptActivity
   );
 
   // User-based identity index (issue #4 P0-R4): primary lookup by userId;
