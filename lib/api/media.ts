@@ -61,8 +61,7 @@ export interface CameraStatusResponse {
 export function createCameraPreflight(sessionId: number): Promise<PreflightResponse> {
   return http.post<PreflightResponse>(
     `/api/exam-sessions/${sessionId}/monitoring/preflights`,
-    { schemaVersion: 1 },
-    { headers: { "Cache-Control": "no-store" } }
+    { schemaVersion: 1 }
   );
 }
 

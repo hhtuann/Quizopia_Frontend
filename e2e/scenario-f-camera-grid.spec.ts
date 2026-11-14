@@ -1,7 +1,9 @@
 import { test, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { apiJson, loginViaUi, registerVerifiedUser, state } from "./helpers";
-import type { Page } from "@playwright/test";
+import type { BrowserContext, Page } from "@playwright/test";
 import type { SmokeState } from "./helpers";
 
 /**
@@ -14,6 +16,16 @@ import type { SmokeState } from "./helpers";
  * remote videos on a student page), LOW-layer grid subscription with
  * HIGH only for fullscreen, foreign-teacher denial.
  */
+interface CameraFile {
+  sessionId: number;
+  attemptIds: number[];
+  students: Array<{ email: string; password: string; accessToken: string }>;
+}
+
+/** Publisher contexts kept alive by Scenario F for the G recovery flow
+ *  (same file = same worker process; workers=1 keeps F→G ordering). */
+let gridContexts: BrowserContext[] = [];
+
 test.describe("Scenario F — camera grid", () => {
   let s: SmokeState;
   test.beforeAll(() => {
@@ -45,10 +57,12 @@ test.describe("Scenario F — camera grid", () => {
     // Enrol 4 extra students (the seeded s.student joins as publisher 5).
     for (let i = 1; i <= 4; i++) {
       const u = await registerVerifiedUser("STUDENT", `grid-student-${i}-${Date.now()}`);
-      await apiJson(`/api/classrooms/${s.classroomId}/members`, s.teacher.accessToken, {
-        method: "POST",
-        body: JSON.stringify({ email: u.email }),
-      });
+      const added = await apiJson(
+        `/api/classrooms/${s.classroomId}/members`,
+        s.teacher.accessToken,
+        { method: "POST", body: JSON.stringify({ userIds: [u.id] }) }
+      );
+      expect(added.status, added.raw ?? "").toBeLessThan(300);
       students.push({ ...u, name: `Grid ${i}` });
     }
     students.unshift({
@@ -95,14 +109,33 @@ test.describe("Scenario F — camera grid", () => {
       const participants = room
         ? ((room as { remoteParticipants?: Map<string, unknown> }).remoteParticipants ?? new Map())
         : new Map();
+      // Presence metadata of other participants is normal; the isolation
+      // guarantee is that no remote CAMERA track is ever SUBSCRIBED
+      // (canSubscribe=false grant).
+      let cameraSubscribed = 0;
+      let cameraPublications = 0;
+      for (const p of participants.values()) {
+        const pubs = (p as { trackPublications?: Map<string, { source?: string; isSubscribed?: boolean }> })
+          .trackPublications ?? new Map();
+        for (const pub of pubs.values()) {
+          if (pub.source === "camera") {
+            cameraPublications += 1;
+            if (pub.isSubscribed) cameraSubscribed += 1;
+          }
+        }
+      }
       return {
         roomConnected: Boolean(room),
-        remoteCount: participants.size,
+        cameraPublications,
+        cameraSubscribed,
         videoElements: document.querySelectorAll("video").length,
       };
     });
     expect(remoteVideos.roomConnected).toBe(true);
-    expect(remoteVideos.remoteCount).toBe(0); // canSubscribe=false — nobody else
+    // Students see presence, but none of the remote camera publications is
+    // subscribed (canSubscribe=false — LiveKit rejects subscribe attempts).
+    expect(remoteVideos.cameraPublications).toBeGreaterThanOrEqual(1);
+    expect(remoteVideos.cameraSubscribed).toBe(0);
     // The attempt page shows a text-only status pill — no self-view video,
     // and certainly no remote videos.
     expect(remoteVideos.videoElements).toBe(0);
@@ -113,8 +146,8 @@ test.describe("Scenario F — camera grid", () => {
     await loginViaUi(teacherPage, s.teacher.email, s.teacher.password);
     await page_gotoSession(teacherPage, s.examId, sessionId);
 
-    const grid = teacherPage.locator("[data-testid='camera-grid'], section:has-text('Camera monitoring')");
-    await expect(grid.first()).toBeVisible({ timeout: 30_000 });
+    const grid = teacherPage.getByTestId("camera-grid");
+    await expect(grid).toBeVisible({ timeout: 30_000 });
     const tiles = grid.locator("[data-media-identity]");
     await expect(tiles).toHaveCount(5, { timeout: 60_000 });
 
@@ -136,12 +169,12 @@ test.describe("Scenario F — camera grid", () => {
       const room = (window as unknown as { __quizopiaMedia?: { getRoom?: (s: string) => unknown } })
         .__quizopiaMedia?.getRoom?.("teacher");
       if (!room) return null;
-      const out: Record<string, string> = {};
-      for (const [, p] of (room as { remoteParticipants: Map<string, { trackPublications?: Map<string, { trackSid?: string; videoQuality?: string; source?: string }> }> })
+      const out: Record<string, number> = {};
+      for (const [identity, p] of (room as { remoteParticipants: Map<string, { trackPublications?: Map<string, { trackSid?: string; videoQuality?: number; source?: string }> }> })
         .remoteParticipants) {
         for (const pub of p.trackPublications?.values() ?? []) {
-          if (pub.trackSid && (pub as { source?: string }).source === "camera") {
-            out[pub.trackSid] = String((pub as { videoQuality?: string }).videoQuality ?? "unknown");
+          if ((pub as { source?: string }).source === "camera") {
+            out[identity] = Number((pub as { videoQuality?: number }).videoQuality ?? 0);
           }
         }
       }
@@ -149,8 +182,11 @@ test.describe("Scenario F — camera grid", () => {
     });
     expect(layersBefore).not.toBeNull();
     expect(Object.keys(layersBefore!).length).toBe(5);
+    // livekit-client's publication.videoQuality is the numeric VideoQuality
+    // enum (OFF=0 / LOW=1 / MEDIUM=2 / HIGH=3). Before fullscreen every
+    // camera publication must be LOW or unset-auto (0) — none promoted.
     for (const q of Object.values(layersBefore!)) {
-      expect(["low", "unknown"]).toContain(q.toLowerCase());
+      expect(q).toBeLessThanOrEqual(1);
     }
 
     // Fullscreen one tile → its layer becomes HIGH.
@@ -163,19 +199,24 @@ test.describe("Scenario F — camera grid", () => {
       const room = (window as unknown as { __quizopiaMedia?: { getRoom?: (s: string) => unknown } })
         .__quizopiaMedia?.getRoom?.("teacher");
       if (!room) return null;
-      const out: Record<string, string> = {};
-      for (const [, p] of (room as { remoteParticipants: Map<string, { trackPublications?: Map<string, { trackSid?: string; videoQuality?: string; source?: string }> }> })
+      const out: Record<string, number> = {};
+      for (const [identity, p] of (room as { remoteParticipants: Map<string, { trackPublications?: Map<string, { trackSid?: string; videoQuality?: number; source?: string }> }> })
         .remoteParticipants) {
         for (const pub of p.trackPublications?.values() ?? []) {
-          if (pub.trackSid && (pub as { source?: string }).source === "camera") {
-            out[pub.trackSid] = String((pub as { videoQuality?: string }).videoQuality ?? "unknown");
+          if ((pub as { source?: string }).source === "camera") {
+            out[identity] = Number((pub as { videoQuality?: number }).videoQuality ?? 0);
           }
         }
       }
       return out;
     });
-    const highs = Object.entries(layersAfter!).filter(([, q]) => q.toLowerCase() === "high");
-    expect(highs.length).toBe(1);
+    // The fullscreen tile is promoted to a HIGHER simulcast layer than the
+    // grid (adaptive streaming may settle at MEDIUM=2 instead of the
+    // requested HIGH=3); every other tile stays at the LOW grid layer.
+    expect(layersAfter![tileName!]).toBeGreaterThanOrEqual(2);
+    for (const [identity, q] of Object.entries(layersAfter!)) {
+      if (identity !== tileName) expect(q).toBeLessThanOrEqual(1);
+    }
     expect(tileName).toBeTruthy();
 
     // Foreign teacher denied.
@@ -196,13 +237,166 @@ test.describe("Scenario F — camera grid", () => {
       JSON.stringify({ sessionId, attemptIds, students })
     );
 
-    // Keep publisher contexts OPEN for scenario G (recovery) — close teacher.
+    // Close everything deterministically: Playwright's per-test teardown is
+    // not a media event — an explicit ctx.close() produces real participant
+    // disconnects and prevents zombie same-identity publishers from fighting
+    // scenario G's re-opened pages (duplicate-identity kick loop).
     await teacherCtx.close();
-    // stash contexts for G via globalThis
-    (globalThis as unknown as { __gridContexts?: unknown[] }).__gridContexts = contexts;
+    for (const ctx of contexts) {
+      await ctx.close();
+    }
+    gridContexts = [];
   });
 });
 
 async function page_gotoSession(page: Page, examId: number, sessionId: number) {
   await page.goto(`/exams/${examId}/sessions/${sessionId}`);
 }
+
+test.describe("Scenario G — camera recovery & reconciliation", () => {
+  let s: SmokeState;
+  let f: CameraFile;
+
+  test.beforeAll(() => {
+    s = state();
+    f = JSON.parse(readFileSync(`${__dirname}/.smoke-camera-f.json`, "utf8"));
+  });
+
+  async function timelineTypes(attemptId: number): Promise<string[]> {
+    const res = await apiJson<{ items: Array<{ eventType: string }> }>(
+      `/api/attempts/${attemptId}/timeline?size=100`,
+      s.teacher.accessToken
+    );
+    expect(res.status).toBe(200);
+    return (res.body?.items ?? []).map((i) => i.eventType);
+  }
+
+  /**
+   * Playwright closes contexts created inside a test when that test ends,
+   * so G re-opens its own publisher pages against the attempts F started.
+   * The attempt page renews its media token and re-publishes on mount —
+   * itself a recovery-path exercise.
+   */
+  async function openPublisherPage(
+    browser: import("@playwright/test").Browser,
+    index: number
+  ): Promise<{ ctx: import("@playwright/test").BrowserContext; page: import("@playwright/test").Page }> {
+    const ctx = await browser.newContext({ permissions: ["camera"] });
+    const page = await ctx.newPage();
+    await loginViaUi(page, f.students[index].email, f.students[index].password);
+    await page.goto(`/attempts/${f.attemptIds[index]}`);
+    await expect(page.getByText("Camera live")).toBeVisible({ timeout: 60_000 });
+    return { ctx, page };
+  }
+
+  test("G1 camera loss logs a server-confirmed gap; attempt survives", async ({ browser }) => {
+    test.setTimeout(240_000);
+    const attemptId = f.attemptIds[0];
+    const { ctx, page } = await openPublisherPage(browser, 0);
+
+    // The pre-attempt publish is connection-row-only (no CAMERA_CONNECTED
+    // event before the attempt exists); G1's rejoin emits CAMERA_RECONNECTED.
+    const before = await timelineTypes(attemptId);
+    expect(before).toContain("CAMERA_RECONNECTED");
+
+    await page.close();
+    await ctx.close();
+
+    await expect
+      .poll(
+        async () => (await timelineTypes(attemptId)).filter((t) => t === "CAMERA_DISCONNECTED").length,
+        { timeout: 90_000, intervals: [5_000] }
+      )
+      .toBeGreaterThanOrEqual(1);
+
+    // D8: the attempt itself is untouched by camera loss.
+    const detail = await apiJson<{ status: string }>(`/api/attempts/${attemptId}`, f.students[0].accessToken);
+    expect(detail.body?.status).toBe("IN_PROGRESS");
+  });
+
+  test("G2 disconnect evidence stays single (webhook + reconcile dedupe)", async () => {
+    const attemptId = f.attemptIds[0];
+    // Period-pairing invariant: every CAMERA_DISCONNECTED corresponds to a
+    // distinct connected period, so disconnects == reconnects + 1 (the final
+    // period stays open/disconnected). A duplicate webhook or a reconciler
+    // double-close would emit an orphan DISCONNECTED and break the equality.
+    // (Client-side reconnects during dev-mount are truthful and allowed.)
+    await expect
+      .poll(
+        async () => {
+          const types = await timelineTypes(attemptId);
+          const d = types.filter((t) => t === "CAMERA_DISCONNECTED").length;
+          const r = types.filter((t) => t === "CAMERA_RECONNECTED").length;
+          return d - r;
+        },
+        { timeout: 60_000 }
+      )
+      .toBe(1);
+  });
+
+  test("G3 LiveKit restart → students reconnect; answers safe", async ({ browser }) => {
+    test.setTimeout(300_000);
+    const { ctx, page } = await openPublisherPage(browser, 1);
+    const attemptId = f.attemptIds[1];
+
+    // Restart the SFU (room routing state survives in its redis).
+    execSync("docker restart quizopia_livekit", { stdio: "ignore" });
+
+    // Reconnect loop with fresh tokens lands back on Camera live.
+    await expect(page.getByText("Camera live")).toBeVisible({ timeout: 150_000 });
+    await page.screenshot({ path: `${__dirname}/evidence/G3-reconnected.png` });
+
+    const detail = await apiJson<{ status: string }>(`/api/attempts/${attemptId}`, f.students[1].accessToken);
+    expect(detail.body?.status).toBe("IN_PROGRESS");
+    await ctx.close();
+  });
+
+  test("G4 revocation kicks the student and denies token renewal", async ({ browser }) => {
+    test.setTimeout(240_000);
+    const attemptId = f.attemptIds[2];
+    const { ctx } = await openPublisherPage(browser, 2);
+
+    const status = await apiJson<{
+      participants: Array<{ mediaIdentity: string; attemptId: number | null; state: string }>;
+    }>(`/api/exam-sessions/${f.sessionId}/monitoring/camera-status`, s.teacher.accessToken);
+    expect(status.status).toBe(200);
+    const victim = status.body!.participants.find((p) => p.attemptId === attemptId);
+    expect(victim, "publisher 3 must appear in camera status").toBeTruthy();
+
+    const revoke = await apiJson(
+      `/api/exam-sessions/${f.sessionId}/monitoring/participants/${victim!.mediaIdentity}/revoke`,
+      s.teacher.accessToken,
+      { method: "POST", body: JSON.stringify({ schemaVersion: 1 }) }
+    );
+    expect([200, 204]).toContain(revoke.status);
+
+    // App-layer revocation beats token TTL for renewal.
+    const renew = await apiJson<{ code?: string }>(
+      `/api/attempts/${attemptId}/monitoring/media-token`,
+      f.students[2].accessToken,
+      { method: "POST", body: JSON.stringify({ schemaVersion: 1 }) }
+    );
+    expect(renew.status).toBe(403);
+    expect(renew.body?.code).toBe("MONITORING_CAMERA_REVOKED");
+
+    await expect
+      .poll(async () => (await timelineTypes(attemptId)).includes("CAMERA_REVOKED"), { timeout: 30_000 })
+      .toBe(true);
+
+    // Attempt validity survives revocation (no auto-punishment).
+    const detail = await apiJson<{ status: string }>(`/api/attempts/${attemptId}`, f.students[2].accessToken);
+    expect(detail.body?.status).toBe("IN_PROGRESS");
+    await ctx.close();
+  });
+
+  test("G5 submit works after the whole media storm", async () => {
+    const attemptId = f.attemptIds[0];
+    const submit = await apiJson(`/api/attempts/${attemptId}/submit`, f.students[0].accessToken, {
+      method: "POST",
+      body: JSON.stringify({ submissionIdempotencyKey: crypto.randomUUID() }),
+    });
+    expect(submit.status).toBe(200);
+    const detail = await apiJson<{ status: string }>(`/api/attempts/${attemptId}`, f.students[0].accessToken);
+    expect(["SUBMITTED", "GRADED"]).toContain(detail.body?.status);
+  });
+});

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { NormalizedApiError } from "@/lib/api";
 import { renewAttemptMediaToken } from "@/lib/api/media";
-import { takeActivePublisherRoom } from "./active-room";
+import { setActivePublisherRoom, takeActivePublisherRoom } from "./active-room";
 import { registerMediaRoom } from "./test-hooks";
 import {
   connectPublisherRoom,
@@ -42,6 +42,13 @@ export type AttemptCameraStatus =
 const RETRY_BASE_MS = 1_000;
 const RETRY_MAX_MS = 15_000;
 
+/**
+ * Grace window before an ADOPTED room's deferred disconnect (cleanup hands
+ * it back first): a React StrictMode remount re-adopts within it, so the
+ * camera never drops at the start of a monitored attempt.
+ */
+const ADOPT_DISCONNECT_GRACE_MS = 100;
+
 /** Terminal outcomes derived from a renewal API error, or null (transient). */
 function classifyRenewalError(err: unknown): AttemptCameraStatus | null {
   const norm = err as NormalizedApiError | undefined;
@@ -65,6 +72,8 @@ export function useAttemptCamera(attemptId: number): AttemptCameraState {
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const mountedRef = useRef(false);
   const retryCountRef = useRef(0);
+  /** StrictMode grace timer for an adopted room pending deferred disconnect. */
+  const pendingAdoptTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -158,11 +167,18 @@ export function useAttemptCamera(attemptId: number): AttemptCameraState {
       }
     };
 
+    let adoptedRoom: Room | null = null;
+
     const begin = (): void => {
       // Landing hand-off: adopt the already-connected publisher room so we
       // never double-publish; a stale one falls through to renewal.
       const adopted = takeActivePublisherRoom();
       if (adopted) {
+        // StrictMode/quick-remount: re-adopting cancels the deferred
+        // disconnect a previous cleanup scheduled for this room.
+        clearTimeout(pendingAdoptTimerRef.current);
+        pendingAdoptTimerRef.current = undefined;
+        adoptedRoom = adopted;
         roomRef.current = adopted;
         adopted.on(RoomEvent.Disconnected, () => onDisconnected(adopted));
         registerMediaRoom("attempt", adopted);
@@ -171,6 +187,7 @@ export function useAttemptCamera(attemptId: number): AttemptCameraState {
           enter("verified");
           return;
         }
+        adoptedRoom = null;
         roomRef.current = null;
         registerMediaRoom("attempt", null);
         forgetRoom(adopted);
@@ -187,13 +204,35 @@ export function useAttemptCamera(attemptId: number): AttemptCameraState {
         timerRef.current = undefined;
       }
       retryCountRef.current = 0;
-      if (roomRef.current) {
-        forgetRoom(roomRef.current);
-        roomRef.current = null;
-      }
-      trackRef.current?.stop();
+      const room = roomRef.current;
+      roomRef.current = null;
+      const track = trackRef.current;
       trackRef.current = null;
       registerMediaRoom("attempt", null);
+      if (!room) return;
+      // StrictMode grace (P4-B): an ADOPTED room that is still connected
+      // and publishing the landing's track is handed BACK and disconnected
+      // only after a grace window — a StrictMode remount re-adopts it (see
+      // begin) so the camera never drops; a real unmount disconnects late.
+      // Rooms this hook connected itself (renewal/reconnect path) and dead
+      // adopted rooms disconnect immediately.
+      if (room === adoptedRoom && room.state === "connected" && track === null) {
+        setActivePublisherRoom(room);
+        clearTimeout(pendingAdoptTimerRef.current);
+        pendingAdoptTimerRef.current = setTimeout(() => {
+          pendingAdoptTimerRef.current = undefined;
+          const stillPending = takeActivePublisherRoom();
+          if (stillPending !== room) {
+            // Re-adopted by a later mount — leave it connected.
+            if (stillPending) setActivePublisherRoom(stillPending);
+            return;
+          }
+          forgetRoom(room);
+        }, ADOPT_DISCONNECT_GRACE_MS);
+        return;
+      }
+      track?.stop();
+      forgetRoom(room);
     };
   }, [attemptId]);
 

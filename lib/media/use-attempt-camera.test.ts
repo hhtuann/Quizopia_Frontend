@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import { createElement } from "react";
+import { createElement, StrictMode } from "react";
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAttemptCamera } from "./use-attempt-camera";
-import { setActivePublisherRoom } from "./active-room";
+import { setActivePublisherRoom, takeActivePublisherRoom } from "./active-room";
 import { getRegisteredMediaRoom } from "./test-hooks";
 import type { MediaTokenResponse } from "@/lib/api/media";
 import type { NormalizedApiError } from "@/lib/api";
@@ -120,6 +120,9 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  // Drain a room that a cleanup handed back (adoption grace) — keeps the
+  // module-level singleton from leaking between tests.
+  takeActivePublisherRoom();
 });
 
 describe("useAttemptCamera mount", () => {
@@ -251,5 +254,82 @@ describe("useAttemptCamera disconnect recovery", () => {
     });
     expect(room.disconnect).toHaveBeenCalled();
     expect(getRegisteredMediaRoom("attempt")).toBeNull();
+  });
+});
+
+describe("useAttemptCamera StrictMode adoption grace", () => {
+  function handedOffRoom(): FakeRoomShape {
+    return {
+      state: "connected",
+      connect: vi.fn(),
+      disconnect: vi.fn(async () => undefined),
+      localParticipant: { publishTrack: vi.fn() },
+      on: vi.fn(),
+      removeAllListeners: vi.fn(),
+      emit: vi.fn(),
+    };
+  }
+
+  it("double mount/unmount cycle inside the grace window never disconnects", async () => {
+    const room = handedOffRoom();
+    setActivePublisherRoom(room as unknown as Room);
+    const first = render(createElement(Harness));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(statusOf()).toBe("verified");
+
+    // StrictMode-style cleanup → immediate remount in the same tick: the
+    // room is handed back and re-adopted, so the camera never drops.
+    first.unmount();
+    render(createElement(Harness));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(statusOf()).toBe("verified");
+    expect(room.connect).not.toHaveBeenCalled();
+    expect(renewMock).not.toHaveBeenCalled();
+
+    // Well past the grace window while mounted: still connected.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(room.disconnect).not.toHaveBeenCalled();
+    expect(getRegisteredMediaRoom("attempt")).toBe(room);
+  });
+
+  it("real unmount disconnects the adopted room after the grace window", async () => {
+    const room = handedOffRoom();
+    setActivePublisherRoom(room as unknown as Room);
+    const { unmount } = render(createElement(Harness));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(statusOf()).toBe("verified");
+
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    expect(room.disconnect).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(room.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("React StrictMode double-mount keeps the adopted room connected", async () => {
+    const room = handedOffRoom();
+    setActivePublisherRoom(room as unknown as Room);
+    render(createElement(StrictMode, null, createElement(Harness)));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(statusOf()).toBe("verified");
+    expect(renewMock).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(room.disconnect).not.toHaveBeenCalled();
   });
 });

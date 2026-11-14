@@ -59,7 +59,7 @@ export function CameraGridCard({
           : { label: "Offline", tone: "text-[#94A3B8]", pulse: false };
 
   return (
-    <div className={cn(cardVariants(), "mt-6 p-6")}>
+    <div data-testid="camera-grid" className={cn(cardVariants(), "mt-6 p-6")}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="font-display text-lg font-bold tracking-tight text-[#0F172A]">
