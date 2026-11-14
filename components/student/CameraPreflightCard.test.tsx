@@ -46,6 +46,27 @@ describe("CameraPreflightCard", () => {
     expect(state.start).toHaveBeenCalledTimes(1);
   });
 
+  it("connecting stage covers server+room connect BEFORE the permission prompt", () => {
+    hookMock.mockReturnValue(mockPreflight({ status: "connecting" }));
+    const { container } = render(
+      <CameraPreflightCard sessionId={5} cameraRequired onReady={vi.fn()} />
+    );
+
+    const status = screen.getByRole("status");
+    expect(status.textContent).toContain("Connecting your camera…");
+    expect(status.textContent).toContain("Starting the camera check");
+    expect(container.querySelector("video")).not.toBeNull();
+  });
+
+  it("permission stage keeps the preview video mounted for the incoming track", () => {
+    hookMock.mockReturnValue(mockPreflight({ status: "permission" }));
+    const { container } = render(
+      <CameraPreflightCard sessionId={5} cameraRequired onReady={vi.fn()} />
+    );
+
+    expect(screen.getByRole("status").textContent).toContain("Requesting camera access…");
+    expect(container.querySelector("video")).not.toBeNull();
+  });
   it("verifying renders the preview video (muted, playsInline) and stage copy", () => {
     hookMock.mockReturnValue(mockPreflight({ status: "verifying", verifyState: "NOT_PUBLISHED" }));
     const { container } = render(

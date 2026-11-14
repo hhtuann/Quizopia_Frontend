@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import * as http from "node:http";
 
 /**
  * Shared fixtures for the P4-A browser smoke tests.
@@ -33,28 +34,83 @@ export interface SmokeState {
 }
 
 export async function api(path: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(`${API}${path}`, init);
+  // Kept for call sites that want a real Response object; routed through
+  // node:http for the same undici-stall reason as apiJson.
+  const url = new URL(`${API}${path}`);
+  const { promise, resolve, reject } = Promise.withResolvers<Response>();
+  const headers: Record<string, string> = {};
+  if (init.body !== undefined) headers["Content-Type"] = "application/json";
+  const req = http.request(
+    {
+      hostname: url.hostname,
+      port: url.port,
+      path: url.pathname + url.search,
+      method: init.method ?? "GET",
+      headers,
+    },
+    (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (c: Buffer) => chunks.push(c));
+      res.on("end", () => {
+        resolve(new Response(Buffer.concat(chunks), { status: res.statusCode ?? 0, headers: { "Content-Type": res.headers["content-type"] ?? "application/json" } }));
+      });
+    }
+  );
+  req.on("error", reject);
+  req.setTimeout(30_000, () => req.destroy(new Error("api timeout")));
+  if (init.body !== undefined && typeof init.body === "string") req.write(init.body);
+  req.end();
+  return promise;
 }
 
+/**
+ * Backend HTTP over node:http — deliberately NOT global fetch/undici:
+ * on some Windows hosts undici's connection handling stalls indefinitely
+ * against this Tomcat while node:http and the browser (its own stack)
+ * work fine. Body is JSON in/out (every call site uses JSON).
+ */
 export async function apiJson<T>(
   path: string,
   token: string | null,
-  init: RequestInit = {}
+  init: { method?: string; body?: string } = {}
 ): Promise<{ status: number; body: T | null; raw: string }> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...((init.headers as Record<string, string>) ?? {}),
-  };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`${API}${path}`, { ...init, headers });
-  const raw = await res.text();
-  let body: T | null = null;
-  try {
-    body = raw ? (JSON.parse(raw) as T) : null;
-  } catch {
-    body = null;
-  }
-  return { status: res.status, body, raw };
+  const url = new URL(`${API}${path}`);
+  const { promise, resolve, reject } = Promise.withResolvers<{
+    status: number;
+    body: T | null;
+    raw: string;
+  }>();
+  const req = http.request(
+    {
+      hostname: url.hostname,
+      port: url.port,
+      path: url.pathname + url.search,
+      method: init.method ?? "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    },
+    (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (c: Buffer) => chunks.push(c));
+      res.on("end", () => {
+        const raw = Buffer.concat(chunks).toString("utf8");
+        let body: T | null = null;
+        try {
+          body = raw ? (JSON.parse(raw) as T) : null;
+        } catch {
+          body = null;
+        }
+        resolve({ status: res.statusCode ?? 0, body, raw });
+      });
+    }
+  );
+  req.on("error", reject);
+  req.setTimeout(30_000, () => req.destroy(new Error("apiJson timeout")));
+  if (init.body !== undefined) req.write(init.body);
+  req.end();
+  return promise;
 }
 
 function delay(ms: number): Promise<void> {

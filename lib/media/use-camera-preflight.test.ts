@@ -17,17 +17,27 @@ vi.mock("@/lib/api/media", () => ({
   verifyCameraPreflight: vi.fn(),
 }));
 
+vi.mock("./camera-fallback", () => ({
+  createCameraFallbackTrack: vi.fn(() => null),
+}));
+
 vi.mock("livekit-client", () => {
   const rooms: FakeRoomShape[] = [];
+  const log: string[] = [];
   class FakeRoom {
     state = "connected";
     handlers: Record<string, Array<() => void>> = {};
     localParticipant = {
-      publishTrack: vi.fn(async () => ({ kind: "video" })),
-    };
+      publishTrack: vi.fn(async () => {
+        log.push("publish");
+        return { kind: "video" };
+      }),
+      unpublishTrack: vi.fn(async () => undefined),
+     };
     connect = vi.fn(async () => {
       this.state = "connected";
       rooms.push(this);
+      log.push("room.connect");
     });
     disconnect = vi.fn(async () => {
       this.state = "disconnected";
@@ -57,6 +67,7 @@ vi.mock("livekit-client", () => {
     VideoPresets: { h360: { encoding: { maxBitrate: 500_000 } } },
     __MediaStream: FakeMediaStream,
     __rooms: rooms,
+    __log: log,
   };
 });
 
@@ -64,7 +75,10 @@ interface FakeRoomShape {
   state: string;
   connect: ReturnType<typeof vi.fn>;
   disconnect: ReturnType<typeof vi.fn>;
-  localParticipant: { publishTrack: ReturnType<typeof vi.fn> };
+  localParticipant: {
+     publishTrack: ReturnType<typeof vi.fn>;
+     unpublishTrack: ReturnType<typeof vi.fn>;
+   };
   emit: (evt: string) => void;
 }
 interface StubMediaStream {
@@ -72,14 +86,17 @@ interface StubMediaStream {
 }
 
 
-import { createCameraPreflight, verifyCameraPreflight } from "@/lib/api/media";
-import * as livekitModule from "livekit-client";
+ import { createCameraPreflight, verifyCameraPreflight } from "@/lib/api/media";
+import { createCameraFallbackTrack } from "./camera-fallback";
+ import * as livekitModule from "livekit-client";
 
 const createMock = vi.mocked(createCameraPreflight);
-const verifyMock = vi.mocked(verifyCameraPreflight);
-const livekitInternals = livekitModule as unknown as {
+ const verifyMock = vi.mocked(verifyCameraPreflight);
+const fallbackMock = vi.mocked(createCameraFallbackTrack);
+ const livekitInternals = livekitModule as unknown as {
   __rooms: FakeRoomShape[];
   __MediaStream: new (tracks: MediaStreamTrack[]) => StubMediaStream;
+  __log: string[];
 };
 
 function fakeTrack(): MediaStreamTrack {
@@ -142,8 +159,10 @@ beforeEach(() => {
   // jsdom has no WebRTC: stub the global the production code branches on.
   vi.stubGlobal("MediaStream", livekitInternals.__MediaStream);
   livekitInternals.__rooms.length = 0;
-  createMock.mockReset().mockResolvedValue(preflightResponse());
-  verifyMock.mockReset().mockResolvedValue({ state: "NOT_PUBLISHED" });
+  livekitInternals.__log.length = 0;
+   createMock.mockReset().mockResolvedValue(preflightResponse());
+  fallbackMock.mockReset().mockReturnValue(null);
+   verifyMock.mockReset().mockResolvedValue({ state: "NOT_PUBLISHED" });
   gum = vi.fn();
   Object.defineProperty(navigator, "mediaDevices", {
     configurable: true,
@@ -166,9 +185,8 @@ describe("useCameraPreflight happy path", () => {
       await vi.advanceTimersByTimeAsync(0);
     });
 
-    // Permission + preview + connect + publish happened.
     expect(gum).toHaveBeenCalledWith({ video: { width: 640, height: 480 }, audio: false });
-    expect(createMock).toHaveBeenCalledWith(5);
+    expect(livekitInternals.__log).toEqual(["room.connect", "publish"]);
     const room = livekitInternals.__rooms[0];
     expect(room).toBeDefined();
     expect(room.connect).toHaveBeenCalledWith("ws://media.test", "pf-token", {
@@ -216,7 +234,7 @@ describe("useCameraPreflight happy path", () => {
 });
 
 describe("useCameraPreflight failures", () => {
-  it("maps NotAllowedError to DENIED", async () => {
+  it("maps NotAllowedError to DENIED (capture after connect) and drops the room", async () => {
     const err = Object.assign(new Error("denied"), { name: "NotAllowedError" });
     gum.mockRejectedValue(err);
     render(createElement(Harness));
@@ -228,7 +246,10 @@ describe("useCameraPreflight failures", () => {
     expect(
       document.querySelector<HTMLElement>('[data-testid="error"]')!.textContent
     ).toContain("denied");
-    expect(createMock).not.toHaveBeenCalled();
+    // The backend preflight + room connect already happened; denial at the
+    // browser prompt tears the room back down.
+    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(livekitInternals.__rooms[0].disconnect).toHaveBeenCalled();
   });
 
   it("maps NotFoundError to UNAVAILABLE", async () => {
@@ -242,9 +263,7 @@ describe("useCameraPreflight failures", () => {
     expect(statusOf()).toBe("unavailable");
   });
 
-  it("maps MONITORING_INFRA_UNAVAILABLE to INFRA and stops the track", async () => {
-    const track = fakeTrack();
-    gum.mockResolvedValue(streamOf(track));
+  it("maps MONITORING_INFRA_UNAVAILABLE to INFRA before any capture", async () => {
     createMock.mockRejectedValue({
       kind: "api",
       status: 503,
@@ -258,10 +277,11 @@ describe("useCameraPreflight failures", () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(statusOf()).toBe("infra");
-    expect(track.stop).toHaveBeenCalled();
+    expect(gum).not.toHaveBeenCalled();
+    expect(livekitInternals.__rooms).toHaveLength(0);
   });
 
-  it("retry() restarts from permission with a fresh track", async () => {
+  it("retry() restarts the whole sequence with a fresh run", async () => {
     const { container } = render(createElement(Harness));
     const err = Object.assign(new Error("denied"), { name: "NotAllowedError" });
     gum.mockRejectedValueOnce(err).mockResolvedValue(streamOf(fakeTrack()));
@@ -278,7 +298,7 @@ describe("useCameraPreflight failures", () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(gum).toHaveBeenCalledTimes(2);
-    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(createMock).toHaveBeenCalledTimes(2);
     expect(statusOf()).toBe("verifying");
   });
 });
@@ -302,11 +322,21 @@ describe("useCameraPreflight cleanup", () => {
   });
 
   it("keeps a handed-off room's connection AND published track alive", async () => {
-    // The track published into the room is the one getUserMedia returned.
+    // Capture start is recorded AFTER the room connect in the op log.
     const track = fakeTrack();
-    gum.mockResolvedValue(streamOf(track));
+    const log = livekitInternals.__log;
+    gum.mockImplementation(async () => {
+      log.push("gum");
+      return streamOf(track);
+    });
+    createMock.mockImplementation(async () => {
+      log.push("preflight");
+      return preflightResponse();
+    });
     const { unmount } = render(createElement(Harness));
     await clickStart();
+    // Full real-device sequence in one log: API → connect → capture → publish.
+    expect(log).toEqual(["preflight", "room.connect", "gum", "publish"]);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
@@ -325,5 +355,89 @@ describe("useCameraPreflight cleanup", () => {
     });
     expect(room.disconnect).not.toHaveBeenCalled();
     expect(track.stop).not.toHaveBeenCalled();
+  });
+});
+
+describe("useCameraPreflight rotated-sensor canvas fallback", () => {
+
+  async function runToVerifying(): Promise<void> {
+    render(createElement(Harness));
+    await clickStart();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(statusOf()).toBe("verifying");
+  }
+
+  it("after 3 NOT_PUBLISHED polls publishes the canvas track and recovers READY", async () => {
+    await runToVerifying();
+    const fbTrack = { stop: vi.fn(), readyState: "live" } as unknown as MediaStreamTrack;
+    const fbStop = vi.fn();
+    fallbackMock.mockReturnValue({ track: fbTrack, stop: fbStop });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3 * 2_000);
+    });
+    const cameraTrack = livekitInternals.__rooms[0].localParticipant.publishTrack.mock
+      .calls[0][0] as MediaStreamTrack;
+    expect(fallbackMock).toHaveBeenCalledWith(cameraTrack);
+    const room = livekitInternals.__rooms[0];
+    // Dead-transport publication dropped WITHOUT stopping the feeder track.
+    expect(room.localParticipant.unpublishTrack).toHaveBeenCalledWith(cameraTrack, false);
+    // Canvas re-encode published under a distinguishable name.
+    expect(room.localParticipant.publishTrack).toHaveBeenCalledTimes(2);
+    const [fbArg, fbOpts] = room.localParticipant.publishTrack.mock.calls[1] as [
+      MediaStreamTrack,
+      { name?: string; source?: string; simulcast?: boolean },
+    ];
+    expect(fbArg).toBe(fbTrack);
+    expect(fbOpts).toMatchObject({ name: "camera-fallback", source: "camera", simulcast: true });
+    expect(statusOf()).toBe("verifying");
+
+    verifyMock.mockResolvedValueOnce(readyResponse("lease-fb"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000);
+    });
+    expect(statusOf()).toBe("ready");
+    expect(
+      document.querySelector<HTMLElement>('[data-testid="lease"]')!.textContent
+    ).toBe("lease-fb");
+  });
+
+  it("teardown stops BOTH the canvas fallback and the camera track", async () => {
+    const fbTrack = { stop: vi.fn(), readyState: "live" } as unknown as MediaStreamTrack;
+    const fbStop = vi.fn();
+    fallbackMock.mockReturnValue({ track: fbTrack, stop: fbStop });
+
+    const { unmount } = render(createElement(Harness));
+    await clickStart();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3 * 2_000);
+    });
+    expect(fallbackMock).toHaveBeenCalled();
+    const cameraTrack = livekitInternals.__rooms[0].localParticipant.publishTrack.mock
+      .calls[0][0] as MediaStreamTrack;
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(fbStop).toHaveBeenCalled();
+    expect(cameraTrack.stop).toHaveBeenCalled();
+  });
+
+  it("skips the fallback when the camera track already ended (→ timeout)", async () => {
+    await runToVerifying();
+    const cameraTrack = livekitInternals.__rooms[0].localParticipant.publishTrack.mock
+      .calls[0][0] as { stop: () => void; readyState: string };
+    cameraTrack.readyState = "ended";
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10 * 2_000);
+    });
+    expect(fallbackMock).not.toHaveBeenCalled();
+    expect(statusOf()).toBe("timeout");
   });
 });

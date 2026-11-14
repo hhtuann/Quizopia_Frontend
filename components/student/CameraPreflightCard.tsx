@@ -11,8 +11,8 @@ import type { Room } from "@/lib/media/livekit";
 
 /**
  * Camera verification card for monitored CAN_START sessions (P4-B). Replaces
- * the P4-A fail-closed block: the student runs a live camera check (preview
- * → publish → server verify) and the Start button unlocks when the hook
+ * the P4-A fail-closed block: the student runs a live camera check (room
+ * connect → camera access → publish → server verify) and the Start button
  * reaches READY with a readiness lease.
  *
  * `onReady` fires with the lease + a `keepAlive` accessor for the connected
@@ -28,7 +28,10 @@ type ProgressStatus = Extract<
 
 const STAGE_COPY: Record<ProgressStatus, { title: string; detail?: string }> = {
   permission: { title: "Requesting camera access…" },
-  connecting: { title: "Connecting your camera…" },
+  connecting: {
+    title: "Connecting your camera…",
+    detail: "Starting the camera check — connecting to the exam room.",
+  },
   verifying: {
     title: "Verifying your camera…",
     detail: "This takes a few seconds. Keep this page open.",
@@ -118,7 +121,10 @@ export function CameraPreflightCard({
       ? status
       : null;
   const showVideo =
-    stage === "connecting" || stage === "verifying" || stage === "ready";
+    stage === "permission" ||
+    stage === "connecting" ||
+    stage === "verifying" ||
+    stage === "ready";
 
   return (
     <div

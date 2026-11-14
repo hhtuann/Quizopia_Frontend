@@ -8,6 +8,8 @@ import {
   type PreflightResponse,
 } from "@/lib/api/media";
 import { isTransferredPublisherRoom } from "./active-room";
+import { registerMediaRoom } from "./test-hooks";
+import { createCameraFallbackTrack } from "./camera-fallback";
 import {
   attachTrack,
   connectPublisherRoom,
@@ -22,20 +24,32 @@ import {
  * session's Start unlocks, and the connected publisher Room + camera track
  * survive until the attempt page adopts them (see ./active-room.ts).
  *
- *   idle → permission → connecting → verifying → ready
+ *   idle → connecting → permission → verifying → ready
  *   any step ⤳ denied | unavailable | infra | timeout | error
  *
- * - permission: `getUserMedia({video:{640×480}, audio:false})`
- *   (NotAllowedError → denied, NotFoundError-family → unavailable); the
- *   SAME MediaStreamTrack is attached to `previewRef` for local preview and
- *   later published — never re-acquired between preview and publish.
- * - connecting: createCameraPreflight → Room.connect(autoSubscribe:false) →
- *   publishTrack(camera).
+ * - connecting: createCameraPreflight → Room.connect(autoSubscribe:false).
+ *   The room MUST be connected BEFORE real capture starts: running
+ *   getUserMedia during the connect/publish handshake destabilizes the
+ *   publisher transport on some real devices (DATA_TRACK_LOSSY close,
+ *   server sees the participant with zero published tracks). Synthetic
+ *   (fake-device) cameras hide it; real webcams do not (e2e, BisonCam).
+ * - permission: `getUserMedia({video:{640×480}, audio:false})` fires the
+ *   browser prompt (NotAllowedError → denied, NotFoundError-family →
+ *   unavailable); the granted MediaStreamTrack is attached to `previewRef`
+ *   for local preview and then published — the SAME track, never
+ *   re-acquired between preview and publish.
  * - verifying: poll verifyCameraPreflight every 2s, max 10 tries;
  *   NOT_PUBLISHED keeps polling, READY stores the lease and KEEPS the room
  *   connected (no disconnect — the attempt page takes it over).
- * - retry() tears everything down and re-runs from permission.
- * - unmount: disconnect the room (unless handed off) + stop the track.
+ *   Rotated-sensor fallback: after 3 consecutive NOT_PUBLISHED polls the
+ *   live camera track is re-encoded through a landscape canvas
+ *   (./camera-fallback.ts) and THAT track is published (name
+ *   "camera-fallback") — same room, same preflight, run not restarted. If
+ *   the fallback also stays NOT_PUBLISHED through the poll budget →
+ *   timeout (truthful).
+ * - retry() tears everything down and re-runs from connecting.
+ * - unmount: disconnect the room (unless handed off) + stop BOTH the camera
+ *   track and any canvas fallback track.
  */
 
 export type CameraPreflightStatus =
@@ -55,6 +69,12 @@ export type CameraPreflightFailure = "denied" | "unavailable" | "infra" | "timeo
 
 const VERIFY_INTERVAL_MS = 2_000;
 const VERIFY_MAX_TRIES = 10;
+/**
+ * Consecutive NOT_PUBLISHED polls (≈6s) before switching to the canvas
+ * re-encode fallback for rotated/portrait camera sensors whose raw track
+ * never publishes server-side (see ./camera-fallback.ts).
+ */
+const FALLBACK_AFTER_NOT_PUBLISHED = 3;
 
 const INFRA_COPY = "Camera verification is unavailable right now — please try again in a moment.";
 const TIMEOUT_COPY = "We couldn't verify your camera in time. Check that your camera works, then retry.";
@@ -133,6 +153,8 @@ export function useCameraPreflight({
   const statusRef = useRef<CameraPreflightStatus>("idle");
   const previewRef = useRef<HTMLVideoElement | null>(null);
   const trackRef = useRef<MediaStreamTrack | null>(null);
+  /** Canvas re-encode fallback (feeds from trackRef's live camera track). */
+  const fallbackRef = useRef<{ track: MediaStreamTrack; stop: () => void } | null>(null);
   const roomRef = useRef<Room | null>(null);
   /** Bumped by teardown — in-flight async steps compare their snapshot. */
   const runRef = useRef(0);
@@ -144,9 +166,10 @@ export function useCameraPreflight({
   }, []);
 
   /**
-   * Cancel any in-flight run and release room/track. Never touches `status`.
-   * A room handed off to the attempt page keeps BOTH the connection and the
-   * published camera track alive — ownership moved, we only drop references.
+   * Cancel any in-flight run and release room/track/fallback. Never touches
+   * `status`. A room handed off to the attempt page keeps the connection,
+   * the published camera track AND its canvas fallback alive — ownership
+   * moved, we only drop references.
    */
   const teardown = useCallback(() => {
     runRef.current += 1;
@@ -156,10 +179,14 @@ export function useCameraPreflight({
     }
     const room = roomRef.current;
     const track = trackRef.current;
+    const fallback = fallbackRef.current;
     roomRef.current = null;
     trackRef.current = null;
+    fallbackRef.current = null;
     if (room && isTransferredPublisherRoom(room)) return;
+    registerMediaRoom("preflight", null);
     if (room) void disconnectRoom(room).catch(() => undefined);
+    fallback?.stop();
     track?.stop();
     setHasTrack(false);
   }, []);
@@ -175,20 +202,55 @@ export function useCameraPreflight({
     [teardown, enter]
   );
 
-  /** Full run: permission → connecting → verifying → ready. */
+  /**
+   * Full run: connecting (server+room) → permission (capture) → verifying →
+   * ready. Real capture starts only AFTER the room is connected.
+   */
   const beginRun = useCallback(() => {
     teardown();
     setLease(null);
     setVerifyState(null);
     setLastError(null);
-    enter("permission");
+    enter("connecting");
     const run = runRef.current;
     const sid = sessionId;
+    let notPublishedStreak = 0;
+    let fallbackAttempted = false;
+
+    /**
+     * Rotated-sensor rescue: unpublish the dead-transport camera track and
+     * publish a landscape canvas re-encode of the SAME live track. One shot
+     * per run; the server sees the same room/identity, so polling continues
+     * untouched. A failed fallback just keeps polling (budget → timeout).
+     */
+    const tryCanvasFallback = async (): Promise<void> => {
+      if (fallbackAttempted) return;
+      fallbackAttempted = true;
+      const camera = trackRef.current;
+      const room = roomRef.current;
+      // Only re-encode a still-live camera; an ended track feeds nothing.
+      if (!room || !camera || camera.readyState !== "live") return;
+      const fallback = createCameraFallbackTrack(camera);
+      if (!fallback) return;
+      fallbackRef.current = fallback;
+      // Drop the publication that never reached the server. stopOnUnpublish
+      // MUST be false — the camera track keeps feeding the canvas.
+      await room.localParticipant.unpublishTrack(camera, false).catch(() => undefined);
+      if (run !== runRef.current) {
+        fallback.stop();
+        fallbackRef.current = null;
+        return;
+      }
+      await publishCameraTrack(room, fallback.track, { name: "camera-fallback" }).catch(
+        () => undefined
+      );
+    };
 
     const poll = (attemptNo: number, preflightId: string): void => {
       pollTimerRef.current = setTimeout(() => {
-        void verifyCameraPreflight(sid, preflightId)
-          .then((res) => {
+        void (async () => {
+          try {
+            const res = await verifyCameraPreflight(sid, preflightId);
             if (run !== runRef.current) return;
             if (res.state === "READY") {
               setLease({
@@ -203,58 +265,91 @@ export function useCameraPreflight({
               return;
             }
             setVerifyState("NOT_PUBLISHED");
+            notPublishedStreak += 1;
+            if (notPublishedStreak === FALLBACK_AFTER_NOT_PUBLISHED) {
+              await tryCanvasFallback();
+              if (run !== runRef.current) return;
+            }
             if (attemptNo >= VERIFY_MAX_TRIES) {
               fail({ status: "timeout", message: TIMEOUT_COPY });
               return;
             }
             poll(attemptNo + 1, preflightId);
-          })
-          .catch((err: unknown) => {
+          } catch (err) {
             if (run !== runRef.current) return;
             fail(classifyApiError(err));
-          });
+          }
+        })();
       }, VERIFY_INTERVAL_MS);
     };
 
-    void navigator.mediaDevices
-      .getUserMedia({ video: { width: 640, height: 480 }, audio: false })
-      .then((stream: MediaStream) => {
-        // Video-only request — the first video track IS the camera track.
-        const track = stream.getVideoTracks()[0];
-        if (!track) {
-          fail({ status: "unavailable", message: "No usable camera was found." });
-          return;
-        }
-        if (run !== runRef.current) {
-          track.stop();
-          return;
-        }
-        trackRef.current = track;
-        setHasTrack(true);
-        enter("connecting");
-        return createCameraPreflight(sid)
-          .then(async (preflight: PreflightResponse) => {
-            if (run !== runRef.current) return;
-            const room = await connectPublisherRoom(preflight.wsUrl, preflight.mediaToken);
-            if (run !== runRef.current) {
-              void disconnectRoom(room).catch(() => undefined);
-              return;
-            }
-            roomRef.current = room;
-            await publishCameraTrack(room, track);
-            if (run !== runRef.current) return;
-            enter("verifying");
-            poll(1, preflight.preflightId);
-          })
-          .catch((err: unknown) => {
-            if (run !== runRef.current) return;
-            fail(classifyApiError(err));
-          });
-      })
-      .catch((err: unknown) => {
+    void (async () => {
+      // 1. Preflight lease (API) — no capture yet.
+      let preflight: PreflightResponse;
+      try {
+        preflight = await createCameraPreflight(sid);
+      } catch (err) {
+        if (run !== runRef.current) return;
+        fail(classifyApiError(err));
+        return;
+      }
+      if (run !== runRef.current) return;
+
+      // 2. Connect the publisher room BEFORE starting real capture.
+      let room: Room;
+      try {
+        room = await connectPublisherRoom(preflight.wsUrl, preflight.mediaToken);
+      } catch (err) {
+        if (run !== runRef.current) return;
+        fail(classifyApiError(err));
+        return;
+      }
+      if (run !== runRef.current) {
+        void disconnectRoom(room).catch(() => undefined);
+        return;
+      }
+      roomRef.current = room;
+      registerMediaRoom("preflight", room);
+
+      // 3. Real capture starts only now — the room is fully connected, so
+      //    the publisher transport is stable when frames begin to flow.
+      enter("permission");
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480 },
+          audio: false,
+        });
+      } catch (err) {
         if (run !== runRef.current) return;
         fail(classifyCaptureError(err));
-      });
+        return;
+      }
+      if (run !== runRef.current) {
+        for (const t of stream.getTracks()) t.stop();
+        return;
+      }
+      // Video-only request — the first video track IS the camera track.
+      const track = stream.getVideoTracks()[0];
+      if (!track) {
+        fail({ status: "unavailable", message: "No usable camera was found." });
+        return;
+      }
+      trackRef.current = track;
+      setHasTrack(true);
+
+      // 4. Publish the SAME track the preview shows.
+      try {
+        await publishCameraTrack(room, track);
+      } catch (err) {
+        if (run !== runRef.current) return;
+        fail(classifyApiError(err));
+        return;
+      }
+      if (run !== runRef.current) return;
+      enter("verifying");
+      poll(1, preflight.preflightId);
+    })();
   }, [sessionId, teardown, fail, enter]);
 
   const start = useCallback(() => {

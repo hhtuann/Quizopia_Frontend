@@ -60,13 +60,6 @@ export async function connectPublisherRoom(
   return room;
 }
 
-/** Publish the (already live) camera track from the local participant. */
-export function publishCameraTrack(
-  room: Room,
-  track: MediaStreamTrack
-): Promise<LocalTrackPublication> {
-  return room.localParticipant.publishTrack(track, CAMERA_PUBLISH_OPTIONS);
-}
 
 /**
  * Attach a camera track to a preview `<video>` element. `null` detaches.
@@ -82,6 +75,18 @@ export function attachTrack(el: HTMLVideoElement, track: MediaStreamTrack | null
     typeof MediaStream === "function"
       ? new MediaStream([track])
       : (track as unknown as MediaStream);
+}
+
+/** Publish the (already live) camera track from the local participant. */
+export function publishCameraTrack(
+  room: Room,
+  track: MediaStreamTrack,
+  opts?: { name?: string }
+): Promise<LocalTrackPublication> {
+  return room.localParticipant.publishTrack(track, {
+    ...CAMERA_PUBLISH_OPTIONS,
+    name: opts?.name,
+  });
 }
 
 /** Disconnect a room (stops its local tracks by default). */
