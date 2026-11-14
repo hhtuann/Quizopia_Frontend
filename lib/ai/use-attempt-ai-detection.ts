@@ -331,14 +331,21 @@ export function useAttemptAiDetection(
       enter("loading");
       // e2e seam: the FAKE detector is consulted FIRST when set (labeled
       // SIMULATED); otherwise the real onnxruntime-web adapter loads.
-      const fake = getFakeDetector();
-      if (fake) {
+      const hasFakeNow = (): boolean => getFakeDetector() != null;
+      if (hasFakeNow()) {
         simulated = true;
         setState((prev) => ({ ...prev, simulated: true }));
         detector = {
           status: "running",
           runtime: null,
-          detect: (video) => Promise.resolve(fake(video)),
+          // Consult the registry on EVERY call: a fake injected after this
+          // detector was built (e2e mid-test injection) must take over on
+          // the next analyzed frame — and dropping back to the real adapter
+          // must work too (setFakeDetector(null)).
+          detect: (video) => {
+            const f = getFakeDetector();
+            return f ? Promise.resolve(f(video)) : Promise.resolve(null);
+          },
           release: async () => undefined,
         };
       } else {
@@ -357,8 +364,26 @@ export function useAttemptAiDetection(
 
       const video = feeder;
       const activeDetector = detector;
+      const detectFrame = (): Promise<DetectionFrame | null> => {
+        // A fake injected after the real detector loaded takes over
+        // immediately; clearing it resumes the REAL model (status stays
+        // honest — frames are labeled by their producer).
+        const f = getFakeDetector();
+        if (f) {
+          if (!simulated) {
+            simulated = true;
+            setState((prev) => ({ ...prev, simulated: true }));
+          }
+          return Promise.resolve(f(video));
+        }
+        if (simulated) {
+          simulated = false;
+          setState((prev) => ({ ...prev, simulated: false }));
+        }
+        return activeDetector.detect(video);
+      };
       scheduler = createDetectionScheduler({
-        detect: () => activeDetector.detect(video),
+        detect: detectFrame,
         onFrame: (frame) => {
           handleFrame(frame);
           publishAiDroppedFrames(scheduler?.droppedFrames ?? 0);
