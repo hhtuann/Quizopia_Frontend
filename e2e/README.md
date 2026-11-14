@@ -75,9 +75,12 @@ Additional environment on top of the P4-A contract:
   and `permissions: ["camera"]`. All published tracks are SIMULATED media —
   every evidence artifact/report must label them as such (issue #84
   acceptance distinguishes real vs simulated).
-- Ordering: A→B→C→D→E→F→G (workers=1). F keeps five publisher contexts
-  alive in `globalThis.__gridContexts` for G's recovery flow; G restarts the
-  `quizopia_livekit` container (requires a docker socket on the host).
+- Ordering: A→B→C→D→E→F→G (workers=1, same worker process for F+G). F closes
+  all five publisher contexts at its end (deterministic disconnects) and
+  records session/attempt/student credentials in `.smoke-camera-f.json`;
+  G re-opens its own publisher pages (itself the token-renewal recovery
+  path). G restarts the `quizopia_livekit` container (requires a docker
+  socket on the host).
 
 State files: `.smoke-camera-e.json` (E), `.smoke-camera-f.json` (F, consumed
 by G). Evidence: `evidence/E3-*`, `F1-*`, `G3-*`.

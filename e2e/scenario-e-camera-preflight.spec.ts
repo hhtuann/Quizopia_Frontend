@@ -96,17 +96,17 @@ test.describe("Scenario E — camera preflight & start gate", () => {
     await fs_writeAttemptE(attemptId, monitoredSessionId);
   });
 
-  test("E4 consumed lease cannot start another attempt", async () => {
-    // Attempt 1 was started in E3 with the only lease; a raw replay of a
-    // verify-then-start flow now must not mint a second attempt: maxAttempts=1
-    // and the lease is gone. Reuse of a stale lease → 409 family.
-    const pre = await apiJson<{ preflightId: string }>(
+  test("E4 preflight is blocked while the attempt is IN_PROGRESS", async () => {
+    // E3 started the attempt; a new preflight must be refused with the
+    // exact already-active contract (single-spend of the lease itself is
+    // covered by CameraPreflightServiceIntegrationTests).
+    const pre = await apiJson<{ code?: string }>(
       `/api/exam-sessions/${monitoredSessionId}/monitoring/preflights`,
       s.student.accessToken,
       { method: "POST", body: JSON.stringify({ schemaVersion: 1 }) }
     );
-    // An IN_PROGRESS attempt exists → the preflight path reports it.
-    expect([200, 409]).toContain(pre.status);
+    expect(pre.status).toBe(409);
+    expect(pre.body?.code).toBe("ATTEMPT_ALREADY_ACTIVE");
   });
 });
 

@@ -183,11 +183,32 @@ test.describe("Scenario F — camera grid", () => {
     expect(layersBefore).not.toBeNull();
     expect(Object.keys(layersBefore!).length).toBe(5);
     // livekit-client's publication.videoQuality is the numeric VideoQuality
-    // enum (OFF=0 / LOW=1 / MEDIUM=2 / HIGH=3). Before fullscreen every
-    // camera publication must be LOW or unset-auto (0) — none promoted.
-    for (const q of Object.values(layersBefore!)) {
-      expect(q).toBeLessThanOrEqual(1);
-    }
+    // enum (OFF=0 / LOW=1 / MEDIUM=2 / HIGH=3). The grid sets LOW on every
+    // camera publication; the application is asynchronous, so poll until
+    // every tile settles on LOW — none promoted above it.
+    await expect
+      .poll(
+        async () => {
+          const layers = await teacherPage.evaluate(() => {
+            const room = (window as unknown as { __quizopiaMedia?: { getRoom?: (s: string) => unknown } })
+              .__quizopiaMedia?.getRoom?.("teacher");
+            if (!room) return null;
+            const out: Record<string, number> = {};
+            for (const [identity, p] of (room as { remoteParticipants: Map<string, { trackPublications?: Map<string, { trackSid?: string; videoQuality?: number; source?: string }> }> })
+              .remoteParticipants) {
+              for (const pub of p.trackPublications?.values() ?? []) {
+                if ((pub as { source?: string }).source === "camera") {
+                  out[identity] = Number((pub as { videoQuality?: number }).videoQuality ?? 0);
+                }
+              }
+            }
+            return out;
+          });
+          return layers && Object.values(layers).every((q) => q === 1);
+        },
+        { timeout: 15_000 }
+      )
+      .toBe(true);
 
     // Fullscreen one tile → its layer becomes HIGH.
     const firstTile = tiles.first();
@@ -298,13 +319,18 @@ test.describe("Scenario G — camera recovery & reconciliation", () => {
     // event before the attempt exists); G1's rejoin emits CAMERA_RECONNECTED.
     const before = await timelineTypes(attemptId);
     expect(before).toContain("CAMERA_RECONNECTED");
+    const disconnectsBefore = before.filter((t) => t === "CAMERA_DISCONNECTED").length;
 
     await page.close();
     await ctx.close();
 
+    // Baseline delta (F's own teardown already emitted disconnects for the
+    // five publishers — this must catch G1's OWN close landing).
     await expect
       .poll(
-        async () => (await timelineTypes(attemptId)).filter((t) => t === "CAMERA_DISCONNECTED").length,
+        async () =>
+          (await timelineTypes(attemptId)).filter((t) => t === "CAMERA_DISCONNECTED").length -
+          disconnectsBefore,
         { timeout: 90_000, intervals: [5_000] }
       )
       .toBeGreaterThanOrEqual(1);
