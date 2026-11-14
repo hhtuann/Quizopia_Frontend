@@ -74,7 +74,7 @@ test("Scenario B — browser activity events recorded exactly once", async ({
   await page.getByRole("button", { name: /start the attempt/i }).click();
   await page.waitForURL(/\/attempts\/\d+/, { timeout: 30_000 });
   const attemptId = Number(page.url().match(/\/attempts\/(\d+)/)![1]);
-  await fs.writeFile("e2e/.smoke-attempt-b.json", JSON.stringify({ attemptId, sessionId }));
+  await fs.writeFile(`${__dirname}/.smoke-attempt-b.json`, JSON.stringify({ attemptId, sessionId }));
 
   // Let the attempt shell (and its telemetry listeners) fully mount before
   // driving events — dispatching earlier drops them (verified by probe).
@@ -94,7 +94,7 @@ test("Scenario B — browser activity events recorded exactly once", async ({
     document.dispatchEvent(new Event("visibilitychange"));
   });
   await page.waitForTimeout(800);
-  await page.screenshot({ path: "e2e/evidence/B-tab-return.png" });
+  await page.screenshot({ path: `${__dirname}/evidence/B-tab-return.png` });
 
   // --- WINDOW_FOCUS_LOST / GAINED via real window events ---
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));
@@ -120,7 +120,7 @@ test("Scenario B — browser activity events recorded exactly once", async ({
   await page.reload();
   await page.waitForURL(/\/attempts\/\d+/);
   await page.getByRole("radio", { name: /Paris/i }).waitFor({ timeout: 30_000 });
-  await page.screenshot({ path: "e2e/evidence/B-after-reload.png", fullPage: true });
+  await page.screenshot({ path: `${__dirname}/evidence/B-after-reload.png`, fullPage: true });
 
   // Telemetry flushes in batches (≤3s timer) — wait generously, then verify.
   await page.waitForTimeout(6_000);

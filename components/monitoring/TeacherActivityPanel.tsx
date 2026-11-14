@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils/cn";
  *
  * The roster provides display identity; attempt ids come from the
  * session-attempts listing (ALL statuses — including IN_PROGRESS, which the
- * graded best-results report misses). Members without attempts render as
- * disabled options. Live updates arrive as
+ * graded best-results report misses). The listing refreshes on
+ * ATTEMPT_STARTED (LiveMonitor) and on reconnect. Live updates arrive as
  * ATTEMPT_ACTIVITY envelopes on the session topic (wired by the parent via
  * LiveMonitor's `onAttemptActivity`) → timeline query invalidation → REST
  * refetch (source of truth).
@@ -41,7 +41,7 @@ export function TeacherActivityPanel({
       const suffix =
         attempt.status === "IN_PROGRESS" ? "live" : attempt.status.toLowerCase();
       return {
-        attemptId: attempt.attemptId as number | null,
+        attemptId: attempt.attemptId,
         label: `${name} — attempt ${attempt.attemptNumber} (${suffix})`,
       };
     });
@@ -78,18 +78,14 @@ export function TeacherActivityPanel({
       >
         <option value="">Select a participant…</option>
         {options.map((option) => (
-          <option
-            key={option.attemptId}
-            value={option.attemptId ?? ""}
-            disabled={option.attemptId == null}
-          >
+          <option key={option.attemptId} value={option.attemptId}>
             {option.label}
           </option>
         ))}
       </select>
       {!hasOptions && (
         <p className="mt-2 text-xs text-[#64748B]">
-          No participants yet — the roster fills as students join the session.
+          No attempts yet — entries appear as participants start attempts.
         </p>
       )}
 

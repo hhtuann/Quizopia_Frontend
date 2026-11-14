@@ -97,6 +97,11 @@ export function LiveMonitor({
       void queryClient.invalidateQueries({
         queryKey: ["exam-sessions", sessionId, "roster"],
       });
+      // P4-A4 review: the Activity-panel picker's attempts list must see
+      // attempts that start while the teacher is already watching.
+      void queryClient.invalidateQueries({
+        queryKey: ["exam-sessions", sessionId, "attempts"],
+      });
     },
     onAttemptActivity
   );

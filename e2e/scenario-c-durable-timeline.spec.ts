@@ -49,7 +49,7 @@ test.describe("Scenario C — durable timeline", () => {
     await expect(page.getByText("Tab hidden")).toBeVisible();
     await expect(page.getByText("Client observation").first()).toBeVisible();
     await expect(page.getByText("Server-confirmed").first()).toBeVisible();
-    await page.screenshot({ path: "e2e/evidence/C1-timeline.png", fullPage: true });
+    await page.screenshot({ path: `${__dirname}/evidence/C1-timeline.png`, fullPage: true });
   });
 
   test("C2 timeline survives reload", async ({ page }) => {
@@ -62,7 +62,7 @@ test.describe("Scenario C — durable timeline", () => {
     await pickStudentAttempt(page);
     await expect(page.getByText("Tab hidden")).toBeVisible();
     await expect(page.getByText("Answer accepted").first()).toBeVisible();
-    await page.screenshot({ path: "e2e/evidence/C2-after-reload.png", fullPage: true });
+    await page.screenshot({ path: `${__dirname}/evidence/C2-after-reload.png`, fullPage: true });
   });
 
   test("C3 source filter narrows the timeline", async ({ page }) => {
@@ -73,7 +73,7 @@ test.describe("Scenario C — durable timeline", () => {
     await page.getByRole("group", { name: "Filter by source" }).getByRole("button", { name: "Server" }).click();
     await expect(page.getByText("Tab hidden")).toHaveCount(0);
     await expect(page.getByText("Attempt started")).toBeVisible({ timeout: 15_000 });
-    await page.screenshot({ path: "e2e/evidence/C3-filter.png", fullPage: true });
+    await page.screenshot({ path: `${__dirname}/evidence/C3-filter.png`, fullPage: true });
   });
 
   test("C4 realtime: student action appears without teacher reload", async ({ page, browser }) => {
@@ -99,21 +99,22 @@ test.describe("Scenario C — durable timeline", () => {
     await expect(page.getByText("Client observation")).toHaveCount(observationsBefore + 1, {
       timeout: 30_000,
     });
-    await page.screenshot({ path: "e2e/evidence/C4-realtime.png", fullPage: true });
+    await page.screenshot({ path: `${__dirname}/evidence/C4-realtime.png`, fullPage: true });
     await studentCtx.close();
   });
 
-  test("C5 unauthorized student cannot read the timeline (IDOR)", async ({ request }) => {
-    const denied = await request.get(`http://localhost:8080/api/attempts/${attemptId()}/timeline`, {
-      headers: { Authorization: `Bearer ${s.stranger.accessToken}` },
-    });
-    expect(denied.status()).toBe(403);
-
-    const deniedHistory = await request.get(
-      `http://localhost:8080/api/attempts/${attemptId()}/answer-history`,
-      { headers: { Authorization: `Bearer ${s.stranger.accessToken}` } }
+  test("C5 unauthorized student cannot read the timeline (IDOR)", async () => {
+    const denied = await apiJson(
+      `/api/attempts/${attemptId()}/timeline`,
+      s.stranger.accessToken
     );
-    expect(deniedHistory.status()).toBe(403);
+    expect(denied.status).toBe(403);
+
+    const deniedHistory = await apiJson(
+      `/api/attempts/${attemptId()}/answer-history`,
+      s.stranger.accessToken
+    );
+    expect(deniedHistory.status).toBe(403);
 
     // Owner still reads fine (control).
     const owner = await apiJson<Timeline>(

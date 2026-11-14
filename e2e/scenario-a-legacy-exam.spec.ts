@@ -50,7 +50,7 @@ test.describe("Scenario A — legacy exam", () => {
     await page.getByRole("button", { name: "Create session" }).click();
     // The create flow returns to the exam's Sessions tab.
     await page.waitForURL(/tab=sessions/, { timeout: 30_000 });
-    await page.screenshot({ path: "e2e/evidence/A1-session-created.png", fullPage: true });
+    await page.screenshot({ path: `${__dirname}/evidence/A1-session-created.png`, fullPage: true });
 
     // Resolve the created session id by its unique title (the redirect does
     // not carry it).
@@ -98,7 +98,7 @@ test.describe("Scenario A — legacy exam", () => {
     await expect(page.getByRole("status").filter({ hasText: "Saved" })).toBeVisible({
       timeout: 20_000,
     });
-    await page.screenshot({ path: "e2e/evidence/A3-answer-saved.png", fullPage: true });
+    await page.screenshot({ path: `${__dirname}/evidence/A3-answer-saved.png`, fullPage: true });
 
     // Verify server-accepted sequence via the answer-history API.
     const hist1 = await apiJson<AnswerHistory>(
@@ -126,7 +126,7 @@ test.describe("Scenario A — legacy exam", () => {
       s.student.accessToken
     );
     expect(hist2.body?.totalCount).toBe(3); // Q1 v1, Q1 v2, Q2 v1
-    await fs.writeFile("e2e/.smoke-attempt-a.json", JSON.stringify({ attemptId, sessionId }));
+    await fs.writeFile(`${__dirname}/.smoke-attempt-a.json`, JSON.stringify({ attemptId, sessionId }));
   });
 
   test("A4 student submits and grading is correct", async ({ page }) => {
@@ -138,7 +138,7 @@ test.describe("Scenario A — legacy exam", () => {
     await page.getByRole("button", { name: "Submit attempt" }).click();
     await page.getByRole("button", { name: "Confirm submit" }).click();
     await page.waitForURL(/\/result/, { timeout: 30_000 });
-    await page.screenshot({ path: "e2e/evidence/A4-result.png", fullPage: true });
+    await page.screenshot({ path: `${__dirname}/evidence/A4-result.png`, fullPage: true });
 
     // Grading: Q1 was answered 4 then CHANGED to 3 (wrong), Q2 Paris (right)
     // → final score 1 of 2. Correctness preserved with history writes active.

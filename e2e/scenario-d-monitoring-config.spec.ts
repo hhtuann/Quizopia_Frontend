@@ -77,7 +77,7 @@ test.describe("Scenario D — monitoring configuration", () => {
     await expect(clips).toBeDisabled();
     await recording.check();
     await expect(clips).toBeEnabled();
-    await page.screenshot({ path: "e2e/evidence/D1-monitoring-config.png", fullPage: true });
+    await page.screenshot({ path: `${__dirname}/evidence/D1-monitoring-config.png`, fullPage: true });
 
     await page.getByRole("button", { name: "Create session" }).click();
     // The create flow returns to the exam's Sessions tab; resolve the id by title.
@@ -170,7 +170,7 @@ test.describe("Scenario D — monitoring configuration", () => {
     await expect(page.getByText("Camera required — monitored session")).toBeVisible();
     const start = page.getByRole("button", { name: /start the attempt/i });
     await expect(start).toBeDisabled();
-    await page.screenshot({ path: "e2e/evidence/D5-student-notice.png", fullPage: true });
+    await page.screenshot({ path: `${__dirname}/evidence/D5-student-notice.png`, fullPage: true });
 
     // Backend backstop: direct start → the defined fail-closed error, no attempt.
     const denied = await apiJson<ApiError>(
