@@ -17,6 +17,7 @@ import {
 import { cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { ParticipantModeration } from "./ParticipantModeration";
+import { AiAlertFeed, isAiAlertActivity } from "./AiAlertFeed";
 
 const EVENT_LABEL: Record<string, string> = {
   SESSION_OPENED: "Session opened",
@@ -85,6 +86,10 @@ export function LiveMonitor({
       void queryClient.invalidateQueries({
         queryKey: ["exam-sessions", sessionId, "participants"],
       });
+      // P4-C: alert backfill — anything missed while the socket was down.
+      void queryClient.invalidateQueries({
+        queryKey: ["exam-sessions", sessionId, "ai-alerts"],
+      });
       // P4-A4: caller backfills the selected attempt's timeline (missed
       // events while the socket was down — REST is the source of truth).
       onReconnectRef.current?.();
@@ -103,7 +108,15 @@ export function LiveMonitor({
         queryKey: ["exam-sessions", sessionId, "attempts"],
       });
     },
-    onAttemptActivity
+    (ev) => {
+      // P4-C: AI_ALERT_* pings → refetch the alert feed (REST = truth).
+      if (isAiAlertActivity(ev)) {
+        void queryClient.invalidateQueries({
+          queryKey: ["exam-sessions", sessionId, "ai-alerts"],
+        });
+      }
+      onAttemptActivity?.(ev);
+    }
   );
 
   // User-based identity index (issue #4 P0-R4): primary lookup by userId;
@@ -143,6 +156,8 @@ export function LiveMonitor({
       <EventFeed events={recentEvents} participants={participants} />
       <ParticipantModeration sessionId={sessionId} roster={rosterData ?? []}
         editable={["DRAFT", "SCHEDULED", "OPEN"].includes(metrics.sessionStatus)} />
+      {/* P4-C: AI alert feed — same card area, REST-backed + ping-invalidated. */}
+      <AiAlertFeed sessionId={sessionId} />
     </div>
   );
 }
