@@ -179,7 +179,8 @@ test.describe("Scenario D — monitoring configuration", () => {
       { method: "POST", body: JSON.stringify({}) }
     );
     expect(denied.status).toBe(409);
-    expect(denied.body?.code).toBe("ATTEMPT_MONITORING_START_UNAVAILABLE");
+    // P4-B (#85): the P4-A placeholder was replaced by the preflight gate.
+    expect(denied.body?.code).toBe("MONITORING_PREFLIGHT_REQUIRED");
 
     const attempts = await apiJson<{ items?: unknown[] }>(
       "/api/attempts/my?page=0&size=50",
