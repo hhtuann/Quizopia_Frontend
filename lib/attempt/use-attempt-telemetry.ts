@@ -7,7 +7,12 @@ import {
   markAttemptVisited,
   type AttemptTelemetry,
 } from "./telemetry";
-import type { ClientActivityEventType } from "@/lib/api/monitoring";
+import type {
+  ActivityEventInput,
+  ClientActivityEventType,
+  IngestActivityEventsResponse,
+} from "@/lib/api/monitoring";
+import { useAuthStore } from "@/lib/auth/store";
 import type { WsStatus } from "@/lib/realtime/use-stomp-connection";
 import type { AutosaveStatus } from "./use-autosave";
 
@@ -31,6 +36,31 @@ import type { AutosaveStatus } from "./use-autosave";
  * QUESTION_NAVIGATED is triggered by the caller (AttemptShell's navigator)
  * via the returned `track` — navigation is not observable from the store.
  */
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+const HIDE_BATCH_SIZE = 25;
+
+/** Synchronous pagehide sender: fetch keepalive, ≤25-event batches, Bearer auth. */
+function sendTelemetryKeepalive(
+  attemptId: number,
+  events: ActivityEventInput[]
+): Promise<IngestActivityEventsResponse> {
+  const token = useAuthStore.getState().accessToken;
+  for (let i = 0; i < events.length; i += HIDE_BATCH_SIZE) {
+    void fetch(`${API_BASE_URL}/api/attempts/${attemptId}/activity-events`, {
+      method: "POST",
+      keepalive: true,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ events: events.slice(i, i + HIDE_BATCH_SIZE) }),
+    }).catch(() => {
+      // Best-effort by contract (#81): an unload-time failure is dropped.
+    });
+  }
+  return Promise.resolve({ acceptedCount: events.length, duplicateCount: 0, results: [] });
+}
+
 export function useAttemptTelemetry(
   attemptId: number,
   clientInstanceId: string,
@@ -55,7 +85,13 @@ export function useAttemptTelemetry(
   }, []);
 
   useEffect(() => {
-    const telemetry = createAttemptTelemetry(attemptId, { clientInstanceId });
+    const telemetry = createAttemptTelemetry(attemptId, {
+      clientInstanceId,
+      // Unload-safe final drain (#81 reload semantics): a reload tears down
+      // JS before unmount effects run — fetch keepalive carries the last
+      // <flushInterval window to the server without blocking the unload.
+      sendOnHide: sendTelemetryKeepalive,
+    });
     telemetryRef.current = telemetry;
 
     if (markAttemptVisited(attemptId)) {

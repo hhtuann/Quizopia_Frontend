@@ -8,6 +8,7 @@ import {
 import {
   getAnswerHistory,
   getAttemptTimeline,
+  getSessionAttempts,
   type AttemptTimelineParams,
 } from "@/lib/api/monitoring";
 import {
@@ -70,6 +71,15 @@ export function useAnswerHistoryQuery(
   return useQuery({
     queryKey: ["attempts", attemptId, "answer-history", attemptQuestionId ?? null],
     queryFn: () => getAnswerHistory(attemptId, attemptQuestionId),
+    enabled,
+  });
+}
+
+/** All attempts of a session incl. IN_PROGRESS — teacher Activity picker. */
+export function useSessionAttemptsQuery(sessionId: number, enabled = true) {
+  return useQuery({
+    queryKey: ["exam-sessions", sessionId, "attempts"],
+    queryFn: () => getSessionAttempts(sessionId),
     enabled,
   });
 }

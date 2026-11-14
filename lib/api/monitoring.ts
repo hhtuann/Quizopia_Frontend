@@ -224,3 +224,25 @@ export function getAnswerHistory(
     { params }
   );
 }
+
+/** Backend record `SessionAttemptsResponse.Item`. */
+export interface SessionAttemptItem {
+  attemptId: number;
+  userId: number;
+  attemptNumber: number;
+  status: string;
+  startedAt: string;
+  deadlineAt: string;
+  submittedAt: string | null;
+}
+
+/**
+ * `GET /api/exam-sessions/{sessionId}/attempts` (P4-A4 #83): every attempt of
+ * the session INCLUDING in-progress ones — the teacher Activity-panel picker
+ * source (the graded best-results report misses live attempts).
+ */
+export function getSessionAttempts(
+  sessionId: number
+): Promise<{ sessionId: number; attempts: SessionAttemptItem[] }> {
+  return http.get(`/api/exam-sessions/${sessionId}/attempts`);
+}

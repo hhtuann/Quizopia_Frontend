@@ -83,6 +83,13 @@ export interface TelemetryOptions {
   clientInstanceId?: string;
   /** Injectable for tests; defaults to the real ingest endpoint. */
   send?: TelemetrySendFn;
+  /**
+   * Synchronous unload-safe sender (fetch keepalive / equivalent), used ONLY
+   * by the pagehide final drain — a reload tears down JS before React
+   * unmount effects run, so the ordinary drain silently drops events queued
+   * since the last interval flush (#81 reload semantics).
+   */
+  sendOnHide?: TelemetrySendFn;
   maxQueue?: number;
   flushThreshold?: number;
   flushIntervalMs?: number;
@@ -112,6 +119,8 @@ class AttemptTelemetryImpl implements AttemptTelemetry {
   private queue: ActivityEventInput[] = [];
   private nextSequence = 0;
   private flushing = false;
+  private sendOnHide: TelemetrySendFn | null = null;
+  private onHide: () => void = () => {};
   /** Module-scope lifecycle flag — public so the singleton factory can check it. */
   disposed = false;
   private stats: TelemetryStats = {
@@ -135,6 +144,24 @@ class AttemptTelemetryImpl implements AttemptTelemetry {
       typeof setInterval === "function"
         ? setInterval(() => this.flush(), intervalMs)
         : null;
+    // Reload/close tear down JS without running React unmount effects —
+    // drain queued events SYNCHRONOUSLY on pagehide via the unload-safe
+    // sender so the final <flushInterval window is not lost.
+    this.onHide = () => {
+      if (this.disposed || this.queue.length === 0) return;
+      const pending = this.queue;
+      this.queue = [];
+      try {
+        this.sendOnHide?.(this.attemptId, pending);
+        this.stats.sent += pending.length;
+      } catch {
+        this.stats.dropped += pending.length;
+      }
+    };
+    if (typeof window !== "undefined" && options.sendOnHide) {
+      this.sendOnHide = options.sendOnHide;
+      window.addEventListener("pagehide", this.onHide);
+    }
   }
 
   track(
@@ -207,6 +234,9 @@ class AttemptTelemetryImpl implements AttemptTelemetry {
     this.disposed = true;
     if (this.timer != null && typeof clearInterval === "function") {
       clearInterval(this.timer);
+    }
+    if (typeof window !== "undefined") {
+      window.removeEventListener("pagehide", this.onHide);
     }
     // Best-effort final drain — still fire-and-forget (never blocks unmount).
     if (this.queue.length > 0 && typeof setTimeout === "function") {

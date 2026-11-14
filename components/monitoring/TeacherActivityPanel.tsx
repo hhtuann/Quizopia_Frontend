@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useSessionRosterQuery } from "@/hooks/queries/use-exam-sessions";
-import { useAllSessionResultsQuery } from "@/hooks/queries/use-teacher-reporting";
+import { useSessionAttemptsQuery } from "@/hooks/queries/use-monitoring";
 import { AttemptTimeline } from "./AttemptTimeline";
 import { cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
@@ -11,9 +11,10 @@ import { cn } from "@/lib/utils/cn";
  * Teacher "Activity" panel for the session detail page (P4-A4): pick a
  * participant's attempt from the roster, then read its durable timeline.
  *
- * The roster provides display identity (contract); each member's best
- * attempt id comes from the session results (BEST-per-student). Members
- * without attempts render as disabled options. Live updates arrive as
+ * The roster provides display identity; attempt ids come from the
+ * session-attempts listing (ALL statuses — including IN_PROGRESS, which the
+ * graded best-results report misses). Members without attempts render as
+ * disabled options. Live updates arrive as
  * ATTEMPT_ACTIVITY envelopes on the session topic (wired by the parent via
  * LiveMonitor's `onAttemptActivity`) → timeline query invalidation → REST
  * refetch (source of truth).
@@ -28,35 +29,23 @@ export function TeacherActivityPanel({
   onSelectAttempt: (attemptId: number | null) => void;
 }) {
   const { data: roster } = useSessionRosterQuery(sessionId, true);
-  const results = useAllSessionResultsQuery(sessionId);
-
-  const bestAttemptByUser = useMemo(() => {
-    const map = new Map<number, { attemptId: number; attemptCount: number }>();
-    for (const item of results.data ?? []) {
-      if (item.bestAttemptId != null) {
-        map.set(item.studentId, {
-          attemptId: item.bestAttemptId,
-          attemptCount: item.attemptCount,
-        });
-      }
-    }
-    return map;
-  }, [results.data]);
+  const attemptsQuery = useSessionAttemptsQuery(sessionId, true);
 
   const options = useMemo(() => {
-    const members = (roster ?? [])
-      .slice()
-      .sort((a, b) => a.displayName.localeCompare(b.displayName));
-    return members.map((member) => {
-      const best = bestAttemptByUser.get(member.userId);
+    const nameByUser = new Map(
+      (roster ?? []).map((m) => [m.userId, m] as const)
+    );
+    return (attemptsQuery.data?.attempts ?? []).map((attempt) => {
+      const member = nameByUser.get(attempt.userId);
+      const name = member?.displayName ?? `User ${attempt.userId}`;
+      const suffix =
+        attempt.status === "IN_PROGRESS" ? "live" : attempt.status.toLowerCase();
       return {
-        attemptId: best?.attemptId ?? null,
-        label: best
-          ? `${member.studentCode ? `${member.studentCode} · ` : ""}${member.displayName} — best of ${best.attemptCount}`
-          : `${member.studentCode ? `${member.studentCode} · ` : ""}${member.displayName} — no attempt yet`,
+        attemptId: attempt.attemptId as number | null,
+        label: `${name} — attempt ${attempt.attemptNumber} (${suffix})`,
       };
     });
-  }, [roster, bestAttemptByUser]);
+  }, [roster, attemptsQuery.data]);
 
   const hasOptions = options.length > 0;
 
@@ -88,9 +77,9 @@ export function TeacherActivityPanel({
         className="h-12 w-full max-w-md rounded-lg border border-[#E2E8F0] bg-white px-4 pr-9 text-sm font-medium text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2"
       >
         <option value="">Select a participant…</option>
-        {options.map((option, index) => (
+        {options.map((option) => (
           <option
-            key={`${roster?.[index]?.userId ?? index}`}
+            key={option.attemptId}
             value={option.attemptId ?? ""}
             disabled={option.attemptId == null}
           >
