@@ -62,19 +62,6 @@ test.describe("Scenario H — AI detections (SIMULATED detector)", () => {
     simulated: true,
   };
 
-  async function injectFake(page: Page, frame: object | null): Promise<void> {
-    await page.evaluate((f) => {
-      const hooks = (window as unknown as {
-        __quizopiaAi?: { setFakeDetector: (fn: unknown) => void };
-      }).__quizopiaAi;
-      hooks?.setFakeDetector(
-        f === null
-          ? null
-          : () => ({ ...(f as { capturedAt?: number }), capturedAt: Date.now() })
-      );
-    }, frame);
-  }
-
   test.beforeAll(async () => {
     // Fresh monitored session.
     const res = await apiJson<{ id: number }>(`/api/exams/${s.examId}/sessions`, s.teacher.accessToken, {

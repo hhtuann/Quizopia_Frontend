@@ -63,6 +63,8 @@ export interface AttemptAiState {
 
 /** Batch bound per request (CONTRACT §3.1). */
 const MAX_BATCH = 8;
+/** Backend contract: at most 8 boxes per event payload. */
+const MAX_PAYLOAD_BOXES = 8;;
 /** Coalescing window before a partial batch is sent. */
 const FLUSH_INTERVAL_MS = 2_000;
 /** Poll cadence while waiting for the camera publish. */
@@ -139,7 +141,9 @@ function newEventId(sequence: number): string {
 
 /** DetectionBox → wire payload box (tuple copy, no shared references). */
 function toPayloadBoxes(boxes: DetectionBox[]): AiDetectionPayloadBox[] {
-  return boxes.map((b) => ({
+  // Backend rejects >8 boxes per event (400) — cap here so a freak frame
+  // (e.g. 9 person boxes) can never 400-loop the batch pipeline.
+  return boxes.slice(0, MAX_PAYLOAD_BOXES).map((b) => ({
     classId: b.classId,
     label: b.label,
     confidence: b.confidence,
