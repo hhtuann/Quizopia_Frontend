@@ -26,6 +26,13 @@ async function login(email: string, password: string): Promise<string> {
   return body.accessToken;
 }
 
+interface MediaTokenPayload {
+  mediaToken: string;
+  wsUrl: string;
+  mediaIdentity: string;
+  mediaTokenExpiresAt: string;
+}
+
 async function api(path: string, token: string, init: RequestInit = {}) {
   const r = await fetch(API + path, {
     ...init,
@@ -48,7 +55,7 @@ const renew = await api(`/api/attempts/${cam.attemptIds[4]}/monitoring/media-tok
   body: JSON.stringify({ schemaVersion: 1 }),
 });
 console.log("renewal:", renew.status);
-const media = renew.body;
+const media = renew.body as MediaTokenPayload;
 
 const browser = await chromium.launch({
   args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"],
@@ -70,7 +77,7 @@ await page.setContent(
 );
 const result = await page.evaluate(async (media) => {
   const { Room, RoomEvent, Track } = await import("livekit-client");
-  const room = new Room({ rtcConfig: { iceTransportPolicy: "relay" } });
+  const room = new Room({ rtcConfig: { iceTransportPolicy: "relay" } } as Partial<typeof Room extends new (o: infer O) => unknown ? O : never>);
   const connected = new Promise<boolean>((res) => {
     room.once(RoomEvent.Connected, () => res(true));
     setTimeout(() => res(false), 30_000);
@@ -100,7 +107,7 @@ const result = await page.evaluate(async (media) => {
   }
   room.disconnect();
   return { connected: ok, published, relayCandidates, relayAddrs, identity: media.mediaIdentity };
-}, media as never);
+}, media satisfies MediaTokenPayload);
 console.log("TURN-RELAY-RESULT", JSON.stringify(result));
 
 // 2) Residual exposure: mint a token for grid-student-3's active binding
@@ -112,7 +119,7 @@ const renew3 = await api(`/api/attempts/${attemptId3}/monitoring/media-token`, s
   body: JSON.stringify({ schemaVersion: 1 }),
 });
 console.log("renewal-3:", renew3.status);
-const token2 = renew3.body as { mediaToken: string; wsUrl: string; mediaIdentity: string; mediaTokenExpiresAt: string };
+const token2 = renew3.body as MediaTokenPayload;
 const status = await api(`/api/exam-sessions/${cam.sessionId}/monitoring/camera-status`, teacherToken);
 const victim = (status.body.participants ?? []).find(
   (p: { mediaIdentity: string }) => p.mediaIdentity === token2.mediaIdentity
@@ -138,7 +145,7 @@ if (victim) {
     }
     room.disconnect();
     return ok;
-  }, token2 as never);
+  }, token2 satisfies MediaTokenPayload);
   console.log("REVOKED-TOKEN-REJOIN", rejoin ? "ADMITTED (residual window open until TTL expiry)" : "REJECTED");
   console.log("token-expires-at", token2.mediaTokenExpiresAt);
   // Renewal after revocation must be denied immediately (app layer).
