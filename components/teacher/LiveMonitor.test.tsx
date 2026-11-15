@@ -63,6 +63,14 @@ vi.mock("./AiAlertFeed", () => ({
     ev.activityType != null && ev.activityType.startsWith("AI_ALERT_"),
 }));
 
+vi.mock("./EvidenceSection", () => ({
+  EvidenceSection: () => null,
+  isEvidenceActivity: (ev: { activityType?: string | null }) =>
+    ev.activityType != null &&
+    (ev.activityType.startsWith("EVIDENCE_") ||
+      ev.activityType.startsWith("RECORDING_")),
+}));
+
 beforeEach(() => {
   invalidateQueries.mockReset();
 });
@@ -109,10 +117,62 @@ describe("LiveMonitor reconnect forwarding (FE-3)", () => {
   });
 });
 
+describe("LiveMonitor evidence invalidation (P4-D)", () => {
+  function envelope(activityType: string | null): RealtimeEventEnvelope {
+    return {
+      eventId: "e",
+      eventType: "ATTEMPT_ACTIVITY",
+      occurredAt: "2026-11-15T08:00:00Z",
+      serverTime: "2026-11-15T08:00:00Z",
+      activityType,
+    } as RealtimeEventEnvelope;
+  }
+
+  it("EVIDENCE_ / RECORDING_ pings invalidate the evidence + recordings keys", () => {
+    render(
+      <LiveMonitor
+        sessionId={5}
+        initial={{
+          activeCount: 0,
+          startedCount: 0,
+          submittedCount: 0,
+          sessionStatus: "OPEN",
+        }}
+      />
+    );
+
+    callbacks.attemptActivity!(envelope("EVIDENCE_CLIP_READY"));
+    callbacks.attemptActivity!(envelope("RECORDING_STARTED"));
+
+    expect(countFor(["exam-sessions", 5, "evidence"])).toBe(2);
+    expect(countFor(["exam-sessions", 5, "recordings"])).toBe(2);
+  });
+
+  it("other activity pings leave the evidence keys alone", () => {
+    render(
+      <LiveMonitor
+        sessionId={5}
+        initial={{
+          activeCount: 0,
+          startedCount: 0,
+          submittedCount: 0,
+          sessionStatus: "OPEN",
+        }}
+      />
+    );
+
+    callbacks.attemptActivity!(envelope("CAMERA_CONNECTED"));
+    expect(onceFor(["exam-sessions", 5, "evidence"])).toBe(false);
+    expect(onceFor(["exam-sessions", 5, "recordings"])).toBe(false);
+  });
+});
+
+function countFor(key: unknown[]): number {
+  return invalidateQueries.mock.calls.filter(
+    (call) => JSON.stringify(call[0]?.queryKey) === JSON.stringify(key)
+  ).length;
+}
+
 function onceFor(key: unknown[]): boolean {
-  return (
-    invalidateQueries.mock.calls.filter((call) =>
-      JSON.stringify(call[0]?.queryKey) === JSON.stringify(key)
-    ).length === 1
-  );
+  return countFor(key) === 1;
 }

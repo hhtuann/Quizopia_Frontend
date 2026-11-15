@@ -12,7 +12,8 @@ import type {
  *     assigned class;
  *   - every advanced flag requires monitoringEnabled;
  *   - evidenceSnapshots additionally requires aiDetectionEnabled;
- *   - evidenceClips additionally requires fullRecordingEnabled;
+ *   - evidenceClips requires only monitoringEnabled (P4-D: clips can ride
+ *     the rolling buffer, not just full recording);
  *   - fullRecording is OFF by default (D4);
  *   - retention is fixed (30 / 90 days) — not teacher-configurable in P4-A.
  */
@@ -54,9 +55,10 @@ export function monitoringConfigFromPolicy(
 
 /**
  * Cascade-normalize a config so it always satisfies the prerequisite chain:
- * monitoring OFF → everything OFF; AI OFF → snapshots OFF; recording OFF →
- * clips OFF. Applied on every change so a saved payload can never hit
- * 400 EXAM_SESSION_MONITORING_INVALID through the form.
+ * monitoring OFF → everything OFF; AI OFF → snapshots OFF. Clips (P4-D) ride
+ * the rolling buffer and no longer require full recording. Applied on every
+ * change so a saved payload can never hit 400 EXAM_SESSION_MONITORING_INVALID
+ * through the form.
  */
 export function normalizeMonitoringConfig(
   config: MonitoringConfigState
@@ -69,8 +71,7 @@ export function normalizeMonitoringConfig(
     evidenceSnapshotsEnabled:
       config.evidenceSnapshotsEnabled && config.aiDetectionEnabled,
     fullRecordingEnabled: config.fullRecordingEnabled,
-    evidenceClipsEnabled:
-      config.evidenceClipsEnabled && config.fullRecordingEnabled,
+    evidenceClipsEnabled: config.evidenceClipsEnabled,
   };
 }
 
@@ -115,7 +116,9 @@ export type MonitoringFlagId =
 /**
  * Per-flag availability given the CURRENT config: a flag is disabled when its
  * prerequisite is off (AI/activity → monitoring; snapshots → AI; clips →
- * recording). Returns the prerequisite flag id for the disabled explanation.
+ * monitoring — P4-D lets clips ride the rolling buffer, so full recording is
+ * NO longer a prerequisite). Returns the prerequisite flag id for the
+ * disabled explanation.
  */
 export function monitoringFlagAvailability(
   config: MonitoringConfigState
@@ -142,8 +145,8 @@ export function monitoringFlagAvailability(
       prerequisite: "monitoringEnabled",
     },
     evidenceClipsEnabled: {
-      disabled: !config.monitoringEnabled || !config.fullRecordingEnabled,
-      prerequisite: "fullRecordingEnabled",
+      disabled: !config.monitoringEnabled,
+      prerequisite: "monitoringEnabled",
     },
   };
 }
