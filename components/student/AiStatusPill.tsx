@@ -80,6 +80,16 @@ export function AiStatusPill({ state }: { state: AttemptAiState }) {
       <span className={cn("mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle", dot)} />
       {label}
       {state.simulated ? " [SIMULATED]" : ""}
+      {" · "}
+      <a
+        href="https://github.com/hhtuann/Quizopia_Frontend/blob/main/SOURCE-AVAILABILITY.md"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-2"
+        aria-label="Mã nguồn và giấy phép AGPL-3.0 của Quizopia"
+      >
+        Mã nguồn
+      </a>
     </span>
   );
 }

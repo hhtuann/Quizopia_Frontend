@@ -20,3 +20,5 @@ recorded separately in `docs/phase4/AI_MODEL_AUDIT.md` §"Real audit results".
 
 Detections from this model are **observations for teacher review only** — no
 automatic cheating verdict, no score impact (ADR-008).
+
+AGPL-3.0 license text: [../../LICENSE](../../LICENSE); application source offer: [../../SOURCE-AVAILABILITY.md](../../SOURCE-AVAILABILITY.md). The model's fine-tuning recipe/dataset provenance must be inventoried before claiming reproducible training; do not publish private datasets or identities.
