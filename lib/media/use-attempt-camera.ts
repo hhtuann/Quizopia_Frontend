@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { NormalizedApiError } from "@/lib/api";
 import { renewAttemptMediaToken } from "@/lib/api/media";
 import { setActivePublisherRoom, takeActivePublisherRoom } from "./active-room";
+import { setPublishedCameraTrack } from "./published-track";
 import { registerMediaRoom } from "./test-hooks";
 import {
   connectPublisherRoom,
@@ -135,8 +136,13 @@ export function useAttemptCamera(attemptId: number): AttemptCameraState {
           return;
         }
         await publishCameraTrack(room, track);
+        // P4-C: expose the published track to the AI feeder (it never
+        // owns/stops it — camera lifecycle stays entirely here).
+        setPublishedCameraTrack(track);
         if (!mountedRef.current) {
           void disconnectRoom(room).catch(() => undefined);
+          track.stop();
+          setPublishedCameraTrack(null);
           return;
         }
         // Adopt the new room (the old one, if any, is already dead).
@@ -157,6 +163,7 @@ export function useAttemptCamera(attemptId: number): AttemptCameraState {
             forgetRoom(roomRef.current);
             roomRef.current = null;
           }
+          setPublishedCameraTrack(null);
           registerMediaRoom("attempt", null);
           enter(terminal);
           return;
@@ -232,6 +239,7 @@ export function useAttemptCamera(attemptId: number): AttemptCameraState {
         return;
       }
       track?.stop();
+      setPublishedCameraTrack(null);
       forgetRoom(room);
     };
   }, [attemptId]);

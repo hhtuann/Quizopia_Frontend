@@ -14,6 +14,10 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Local GitNexus CLI tooling (git-ignored; never present in CI).
     ".gitnexus/**",
+    // P4-C: vendored ONNX Runtime wasm loader (copied artifact, not source).
+    "public/ort/**",
+    // P4-C: AI model artifacts (binary + card; never linted).
+    "public/models/**",
   ]),
 ]);
 

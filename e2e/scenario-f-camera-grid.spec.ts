@@ -93,7 +93,25 @@ test.describe("Scenario F — camera grid", () => {
     for (const stu of students) {
       // Synthetic camera comes from the shared launch flags; per-context
       // camera permission keeps the grant explicit.
+      // AI isolation: the P4-C hook would load the REAL model on every
+      // publisher page (5 × WASM inference starves WebRTC under load) —
+      // install a null FAKE detector (labeled SIMULATED, emits no events)
+      // so this MEDIA suite measures the P4-B pipeline only. AI transport
+      // is covered by Scenario H; real-model load by the benchmark.
       const ctx = await browser.newContext({ permissions: ["camera"] });
+      await ctx.addInitScript(() => {
+        const install = (): void => {
+          const hooks = (window as unknown as {
+            __quizopiaAi?: { setFakeDetector: (fn: unknown) => void };
+          }).__quizopiaAi;
+          if (hooks?.setFakeDetector) {
+            hooks.setFakeDetector(() => null);
+          } else {
+            setTimeout(install, 200);
+          }
+        };
+        install();
+      });
       contexts.push(ctx);
       const page = await ctx.newPage();
       attemptIds.push(await publisherFlow(page, stu));
@@ -219,7 +237,31 @@ test.describe("Scenario F — camera grid", () => {
     // The fullscreen tile is promoted to a HIGHER simulcast layer than the
     // grid (adaptive streaming may settle at MEDIUM=2 instead of the
     // requested HIGH=3); every other tile stays at the LOW grid layer.
-    expect(layersAfter![tileName!]).toBeGreaterThanOrEqual(2);
+    // videoQuality reports only CHANGES — under load the switch can land
+    // after the first snapshot, so poll (bounded) for the promotion.
+    await expect
+      .poll(
+        async () => {
+          const l = await teacherPage.evaluate(() => {
+            const room = (window as unknown as { __quizopiaMedia?: { getRoom?: (s: string) => unknown } })
+              .__quizopiaMedia?.getRoom?.("teacher");
+            if (!room) return null;
+            const out: Record<string, number> = {};
+            for (const [identity, p] of (room as { remoteParticipants: Map<string, { trackPublications?: Map<string, { trackSid?: string; videoQuality?: number; source?: string }> }> })
+              .remoteParticipants) {
+              for (const pub of p.trackPublications?.values() ?? []) {
+                if ((pub as { source?: string }).source === "camera") {
+                  out[identity] = Number((pub as { videoQuality?: number }).videoQuality ?? 0);
+                }
+              }
+            }
+            return out;
+          });
+          return l?.[tileName!] ?? -1;
+        },
+        { timeout: 20_000 }
+      )
+      .toBeGreaterThanOrEqual(2);
     for (const [identity, q] of Object.entries(layersAfter!)) {
       if (identity !== tileName) expect(q).toBeLessThanOrEqual(1);
     }

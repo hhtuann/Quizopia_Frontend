@@ -99,6 +99,13 @@ export async function createCameraFallbackTrack(
   let stopped = false;
   const draw = (): void => {
     if (stopped) return;
+    // Environments without a real 2D context (jsdom, hardened browsers
+    // with canvas disabled) cannot draw — stop the loop instead of
+    // throwing every frame.
+    if (typeof ctx.drawImage !== "function") {
+      stopped = true;
+      return;
+    }
     // HAVE_CURRENT_DATA (2) — never draw a frame that isn't decoded yet.
     if (video.readyState >= 2) ctx.drawImage(video, 0, 0, outW, outH);
     rafId = requestAnimationFrame(draw);

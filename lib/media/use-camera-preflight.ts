@@ -8,6 +8,7 @@ import {
   type PreflightResponse,
 } from "@/lib/api/media";
 import { isTransferredPublisherRoom } from "./active-room";
+import { setPublishedCameraTrack } from "./published-track";
 import { registerMediaRoom } from "./test-hooks";
 import { createCameraFallbackTrack } from "./camera-fallback";
 import {
@@ -182,8 +183,8 @@ export function useCameraPreflight({
     const fallback = fallbackRef.current;
     roomRef.current = null;
     trackRef.current = null;
-    fallbackRef.current = null;
     if (room && isTransferredPublisherRoom(room)) return;
+    setPublishedCameraTrack(null);
     registerMediaRoom("preflight", null);
     if (room) void disconnectRoom(room).catch(() => undefined);
     fallback?.stop();
@@ -244,6 +245,8 @@ export function useCameraPreflight({
       await publishCameraTrack(room, fallback.track, { name: "camera-fallback" }).catch(
         () => undefined
       );
+      // P4-C: the canvas re-encode track is what is published now.
+      setPublishedCameraTrack(fallback.track);
     };
 
     const poll = (attemptNo: number, preflightId: string): void => {
@@ -341,6 +344,7 @@ export function useCameraPreflight({
       // 4. Publish the SAME track the preview shows.
       try {
         await publishCameraTrack(room, track);
+        setPublishedCameraTrack(track);
       } catch (err) {
         if (run !== runRef.current) return;
         fail(classifyApiError(err));
