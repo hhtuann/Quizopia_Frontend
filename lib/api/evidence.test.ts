@@ -3,6 +3,7 @@ import { http } from "./http-client";
 import {
   fetchAttemptMediaStatus,
   fetchEvidenceUrl,
+  fetchRecordingUrl,
   fetchSessionEvidence,
   fetchSessionRecordings,
   requestAlertClip,
@@ -102,5 +103,14 @@ describe("fetchSessionRecordings (teacher)", () => {
   it("targets the recordings route", async () => {
     await fetchSessionRecordings(5);
     expect(get).toHaveBeenCalledWith("/api/exam-sessions/5/recordings");
+  });
+});
+
+describe("fetchRecordingUrl (teacher, presigned)", () => {
+  it("targets the recording playback-url route", async () => {
+    await fetchRecordingUrl(5, "99999999-0000-4000-8000-000000000009");
+    expect(get).toHaveBeenCalledWith(
+      "/api/exam-sessions/5/recordings/99999999-0000-4000-8000-000000000009/url"
+    );
   });
 });

@@ -66,6 +66,12 @@ export interface SnapshotResponse {
   idempotentReplay: boolean;
 }
 
+export interface RecordingUrlResponse {
+  url: string;
+  /** ISO instant — when the presigned URL dies (300s TTL). */
+  expiresAt: string;
+}
+
 export interface EvidenceUrlResponse {
   url: string;
   /** ISO instant — when the presigned URL dies (300s TTL). */
@@ -84,6 +90,12 @@ export interface RecordingSegment {
   durationMs?: number;
   objectDeleted: boolean;
   error?: string;
+  /**
+   * Storage key of the segment's media object. The wire DTO currently
+   * omits it (nullable-omitted); `bytes` presence is the fallback signal
+   * that an object was actually written.
+   */
+  objectKey?: string;
 }
 
 export interface AttemptMediaStatus {
@@ -162,4 +174,13 @@ export function fetchSessionRecordings(
   sessionId: number
 ): Promise<RecordingSegment[]> {
   return http.get(`/api/exam-sessions/${sessionId}/recordings`);
+}
+
+/** Presigned recording playback URL (300s TTL; teacher-only, 409 when the
+ * segment has no servable object). */
+export function fetchRecordingUrl(
+  sessionId: number,
+  jobId: string
+): Promise<RecordingUrlResponse> {
+  return http.get(`/api/exam-sessions/${sessionId}/recordings/${jobId}/url`);
 }
