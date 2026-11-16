@@ -9,6 +9,8 @@ import {
 import { cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { RealtimeEventEnvelope } from "@/lib/realtime/types";
+import { AlertReviewForm, REVIEW_STATUS_LABEL } from "@/components/teacher/monitoring/AlertReviewForm";
+import type { AlertReviewStatus } from "@/lib/api/alert-review";
 
 /**
  * P4-C teacher AI alert feed (CONTRACT §5/§6). Sits in the LiveMonitor
@@ -21,6 +23,11 @@ import type { RealtimeEventEnvelope } from "@/lib/realtime/types";
  * and the disclaimer "Quan sát bằng AI — không tự động kết luận vi phạm."
  * The bbox mini-render draws ONLY normalized boxes from latestDetections —
  * no image is ever stored or shown (evidence media is P4-D).
+ *
+ * P4-E: each card gains teacher review controls (action + note + history,
+ * `AlertReviewForm`) and provenance chips — "AI phát hiện" (detector
+ * fields) vs "Giảng viên đánh giá" (review fields) vs "Chưa được xác minh"
+ * (UNREVIEWED). Reviews are assessments, never verdicts.
  */
 
 /** True when an ATTEMPT_ACTIVITY ping concerns the AI alert feed. */
@@ -136,7 +143,7 @@ export function AiAlertFeed({ sessionId }: { sessionId: number }) {
         <ul className="space-y-3">
           {items.map((alert) => (
             <li key={alert.alertId}>
-              <AiAlertCard alert={alert} />
+              <AiAlertCard alert={alert} sessionId={sessionId} />
             </li>
           ))}
         </ul>
@@ -156,7 +163,13 @@ export function AiAlertFeed({ sessionId }: { sessionId: number }) {
   );
 }
 
-export function AiAlertCard({ alert }: { alert: AiAlertItem }) {
+export function AiAlertCard({
+  alert,
+  sessionId,
+}: {
+  alert: AiAlertItem;
+  sessionId: number;
+}) {
   const confidence =
     alert.maxConfidence != null ? `${Math.round(alert.maxConfidence * 100)}%` : "—";
   const first = formatTime(alert.firstDetectedAt);
@@ -170,10 +183,24 @@ export function AiAlertCard({ alert }: { alert: AiAlertItem }) {
         ? "CLIENT MODEL"
         : "—";
   const detections = alert.latestDetections ?? [];
+  // P4-E review rollup — absent field (pre-P4-E backend) reads UNREVIEWED.
+  const reviewStatus: AlertReviewStatus = alert.reviewStatus ?? "UNREVIEWED";
+  const reviewStatusChip =
+    reviewStatus === "UNREVIEWED" ? (
+      <span className="rounded-full border border-[#F59E0B]/30 bg-[#F59E0B]/5 px-2 py-0.5 text-[11px] font-semibold text-[#F59E0B]">
+        {REVIEW_STATUS_LABEL[reviewStatus]}
+      </span>
+    ) : (
+      <span className="rounded-full border border-[#10B981]/30 bg-[#10B981]/5 px-2 py-0.5 text-[11px] font-semibold text-[#10B981]">
+        {`Giảng viên đánh giá · ${REVIEW_STATUS_LABEL[reviewStatus]}`}
+        {alert.reviewedAt ? ` · ${formatTime(alert.reviewedAt)}` : ""}
+      </span>
+    );
 
   return (
     <div
       data-testid="ai-alert-card"
+      data-attempt-id={alert.attemptId}
       className="rounded-xl border border-[#E2E8F0] bg-white p-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -187,6 +214,12 @@ export function AiAlertCard({ alert }: { alert: AiAlertItem }) {
           <span className="rounded-full border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wide text-[#64748B]">
             {provenance}
           </span>
+          {/* P4-E provenance distinction: detector fields vs review fields.
+           * UNREVIEWED is stated honestly — an unverified observation. */}
+          <span className="rounded-full border border-[#0052FF]/30 bg-[#0052FF]/5 px-2 py-0.5 text-[11px] font-semibold text-[#0052FF]">
+            AI phát hiện
+          </span>
+          {reviewStatusChip}
         </div>
         <span className="font-mono text-[11px] text-[#94A3B8]">{last}</span>
       </div>
@@ -247,6 +280,10 @@ export function AiAlertCard({ alert }: { alert: AiAlertItem }) {
           </p>
         </div>
       )}
+
+      {/* P4-E: teacher review (actions + note + history) — assessment over
+       * the observation, never a verdict. */}
+      <AlertReviewForm alert={alert} sessionId={sessionId} />
     </div>
   );
 }

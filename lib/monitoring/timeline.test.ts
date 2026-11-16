@@ -36,6 +36,12 @@ describe("labels + groups", () => {
     expect(timelineTypeLabel("SOME_FUTURE_TYPE")).toBe("SOME_FUTURE_TYPE");
   });
 
+  it("labels the P4-E teacher review event (falls back to ALL group)", () => {
+    expect(TIMELINE_TYPE_LABEL.ALERT_REVIEW_RECORDED).toBe("Alert review recorded");
+    // No dedicated group: the reviews-only toggle targets it via `types`.
+    expect(timelineGroupOf("ALERT_REVIEW_RECORDED")).toBe("ALL");
+  });
+
   it("maps every group to its type list and back", () => {
     expect(timelineGroupTypes("ALL")).toEqual([]);
     const answers = timelineGroupTypes("ANSWERS");

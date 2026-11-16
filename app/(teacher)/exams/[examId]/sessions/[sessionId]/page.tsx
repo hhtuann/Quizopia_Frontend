@@ -41,6 +41,11 @@ import { buildParticipantIndex, type RealtimeEventEnvelope } from "@/lib/realtim
 import { getCameraStatus, type CameraParticipantStatus } from "@/lib/api/media";
 import { isCameraGridActivity } from "@/lib/media/use-camera-grid";
 import { CameraGridCard } from "@/components/teacher/CameraGridCard";
+import {
+  isMonitoringDashboardActivity,
+  MonitoringDashboard,
+} from "@/components/teacher/monitoring/MonitoringDashboard";
+import { MonitoringReportCard } from "@/components/teacher/monitoring/MonitoringReportCard";
 
 const EDITABLE_STATES: ExamSessionStatus[] = ["DRAFT", "SCHEDULED"];
 
@@ -145,10 +150,19 @@ export default function ExamSessionDetailPage() {
   if (isPending) return <Skeleton />;
   if (isError) return <LoadError error={error as unknown as NormalizedApiError | undefined} backHref={backHref} />;
   if (!data) return <NotFound backHref={backHref} />;
-  return <DetailView data={data} backHref={backHref} />;
+  return <DetailView data={data} backHref={backHref} examId={examIdNum} />;
 }
 
-function DetailView({ data, backHref }: { data: ExamSessionDetailResponse; backHref: string }) {
+
+function DetailView({
+  data,
+  backHref,
+  examId,
+}: {
+  data: ExamSessionDetailResponse;
+  backHref: string;
+  examId: number;
+}) {
   const queryClient = useQueryClient();
   const actionMut = useSessionActionMutation(data.id);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; message: string } | null>(null);
@@ -211,6 +225,17 @@ function DetailView({ data, backHref }: { data: ExamSessionDetailResponse; backH
           queryKey: ["exam-sessions", data.id, "camera-status"],
         });
       }
+      // P4-E: monitoring-relevant pings (AI_ALERT_*/EVIDENCE_*/RECORDING_*/
+      // CAMERA_*/MONITORING_GAP/ALERT_REVIEW_RECORDED) also refresh the
+      // dashboard aggregates — REST is the source of truth.
+      if (isMonitoringDashboardActivity(ev)) {
+        void queryClient.invalidateQueries({
+          queryKey: ["exam-sessions", data.id, "monitoring-overview"],
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ["exam-sessions", data.id, "monitoring-participants"],
+        });
+      }
       const selected = activityAttemptRef.current;
       if (selected == null || ev.attemptId !== selected) return;
       // Durable event landed → refetch the visible timeline pages (REST is
@@ -234,6 +259,13 @@ function DetailView({ data, backHref }: { data: ExamSessionDetailResponse; backH
     }
     void queryClient.invalidateQueries({
       queryKey: ["exam-sessions", data.id, "camera-status"],
+    });
+    // P4-E: the dashboard aggregates backfill the same way.
+    void queryClient.invalidateQueries({
+      queryKey: ["exam-sessions", data.id, "monitoring-overview"],
+    });
+    void queryClient.invalidateQueries({
+      queryKey: ["exam-sessions", data.id, "monitoring-participants"],
     });
   }, [queryClient, data.id]);
 
@@ -371,6 +403,17 @@ function DetailView({ data, backHref }: { data: ExamSessionDetailResponse; backH
         onReconnect={backfillSelectedTimeline}
       />
 
+      {/* P4-E: unified monitoring dashboard — monitored sessions only,
+          above the camera grid; row selection drives the Activity panel
+          picker via the page-owned attempt selection. */}
+      {monitored && (
+        <MonitoringDashboard
+          sessionId={data.id}
+          selectedAttemptId={activityAttemptId}
+          onSelectAttempt={selectActivityAttempt}
+        />
+      )}
+
       {/* P4-B: teacher camera grid — monitored sessions only. */}
       {monitored && (
         <CameraGridCard sessionId={data.id} participants={cameraParticipants} />
@@ -385,6 +428,11 @@ function DetailView({ data, backHref }: { data: ExamSessionDetailResponse; backH
         selectedAttemptId={activityAttemptId}
         onSelectAttempt={selectActivityAttempt}
       />
+
+      {/* P4-E: per-attempt monitoring report (picker → §3.6 render). */}
+      {monitored && (
+        <MonitoringReportCard sessionId={data.id} examId={examId} />
+      )}
 
       {/* Results & statistics */}
       <ReportingSection sessionId={data.id} />

@@ -15,7 +15,7 @@ const fetchNextPage = vi.fn();
 
 vi.mock("@/hooks/queries/use-monitoring", () => ({
   useAttemptTimelineQuery: vi.fn(),
-  DEFAULT_TIMELINE_FILTERS: { source: "ALL", group: "ALL" },
+  DEFAULT_TIMELINE_FILTERS: { source: "ALL", group: "ALL", reviewsOnly: false },
 }));
 
 const timelineQuery = vi.mocked(useAttemptTimelineQuery);
@@ -129,6 +129,7 @@ describe("AttemptTimeline", () => {
     expect(timelineQuery).toHaveBeenLastCalledWith(12, {
       source: "CLIENT",
       group: "ALL",
+      reviewsOnly: false,
     });
 
     const groupSelect = screen.getByLabelText("Event type");
@@ -136,6 +137,7 @@ describe("AttemptTimeline", () => {
     expect(timelineQuery).toHaveBeenLastCalledWith(12, {
       source: "CLIENT",
       group: "ANSWERS",
+      reviewsOnly: false,
     });
 
     // Filter controls exist inside the labelled group.
@@ -146,5 +148,33 @@ describe("AttemptTimeline", () => {
     mockQuery({ pages: [page([], null)] });
     render(<AttemptTimeline attemptId={12} emptyHint="Nothing here." />);
     expect(screen.getByText("Nothing here.")).toBeTruthy();
+  });
+});
+
+describe("AttemptTimeline reviews-only toggle (P4-E)", () => {
+  it("is absent by default and rendered for teacher panels", () => {
+    mockQuery({ pages: [page([], null)] });
+    const { rerender } = render(<AttemptTimeline attemptId={12} />);
+    expect(screen.queryByRole("button", { name: /Reviews only/ })).toBeNull();
+
+    rerender(<AttemptTimeline attemptId={12} showReviewFilter />);
+    const toggle = screen.getByRole("button", { name: "Reviews only" });
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("toggles reviewsOnly into the filters and disables the type-group select", () => {
+    mockQuery({ pages: [page([], null)] });
+    render(<AttemptTimeline attemptId={12} showReviewFilter />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Reviews only" }));
+    expect(timelineQuery).toHaveBeenLastCalledWith(12, {
+      source: "ALL",
+      group: "ALL",
+      reviewsOnly: true,
+    });
+    expect(screen.getByLabelText("Event type")).toHaveProperty("disabled", true);
+    expect(
+      screen.getByRole("button", { name: "Reviews only (on)" }).getAttribute("aria-pressed")
+    ).toBe("true");
   });
 });

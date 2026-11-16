@@ -58,6 +58,7 @@ export function AttemptTimeline({
   title = "Activity timeline",
   emptyHint = "No activity recorded yet.",
   className,
+  showReviewFilter = false,
 }: {
   attemptId: number;
   /** attemptQuestionId → display label (e.g. "Q3"); falls back to `Q<id>`. */
@@ -65,6 +66,11 @@ export function AttemptTimeline({
   title?: string;
   emptyHint?: string;
   className?: string;
+  /**
+   * P4-E: render the "Reviews only" toggle (`types=ALERT_REVIEW_RECORDED`).
+   * Teacher-only — review events never appear on student timelines.
+   */
+  showReviewFilter?: boolean;
 }) {
   const [filters, setFilters] = useState<TimelineFilters>(DEFAULT_TIMELINE_FILTERS);
   const query = useAttemptTimelineQuery(attemptId, filters);
@@ -125,7 +131,11 @@ export function AttemptTimeline({
                 group: e.target.value as TimelineGroupValue,
               }))
             }
-            className="h-11 w-full rounded-lg border border-[#E2E8F0] bg-white px-4 pr-9 text-sm font-medium text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2"
+            disabled={filters.reviewsOnly}
+            className={cn(
+              "h-11 w-full rounded-lg border border-[#E2E8F0] bg-white px-4 pr-9 text-sm font-medium text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2",
+              filters.reviewsOnly && "cursor-not-allowed opacity-60"
+            )}
           >
             {TIMELINE_GROUPS.map((g) => (
               <option key={g.value} value={g.value}>
@@ -134,6 +144,31 @@ export function AttemptTimeline({
             ))}
           </select>
         </div>
+        {showReviewFilter && (
+          <div className="min-w-48 flex-1">
+            <p
+              id={`timeline-reviews-label-${attemptId}`}
+              className="mb-2 block font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]"
+            >
+              Review events
+            </p>
+            <button
+              type="button"
+              aria-pressed={filters.reviewsOnly}
+              onClick={() =>
+                setFilters((f) => ({ ...f, reviewsOnly: !f.reviewsOnly }))
+              }
+              className={cn(
+                "h-11 w-full rounded-lg border px-4 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2",
+                filters.reviewsOnly
+                  ? "border-[#0052FF] bg-[#0052FF]/5 text-[#0052FF]"
+                  : "border-[#E2E8F0] bg-white text-[#64748B] hover:text-[#0F172A]"
+              )}
+            >
+              {filters.reviewsOnly ? "Reviews only (on)" : "Reviews only"}
+            </button>
+          </div>
+        )}
       </div>
 
       <p aria-live="polite" className="sr-only">

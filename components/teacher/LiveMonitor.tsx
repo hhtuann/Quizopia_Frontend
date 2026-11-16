@@ -109,9 +109,16 @@ export function LiveMonitor({
         queryKey: ["exam-sessions", sessionId, "roster"],
       });
       // P4-A4 review: the Activity-panel picker's attempts list must see
-      // attempts that start while the teacher is already watching.
       void queryClient.invalidateQueries({
         queryKey: ["exam-sessions", sessionId, "attempts"],
+      });
+      // P4-E: a new attempt also shifts the dashboard aggregates —
+      // overview counts and the participants rollup refetch with it.
+      void queryClient.invalidateQueries({
+        queryKey: ["exam-sessions", sessionId, "monitoring-overview"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["exam-sessions", sessionId, "monitoring-participants"],
       });
     },
     (ev) => {

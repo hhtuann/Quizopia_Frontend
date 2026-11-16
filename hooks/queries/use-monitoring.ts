@@ -20,18 +20,26 @@ import {
 export interface TimelineFilters {
   source: "ALL" | "CLIENT" | "SERVER";
   group: TimelineGroupValue;
+  /**
+   * P4-E: reviews-only toggle — sends `types=ALERT_REVIEW_RECORDED`
+   * (overrides the type-group while active).
+   */
+  reviewsOnly: boolean;
 }
 
 export const DEFAULT_TIMELINE_FILTERS: TimelineFilters = {
   source: "ALL",
   group: "ALL",
+  reviewsOnly: false,
 };
 
 /** Filters → REST params (undefined values are omitted by the param builder). */
 export function timelineQueryParams(
   filters: TimelineFilters
 ): AttemptTimelineParams {
-  const types = timelineGroupTypes(filters.group);
+  const types = filters.reviewsOnly
+    ? ["ALERT_REVIEW_RECORDED"]
+    : timelineGroupTypes(filters.group);
   return {
     source: filters.source === "ALL" ? undefined : filters.source,
     types: types.length > 0 ? types : undefined,
