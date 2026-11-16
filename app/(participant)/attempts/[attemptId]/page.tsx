@@ -24,6 +24,7 @@ import { useAttemptCamera } from "@/lib/media/use-attempt-camera";
 import { useAttemptAiDetection } from "@/lib/ai/use-attempt-ai-detection";
 import { CameraStatusPill } from "@/components/student/CameraStatusPill";
 import { AiStatusPill } from "@/components/student/AiStatusPill";
+import { RecordingStatusPill } from "@/components/student/RecordingStatusPill";
  import type {
   AttemptDetailResponse,
   SubmitResponse,
@@ -300,7 +301,16 @@ function InProgressShell({
         ) : submitSlot}
         liveServerTime={liveServerTime}
         wsStatus={wsStatus}
-        cameraSlot={<><CameraStatusPill status={camera.status} />{camera.status !== "inactive" && <AiStatusPill state={ai} />}</>}
+        cameraSlot={
+          <>
+            <CameraStatusPill status={camera.status} />
+            {camera.status !== "inactive" && <AiStatusPill state={ai} />}
+            <RecordingStatusPill
+              attemptId={attemptId}
+              active={camera.status !== "inactive"}
+            />
+          </>
+        }
         onExpire={handleAutoSubmit}
         onQuestionNavigated={(qid) =>
           telemetry.track("QUESTION_NAVIGATED", { questionId: qid })

@@ -67,16 +67,18 @@ test.describe("Scenario D — monitoring configuration", () => {
     const recording = page.getByRole("checkbox", { name: /full recording/i }).first();
     await expect(recording).not.toBeChecked();
 
-    // Prerequisites: snapshots require AI detection; clips require recording.
+    // Prerequisites: snapshots require AI detection. Clips are independent
+    // of recording since P4-D (rolling-buffer mode — recording OFF + clips
+    // ON); the P4-A "clips require recording" coupling was a capability
+    // placeholder, removed by V40.
     const ai = page.getByRole("checkbox", { name: /^AI detection/i }).first();
     const snapshots = page.getByRole("checkbox", { name: /evidence snapshots/i }).first();
     const clips = page.getByRole("checkbox", { name: /evidence clips/i }).first();
     await expect(snapshots).toBeDisabled();
     await ai.check();
     await expect(snapshots).toBeEnabled();
-    await expect(clips).toBeDisabled();
-    await recording.check();
     await expect(clips).toBeEnabled();
+    await recording.check(); // recording stays independent of clips (D1 asserts it persists)
     await page.screenshot({ path: `${__dirname}/evidence/D1-monitoring-config.png`, fullPage: true });
 
     await page.getByRole("button", { name: "Create session" }).click();

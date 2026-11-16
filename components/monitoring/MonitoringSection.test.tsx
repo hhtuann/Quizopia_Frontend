@@ -67,17 +67,24 @@ describe("MonitoringSection", () => {
         onConfigChange={onConfigChange}
       />
     );
-    // Snapshots need AI; clips need recording — both disabled here.
+    // Snapshots still need AI (disabled here); clips (P4-D) ride the rolling
+    // buffer — available as soon as monitoring is on, WITHOUT full recording.
     const snapshots = screen.getByRole("checkbox", { name: /evidence snapshots/i });
     const clips = screen.getByRole("checkbox", { name: /evidence clips/i });
     expect((snapshots as HTMLInputElement).disabled).toBe(true);
-    expect((clips as HTMLInputElement).disabled).toBe(true);
+    expect((clips as HTMLInputElement).disabled).toBe(false);
 
     // AI is available → clicking it emits the full next config.
     const ai = screen.getByRole("checkbox", { name: /^ai detection/i }) as HTMLInputElement;
     fireEvent.click(ai);
     expect(onConfigChange).toHaveBeenCalledWith(
       state({ monitoringEnabled: true, aiDetectionEnabled: true })
+    );
+
+    // Clips toggle without touching full recording.
+    fireEvent.click(clips);
+    expect(onConfigChange).toHaveBeenLastCalledWith(
+      state({ monitoringEnabled: true, evidenceClipsEnabled: true })
     );
   });
 

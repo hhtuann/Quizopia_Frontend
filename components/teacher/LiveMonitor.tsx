@@ -18,6 +18,7 @@ import { cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { ParticipantModeration } from "./ParticipantModeration";
 import { AiAlertFeed, isAiAlertActivity } from "./AiAlertFeed";
+import { EvidenceSection, isEvidenceActivity } from "./EvidenceSection";
 
 const EVENT_LABEL: Record<string, string> = {
   SESSION_OPENED: "Session opened",
@@ -90,8 +91,13 @@ export function LiveMonitor({
       void queryClient.invalidateQueries({
         queryKey: ["exam-sessions", sessionId, "ai-alerts"],
       });
-      // P4-A4: caller backfills the selected attempt's timeline (missed
-      // events while the socket was down — REST is the source of truth).
+      // P4-D: evidence/recordings backfill the same way (REST = truth).
+      void queryClient.invalidateQueries({
+        queryKey: ["exam-sessions", sessionId, "evidence"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["exam-sessions", sessionId, "recordings"],
+      });
       onReconnectRef.current?.();
     },
     () => {
@@ -113,6 +119,15 @@ export function LiveMonitor({
       if (isAiAlertActivity(ev)) {
         void queryClient.invalidateQueries({
           queryKey: ["exam-sessions", sessionId, "ai-alerts"],
+        });
+      }
+      // P4-D: EVIDENCE_*/RECORDING_* pings → refetch evidence + segments.
+      if (isEvidenceActivity(ev)) {
+        void queryClient.invalidateQueries({
+          queryKey: ["exam-sessions", sessionId, "evidence"],
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ["exam-sessions", sessionId, "recordings"],
         });
       }
       onAttemptActivity?.(ev);
@@ -158,6 +173,8 @@ export function LiveMonitor({
         editable={["DRAFT", "SCHEDULED", "OPEN"].includes(metrics.sessionStatus)} />
       {/* P4-C: AI alert feed — same card area, REST-backed + ping-invalidated. */}
       <AiAlertFeed sessionId={sessionId} />
+      {/* P4-D: per-alert evidence panel (snapshots + clip) under the feed. */}
+      <EvidenceSection sessionId={sessionId} />
     </div>
   );
 }

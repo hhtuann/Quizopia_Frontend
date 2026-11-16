@@ -44,7 +44,7 @@ const ADVANCED_OPTIONS: {
   {
     id: "evidenceClipsEnabled",
     label: "Evidence clips",
-    hint: "Requires full recording",
+    hint: "Ghi clip quanh cảnh báo (đệm luân chuyển khi không ghi hình đầy đủ)",
   },
 ];
 

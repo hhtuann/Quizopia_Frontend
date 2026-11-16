@@ -28,11 +28,19 @@ vi.mock("@/lib/api/ai-detections", () => ({
   ingestAiDetections: vi.fn(),
 }));
 
+// P4-D: the hook also fetches the attempt's snapshot policy once — keep it
+// offline and deterministic (snapshots disabled; the snapshot-path suite
+// covers the enabled branch).
+vi.mock("@/lib/api/evidence", () => ({
+  fetchAttemptMediaStatus: vi.fn(),
+  uploadEvidenceSnapshot: vi.fn(),
+}));
+
 vi.mock("@/lib/ai/model-adapter", async (importOriginal) => {
   const actual = await importOriginal<typeof ModelAdapter>();
   return { ...actual, createDetector: vi.fn() };
 });
-
+import { fetchAttemptMediaStatus } from "@/lib/api/evidence";
 import { ingestAiDetections } from "@/lib/api/ai-detections";
 import { createDetector, MODEL } from "./model-adapter";
 
@@ -95,6 +103,11 @@ beforeEach(() => {
     .spyOn(HTMLMediaElement.prototype, "play")
     .mockResolvedValue(undefined);
   vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
+  vi.mocked(fetchAttemptMediaStatus).mockResolvedValue({
+    fullRecordingEnabled: false,
+    rollingBufferActive: false,
+    snapshotsEnabled: false,
+  });
 });
 
 afterEach(() => {
