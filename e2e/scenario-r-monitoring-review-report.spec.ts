@@ -259,7 +259,16 @@ test.describe("Scenario R — monitoring dashboard, review & report", () => {
     ).toBeVisible();
 
     // Foreign teacher IDOR: API denies overview + report + reviews.
-    const foreign = await registerVerifiedUser("TEACHER", `r-foreign-${Date.now()}`);
+    // (Public TEACHER registration is disabled — the real path is the
+    // authenticated self-upgrade, same as global-setup.)
+    const foreignStudent = await registerVerifiedUser("STUDENT", `r-foreign-${Date.now()}`);
+    const upgrade = await apiJson<{ roles: string[] }>(
+      "/api/auth/upgrade-teacher",
+      foreignStudent.accessToken,
+      { method: "POST", body: JSON.stringify({}) }
+    );
+    expect(upgrade.status, upgrade.raw ?? "").toBeLessThan(300);
+    const foreign = foreignStudent;
     const ov = await apiJson(
       `/api/exam-sessions/${sessionId}/monitoring/overview`,
       foreign.accessToken,
