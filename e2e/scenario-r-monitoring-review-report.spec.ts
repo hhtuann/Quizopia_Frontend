@@ -201,8 +201,9 @@ test.describe("Scenario R — monitoring dashboard, review & report", () => {
     const history = reviewForm.getByTestId("alert-review-history");
     await expect(history.getByText("Báo động sai").first()).toBeVisible({ timeout: 30_000 });
 
-    // Unified timeline gains the review event with review provenance.
-    await expect(timeline.getByText("ALERT_REVIEW_RECORDED").first()).toBeVisible({
+    // Unified timeline gains the review event with review provenance
+    // (rendered via TIMELINE_TYPE_LABEL — "Alert review recorded").
+    await expect(timeline.getByText("Alert review recorded").first()).toBeVisible({
       timeout: 60_000,
     });
 
@@ -217,12 +218,15 @@ test.describe("Scenario R — monitoring dashboard, review & report", () => {
       ).getByText("Giảng viên đánh giá")
     ).toBeVisible({ timeout: 30_000 });
 
-    // Submit the focus attempt so the report has a closed window.
+    // Submit the focus attempt so the report has a closed window
+    // (confirm dialog → result page, the established chain pattern).
     const studentPage = contexts[0].pages()[0];
     await studentPage.getByRole("button", { name: /submit|nộp/i }).first().click();
-    await expect(studentPage.getByText(/submitted|đã nộp/i).first()).toBeVisible({
-      timeout: 30_000,
-    });
+    await studentPage
+      .getByRole("button", { name: /confirm|xác nhận/i })
+      .first()
+      .click({ timeout: 10_000 });
+    await studentPage.waitForURL(/result|\/sessions\//, { timeout: 30_000 });
 
     // R2 report after close.
     const close = await apiJson(
@@ -238,7 +242,10 @@ test.describe("Scenario R — monitoring dashboard, review & report", () => {
     const reportView = teacherPage.getByTestId("monitoring-report-view");
     await expect(reportView).toBeVisible({ timeout: 60_000 });
     await expect(reportView.getByText(/Monitoring observations only/i)).toBeVisible();
-    await expect(reportView.getByText(focusAttempt.toString())).toBeVisible();
+    // header pins the attempt id unambiguously
+    await expect(
+      reportView.getByText('attempt #' + '1' + ' · #' + focusAttempt)
+    ).toBeVisible();
 
     // Printable route renders the SAME report with a print control.
     await teacherPage.goto(
