@@ -165,9 +165,15 @@ test.describe("P4-F physical camera gate, no fake media", () => {
           navigator.mediaDevices.getUserMedia = (constraints: MediaStreamConstraints) => {
             if (!constraints?.video) return original(constraints);
             const video = typeof constraints.video === "object" ? { ...constraints.video } : {};
+            if (constraints.audio) {
+              throw new Error(
+                "P4-F violation: attempt camera flow requested microphone by default"
+              );
+            }
+            // Preserve audio constraints rather than silently suppressing a
+            // microphone request; a default mic request must FAIL the gate.
             return original({
               ...constraints,
-              audio: false,
               video: { ...video, deviceId: { exact: chosenDeviceId } },
             });
           };
