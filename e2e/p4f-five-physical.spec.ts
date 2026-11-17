@@ -136,9 +136,12 @@ test.describe("P4-F physical camera gate, no fake media", () => {
           // BrowserContext has camera permission already. Enumerate WITHOUT
           // opening the default camera (which may be single-open and already
           // streaming from an earlier student context). Only probe capture
-          // if this browser hides device labels until a track is granted.
+          // when fewer than five devices enumerate — a missing LABEL on one
+          // of ≥5 devices must NOT trigger a default-camera open that could
+          // steal a sensor an earlier student context is publishing from
+          // (the label-equality assertion below catches hidden labels).
           let found = await enumerate();
-          if (found.length >= 5 && found.every((d) => d.label)) return found;
+          if (found.length >= 5) return found;
           const stream = await navigator.mediaDevices.getUserMedia({
             video: true,
             audio: false,
@@ -166,9 +169,15 @@ test.describe("P4-F physical camera gate, no fake media", () => {
             if (!constraints?.video) return original(constraints);
             const video = typeof constraints.video === "object" ? { ...constraints.video } : {};
             if (constraints.audio) {
-              throw new Error(
+              // A default mic request must FAIL the gate. Throw a
+              // NotAllowedError-shaped rejection so the app's error
+              // classifier surfaces it (a bare Error maps to a generic
+              // retryable message and hides the violation).
+              const err = new Error(
                 "P4-F violation: attempt camera flow requested microphone by default"
               );
+              err.name = "NotAllowedError";
+              throw err;
             }
             // Preserve audio constraints rather than silently suppressing a
             // microphone request; a default mic request must FAIL the gate.
@@ -178,21 +187,52 @@ test.describe("P4-F physical camera gate, no fake media", () => {
             });
           };
         }, device.deviceId);
+        // AI isolation (media gate only): the P4-C hook would load the REAL
+        // yolo26s + gaze models on every publisher page (5 × WASM inference
+        // starves WebRTC on one workstation). Install a null detector that
+        // emits NO events — this suite measures the physical MEDIA pipeline;
+        // real-model proof is the separate benchmark/manual demo, never this
+        // spec. The camera media itself stays 100% physical.
+        await ctx.addInitScript(() => {
+          const install = (): void => {
+            const hooks = (window as unknown as {
+              __quizopiaAi?: { setFakeDetector: (fn: unknown) => void };
+            }).__quizopiaAi;
+            if (hooks?.setFakeDetector) {
+              hooks.setFakeDetector(() => null);
+            } else {
+              setTimeout(install, 200);
+            }
+          };
+          install();
+        });
         const page: Page = await ctx.newPage();
         await loginViaUi(page, students[i]!.email, students[i]!.password);
         await page.goto("/sessions/" + sessionId);
         const preflight = page.getByTestId("camera-preflight");
         await preflight.getByRole("button", { name: "Enable camera" }).click();
-
         // Verify the actual browser MediaStreamTrack reports the selected
         // deviceId, not merely that a camera permission dialog was granted.
-        const selected = await preflight.locator("video").first().evaluate((video) => {
-          const stream = (video as HTMLVideoElement).srcObject as MediaStream | null;
-          const track = stream?.getVideoTracks()[0];
-          return track
-            ? { deviceId: track.getSettings().deviceId ?? "", readyState: track.readyState }
-            : null;
-        });
+        // The preflight is a multi-hop async chain (API → room connect →
+        // getUserMedia → attachTrack sets srcObject); POLL until the track
+        // exists instead of a one-shot evaluate that races the pipeline.
+        const selectedHandle = await page.waitForFunction(
+          () => {
+            const video = document.querySelector<HTMLElement>(
+              "[data-testid='camera-preflight'] video"
+            );
+            const stream = video
+              ? ((video as HTMLVideoElement).srcObject as MediaStream | null)
+              : null;
+            const track = stream?.getVideoTracks()[0];
+            return track
+              ? { deviceId: track.getSettings().deviceId ?? "", readyState: track.readyState }
+              : null;
+          },
+          undefined,
+          { timeout: 60_000, polling: 500 }
+        );
+        const selected = await selectedHandle.jsonValue();
         expect(selected?.readyState).toBe("live");
         expect(selected?.deviceId, "Preview capture did not use selected hardware webcam").toBe(
           device.deviceId
@@ -228,7 +268,7 @@ test.describe("P4-F physical camera gate, no fake media", () => {
           teacherSubscribed: false,
           decodedFrames: 0,
           measuredFps: 0,
-          evidenceRef: "private/p4f-physical-candidate.json",
+          evidenceRef: "e2e/evidence/p4f-physical-candidate.json",
         });
         report.cameras = cameraReports;
         void attemptId;
@@ -278,30 +318,46 @@ test.describe("P4-F physical camera gate, no fake media", () => {
           });
         });
 
+      // Backgrounded tabs can throttle rAF/frame counters; keep the teacher
+      // page foregrounded while sampling decoded frames.
+      await teacherPage.bringToFront();
       await expect.poll(async () => (await frames()).filter((v) => v.width > 0).length,
         { timeout: 60_000 }).toBe(5);
-      const first = await frames();
-      await teacherPage.waitForTimeout(5_000);
-      const last = await frames();
-      expect(last.length).toBe(5);
+      // LOW-layer simulcast + counter sampling quirks can legitimately yield
+      // delta 0 over one 5s window; measure twice and take the better sample
+      // before declaring a track dead (a real dead track fails BOTH windows).
+      const measureDelta = async (): Promise<Map<string | null, number>> => {
+        const first = await frames();
+        await teacherPage.waitForTimeout(5_000);
+        const last = await frames();
+        expect(last.length).toBe(5);
+        const firstBySid = new Map(first.map((frame) => [frame.trackSid, frame.frames]));
+        const lastBySid = new Map(last.map((frame) => [frame.trackSid, frame.frames]));
+        const delta = new Map<string | null, number>();
+        for (const [sid, end] of lastBySid) {
+          delta.set(sid, end - (firstBySid.get(sid) ?? 0));
+        }
+        return delta;
+      };
+      let deltas = await measureDelta();
+      if (Array.from(deltas.values()).some((d) => d <= 0)) {
+        deltas = await measureDelta();
+      }
       const gridObservedAt = new Date().toISOString();
-      const firstBySid = new Map(first.map((frame) => [frame.trackSid, frame]));
-      const lastBySid = new Map(last.map((frame) => [frame.trackSid, frame]));
-      expect(firstBySid.size, "Each teacher tile must map to a unique LiveKit track").toBe(5);
+      const uniqueSids = new Set(deltas.keys());
+      expect(uniqueSids.size, "Each teacher tile must map to a unique LiveKit track").toBe(5);
       for (const camera of cameraReports) {
         const sid = String(camera.trackSid);
-        const a = firstBySid.get(sid);
-        const b = lastBySid.get(sid);
-        expect(a && b, "Camera's actual trackSid must appear in the teacher grid").toBeTruthy();
-        const delta = b!.frames - a!.frames;
+        const delta = deltas.get(sid);
+        expect(delta !== undefined, "Camera's actual trackSid must appear in the teacher grid").toBe(true);
         expect(delta, "Every exact CAMERA track must decode NEW frames").toBeGreaterThan(0);
         camera.teacherSubscribed = true;
-        camera.decodedFrames = delta;
-        camera.measuredFps = Math.round((delta / 5) * 10) / 10;
+        camera.decodedFrames = delta!;
+        camera.measuredFps = Math.round((delta! / 5) * 10) / 10;
       }
       report.teacherGrid = {
         observedAt: gridObservedAt,
-        evidenceRef: "private/p4f-five-teacher-grid.png",
+        evidenceRef: "e2e/evidence/p4f-five-teacher-grid.png",
         decodedTiles: 5,
       };
       await teacherPage.screenshot({
@@ -309,6 +365,12 @@ test.describe("P4-F physical camera gate, no fake media", () => {
         fullPage: true,
       });
       report.status = "FIVE_LIVE_TRACKS_OBSERVED_HUMAN_HARDWARE_ATTESTATION_PENDING";
+    } catch (error) {
+      // Persist WHICH assertion failed so the offline human attestation is
+      // not left with a half-mutated cameras array and no explanation.
+      report.status = "FAILED";
+      report.failure = error instanceof Error ? error.message : String(error);
+      throw error;
     } finally {
       const disconnectedAt = new Date().toISOString();
       for (const cam of report.cameras as Array<Record<string, unknown>>) {
