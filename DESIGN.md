@@ -580,4 +580,13 @@ Fonts are loaded via Google Fonts:
 
 **Animation Library:**
 Framer Motion is used for all entrance animations and continuous motion. Viewport options are set to `{ once: true, amount: 0.15, margin: "-60px" }` for optimal performance and timing.
+
+**Print (P4-E):**
+Printable documents (e.g. the monitoring report route) reuse the screen
+components on a chrome-less page: `@media print` rules in `app/globals.css`
+hide the app shell (`.app-topbar`, `.app-sidebar`, footer) and drop the
+content column's sidebar offset; page-local controls opt out individually
+with Tailwind's `print:hidden`. Report sections keep themselves unbroken
+across page breaks with `break-inside-avoid`. No separate print stylesheet
+or print-specific component tree — one renderer serves screen and paper.
 </design-system>

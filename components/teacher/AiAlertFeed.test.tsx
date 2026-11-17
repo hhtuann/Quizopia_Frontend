@@ -181,6 +181,22 @@ describe("AiAlertFeed", () => {
 });
 
 describe("AiAlertCard", () => {
+  function renderCard(item: AiAlertItem): {
+    container: HTMLElement;
+    client: QueryClient;
+    unmount: () => void;
+  } {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const rendered = render(
+      <QueryClientProvider client={client}>
+        <AiAlertCard alert={item} sessionId={5} />
+      </QueryClientProvider>
+    );
+    return { container: rendered.container, client, unmount: rendered.unmount };
+  }
+
   it("labels each VN alert type", () => {
     const types: Array<[AiAlertItem["alertType"], string]> = [
       ["PHONE_DETECTED", "Phát hiện điện thoại"],
@@ -189,8 +205,8 @@ describe("AiAlertCard", () => {
       ["PERSON_NOT_VISIBLE", "Không thấy người làm bài"],
     ];
     for (const [alertType, label] of types) {
-      const { container, unmount } = render(
-        <AiAlertCard alert={alertItem({ alertType, latestDetections: null })} />
+      const { container, unmount } = renderCard(
+        alertItem({ alertType, latestDetections: null })
       );
       expect(container.textContent).toContain(label);
       unmount();
@@ -198,18 +214,33 @@ describe("AiAlertCard", () => {
   });
 
   it("shows the WORKER chip for worker-verified provenance", () => {
-    const { container } = render(
-      <AiAlertCard
-        alert={alertItem({ provenance: "WORKER_VERIFIED", latestDetections: null })}
-      />
+    const { container } = renderCard(
+      alertItem({ provenance: "WORKER_VERIFIED", latestDetections: null })
     );
     expect(container.textContent).toContain("WORKER");
   });
 
   it("renders without detections (no bbox area)", () => {
-    const { container } = render(
-      <AiAlertCard alert={alertItem({ latestDetections: null })} />
-    );
+    const { container } = renderCard(alertItem({ latestDetections: null }));
     expect(container.querySelector('[data-testid="ai-alert-bboxes"]')).toBeNull();
+  });
+
+  // P4-E provenance distinction chips.
+  it("shows AI phát hiện + Chưa được xác minh when no review exists", () => {
+    const { container } = renderCard(alertItem({ latestDetections: null }));
+    expect(container.textContent).toContain("AI phát hiện");
+    expect(container.textContent).toContain("Chưa được xác minh");
+  });
+
+  it("shows the Giảng viên đánh giá outcome chip once reviewed", () => {
+    const { container } = renderCard(
+      alertItem({
+        latestDetections: null,
+        reviewStatus: "FALSE_POSITIVE",
+        reviewVersion: 2,
+      })
+    );
+    expect(container.textContent).toContain("Giảng viên đánh giá · Báo động sai");
+    expect(container.textContent).not.toContain("Chưa được xác minh");
   });
 });
