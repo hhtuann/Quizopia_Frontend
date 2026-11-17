@@ -128,15 +128,24 @@ test.describe("P4-F physical camera gate, no fake media", () => {
         const calibration = await ctx.newPage();
         await calibration.goto("/");
         const localDevices = await calibration.evaluate(async () => {
+          const enumerate = async () =>
+            (await navigator.mediaDevices.enumerateDevices())
+              .filter((d) => d.kind === "videoinput" && Boolean(d.deviceId))
+              .map((d) => ({ deviceId: d.deviceId, label: d.label }))
+              .filter((d) => !/virtual|fake|obs|loopback|manycam|screen capture/i.test(d.label));
+          // BrowserContext has camera permission already. Enumerate WITHOUT
+          // opening the default camera (which may be single-open and already
+          // streaming from an earlier student context). Only probe capture
+          // if this browser hides device labels until a track is granted.
+          let found = await enumerate();
+          if (found.length >= 5 && found.every((d) => d.label)) return found;
           const stream = await navigator.mediaDevices.getUserMedia({
             video: true,
             audio: false,
           });
           stream.getTracks().forEach((t) => t.stop());
-          return (await navigator.mediaDevices.enumerateDevices())
-            .filter((d) => d.kind === "videoinput" && Boolean(d.deviceId))
-            .map((d) => ({ deviceId: d.deviceId, label: d.label }))
-            .filter((d) => !/virtual|fake|obs|loopback|manycam|screen capture/i.test(d.label));
+          found = await enumerate();
+          return found;
         });
         await calibration.close();
         // Chrome's stable per-device order is only a candidate mapping.
