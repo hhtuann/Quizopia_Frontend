@@ -25,12 +25,21 @@ export interface TimelineFilters {
    * (overrides the type-group while active).
    */
   reviewsOnly: boolean;
+  /**
+   * F08: server-side time-range window (inclusive), `datetime-local`
+   * strings converted to ISO; empty = unbounded. Part of the query key so
+   * a range change restarts pagination from the first page.
+   */
+  from: string;
+  to: string;
 }
 
 export const DEFAULT_TIMELINE_FILTERS: TimelineFilters = {
   source: "ALL",
   group: "ALL",
   reviewsOnly: false,
+  from: "",
+  to: "",
 };
 
 /** Filters → REST params (undefined values are omitted by the param builder). */
@@ -43,6 +52,8 @@ export function timelineQueryParams(
   return {
     source: filters.source === "ALL" ? undefined : filters.source,
     types: types.length > 0 ? types : undefined,
+    from: filters.from ? new Date(filters.from).toISOString() : undefined,
+    to: filters.to ? new Date(filters.to).toISOString() : undefined,
   };
 }
 

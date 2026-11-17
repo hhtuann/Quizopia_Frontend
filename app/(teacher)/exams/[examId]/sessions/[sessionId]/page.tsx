@@ -243,6 +243,15 @@ function DetailView({
       void queryClient.invalidateQueries({
         queryKey: ["attempts", selected, "timeline"],
       });
+      // F09: an already-open report stays fresh after evidence/recording/
+      // review transitions — keyed to the EVENT's attempt so a report open
+      // for a different participant than the Activity panel still refreshes
+      // (invalidation → GET only; no cycle).
+      if (ev.attemptId != null) {
+        void queryClient.invalidateQueries({
+          queryKey: ["attempts", ev.attemptId, "monitoring-report"],
+        });
+      }
     },
     [queryClient, data.id]
   );
@@ -266,6 +275,15 @@ function DetailView({
     });
     void queryClient.invalidateQueries({
       queryKey: ["exam-sessions", data.id, "monitoring-participants"],
+    });
+    // F09: open reports backfill too — the whole attempt-report prefix
+    // (only mounted report queries refetch).
+    void queryClient.invalidateQueries({
+      queryKey: ["attempts"],
+      predicate: (q) =>
+        Array.isArray(q.queryKey) &&
+        q.queryKey[0] === "attempts" &&
+        q.queryKey[2] === "monitoring-report",
     });
   }, [queryClient, data.id]);
 

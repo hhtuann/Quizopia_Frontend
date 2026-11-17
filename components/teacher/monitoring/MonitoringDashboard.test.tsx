@@ -51,6 +51,7 @@ function overview(
     camera: {
       policyRequired: true,
       connected: 2,
+      publishing: 1,
       reconnecting: 0,
       idle: 1,
       revoked: 0,
@@ -91,9 +92,9 @@ function participant(
       state: "CONNECTED",
       connectedSince: "2026-11-17T08:01:00Z",
       lastVerifiedAt: "2026-11-17T08:28:00Z",
-      mediaIdentity: "identity_a",
+      mediaIdentity: "identity_a", publishing: true, online: true,
     },
-    ai: { lastDetectionAt: null, openAlerts: 1, totalAlerts: 2, unreviewedAlerts: 2 },
+    ai: { enabled: true, lastDetectionAt: null, openAlerts: 1, totalAlerts: 2, unreviewedAlerts: 2, detections: 3, quarantined: 0 },
     recording: { mode: "ROLLING", activeJobs: 1, completeJobs: 2, failedJobs: 0 },
     evidence: { snapshots: 1, clips: 1 },
     reviewStatus: "UNREVIEWED",
@@ -126,7 +127,7 @@ beforeEach(() => {
   participantsMock.mockResolvedValue({
     sessionId: 5,
     items: [participant()],
-    nextCursor: null,
+    nextCursor: null, teacherSubscriptionState: "NOT_AVAILABLE",
   } satisfies MonitoringParticipantsResponse);
 });
 
@@ -220,12 +221,12 @@ describe("MonitoringDashboard participants", () => {
     participantsMock.mockResolvedValueOnce({
       sessionId: 5,
       items: [participant({ attemptId: 7 })],
-      nextCursor: "7",
+      nextCursor: "7", teacherSubscriptionState: "NOT_AVAILABLE",
     } satisfies MonitoringParticipantsResponse);
     participantsMock.mockResolvedValueOnce({
       sessionId: 5,
       items: [participant({ attemptId: 3, displayName: "Binh", attemptNumber: 2 })],
-      nextCursor: null,
+      nextCursor: null, teacherSubscriptionState: "NOT_AVAILABLE",
     } satisfies MonitoringParticipantsResponse);
     renderDashboard();
 
@@ -257,7 +258,7 @@ describe("MonitoringDashboard participants", () => {
     participantsMock.mockResolvedValue({
       sessionId: 5,
       items: [],
-      nextCursor: null,
+      nextCursor: null, teacherSubscriptionState: "NOT_AVAILABLE",
     } satisfies MonitoringParticipantsResponse);
     renderDashboard();
     await screen.findByText("No participant attempts yet.");

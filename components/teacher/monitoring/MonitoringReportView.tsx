@@ -17,6 +17,8 @@ import type {
   MonitoringReportPolicy,
 } from "@/lib/api/monitoring-report";
 import { formatDateTime, formatTime } from "@/lib/utils/format";
+import { fetchRecordingUrl } from "@/lib/api/evidence";
+import React from "react";
 
 /**
  * P4-E monitoring report renderer (design §3.6/§4) — shared by the session
@@ -68,6 +70,59 @@ export function sortTypeCounts(
   return [...byType]
     .map((e) => [e.type, e.count] as [string, number])
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+/**
+ * F05: on-demand authorized playback for a playable report segment. Mints
+ * the short-lived URL ONLY when the teacher clicks Play (no pre-mint on
+ * render); unplayable segments render no control at all.
+ */
+function ReportSegmentPlayer({
+  sessionId,
+  jobId,
+}: {
+  sessionId: number;
+  jobId: string;
+}) {
+  const [state, setState] = React.useState<
+    { url: string } | "idle" | "loading" | "error"
+  >("idle");
+  const load = React.useCallback(() => {
+    setState("loading");
+    fetchRecordingUrl(sessionId, jobId)
+      .then((r) => setState({ url: r.url }))
+      .catch(() => setState("error"));
+  }, [sessionId, jobId]);
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={load}
+        disabled={state === "loading"}
+        className="rounded-lg px-2 py-0.5 text-[11px] font-semibold text-[#0052FF] underline underline-offset-2 outline-none transition-colors hover:text-[#0052FF]/80 focus-visible:ring-2 focus-visible:ring-[#0052FF]"
+      >
+        {state === "loading" ? "Loading…" : "Play"}
+      </button>
+      {state === "error" && (
+        <button
+          type="button"
+          onClick={load}
+          className="text-[11px] font-semibold text-[#EF4444] underline underline-offset-2"
+        >
+          retry
+        </button>
+      )}
+      {typeof state === "object" && (
+        <video
+          key={state.url}
+          src={state.url}
+          controls
+          preload="metadata"
+          className="mt-1 h-auto w-full max-w-[420px] rounded-lg border border-[#E2E8F0]"
+        />
+      )}
+    </span>
+  );
 }
 
 function formatBytes(bytes: number | null | undefined): string {
@@ -175,7 +230,10 @@ export function MonitoringReportView({
       <ReportPolicySection policy={report.policy} />
       <ReportActivitySection activity={report.activity} />
       <ReportCameraSection camera={report.camera} />
-      <ReportRecordingSection recording={report.recording} />
+      <ReportRecordingSection
+        recording={report.recording}
+        sessionId={report.attempt.sessionId}
+      />
       <ReportAiSection ai={report.ai} />
       <ReportEvidenceSection evidence={report.evidence} />
       <ReportReviewsSection reviews={report.reviews} />
@@ -337,8 +395,10 @@ function ReportCameraSection({
 
 function ReportRecordingSection({
   recording,
+  sessionId,
 }: {
   recording: MonitoringReportRecording;
+  sessionId: number;
 }) {
   return (
     <ReportSection title="Recording">
@@ -388,6 +448,9 @@ function ReportRecordingSection({
                   </span>
                   {segment.objectDeleted && (
                     <Badge variant="warn">object deleted</Badge>
+                  )}
+                  {segment.playbackRef != null && (
+                    <ReportSegmentPlayer sessionId={sessionId} jobId={segment.jobId} />
                   )}
                   {segment.expiresAt != null && (
                     <span className="text-[#94A3B8]">

@@ -15,7 +15,13 @@ const fetchNextPage = vi.fn();
 
 vi.mock("@/hooks/queries/use-monitoring", () => ({
   useAttemptTimelineQuery: vi.fn(),
-  DEFAULT_TIMELINE_FILTERS: { source: "ALL", group: "ALL", reviewsOnly: false },
+  DEFAULT_TIMELINE_FILTERS: {
+    source: "ALL",
+    group: "ALL",
+    reviewsOnly: false,
+    from: "",
+    to: "",
+  },
 }));
 
 const timelineQuery = vi.mocked(useAttemptTimelineQuery);
@@ -130,6 +136,8 @@ describe("AttemptTimeline", () => {
       source: "CLIENT",
       group: "ALL",
       reviewsOnly: false,
+      from: "",
+      to: "",
     });
 
     const groupSelect = screen.getByLabelText("Event type");
@@ -138,6 +146,8 @@ describe("AttemptTimeline", () => {
       source: "CLIENT",
       group: "ANSWERS",
       reviewsOnly: false,
+      from: "",
+      to: "",
     });
 
     // Filter controls exist inside the labelled group.
@@ -171,10 +181,26 @@ describe("AttemptTimeline reviews-only toggle (P4-E)", () => {
       source: "ALL",
       group: "ALL",
       reviewsOnly: true,
+      from: "",
+      to: "",
     });
     expect(screen.getByLabelText("Event type")).toHaveProperty("disabled", true);
     expect(
       screen.getByRole("button", { name: "Reviews only (on)" }).getAttribute("aria-pressed")
     ).toBe("true");
+  });
+
+  it("drives the query with the F08 time-range filters", () => {
+    render(<AttemptTimeline attemptId={12} />);
+    fireEvent.change(screen.getByLabelText("Filter events from this server time"), {
+      target: { value: "2026-11-17T10:00" },
+    });
+    fireEvent.change(screen.getByLabelText("Filter events up to this server time"), {
+      target: { value: "2026-11-17T11:00" },
+    });
+    const calls = timelineQuery.mock.calls;
+    const lastFilters = calls[calls.length - 1]?.[1];
+    expect(lastFilters?.from).toBe("2026-11-17T10:00");
+    expect(lastFilters?.to).toBe("2026-11-17T11:00");
   });
 });

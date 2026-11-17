@@ -190,7 +190,7 @@ function OverviewSection({ overview }: { overview: MonitoringOverviewResponse })
 
       <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 xl:grid-cols-5">
         <OverviewGroup title="Attempts" rows={[["Total", overview.attempts.total], ["In progress", overview.attempts.inProgress], ["Submitted", overview.attempts.submitted], ["Graded", overview.attempts.graded]]} />
-        <OverviewGroup title="Camera" rows={[["Connected", overview.camera.connected], ["Reconnecting", overview.camera.reconnecting], ["Idle", overview.camera.idle], ["Revoked", overview.camera.revoked]]} />
+        <OverviewGroup title="Camera" rows={[["Connected", overview.camera.connected], ["Publishing", overview.camera.publishing], ["Reconnecting", overview.camera.reconnecting], ["Idle", overview.camera.idle], ["Revoked", overview.camera.revoked]]} />
         <OverviewGroup title="AI alerts" rows={[["Enabled", overview.ai.enabled ? "Yes" : "No"], ["Open", overview.ai.openAlerts], ["Closed", overview.ai.closedAlerts], ["Unreviewed", overview.ai.unreviewedAlerts], ["Last detection", formatDateTime(overview.ai.lastDetectionAt)]]} />
         <OverviewGroup title="Recording" rows={[["Mode", overview.recording.fullRecordingEnabled ? "Full" : overview.recording.rollingBufferActive ? "Rolling buffer" : "Off"], ["Active jobs", overview.recording.activeJobs], ["Complete jobs", overview.recording.completeJobs], ["Failed jobs", overview.recording.failedJobs]]} />
         <OverviewGroup title="Evidence" rows={[["Available", overview.evidence.available], ["Partial", overview.evidence.partial], ["Pending", overview.evidence.pending], ["Failed", overview.evidence.failed], ["Expired", overview.evidence.expired]]} />
@@ -541,16 +541,36 @@ function ParticipantRow({
         <Badge variant={cameraStateVariant(item.camera.state)}>
           {CAMERA_STATE_LABEL[item.camera.state]}
         </Badge>
+        {item.camera.online && !item.camera.publishing && (
+          <span
+            className="ml-1.5 text-[11px] font-semibold text-[#F59E0B]"
+            title="Transport connected but no verified published track"
+          >
+            no track
+          </span>
+        )}
       </td>
       <td className="px-3 py-2.5 text-xs text-[#0F172A]">
-        {item.ai.unreviewedAlerts > 0 ? (
-          <Badge variant="warn">{item.ai.unreviewedAlerts} unreviewed</Badge>
+        {!item.ai.enabled ? (
+          <span className="text-[#64748B]">Disabled</span>
         ) : (
-          <span className="text-[#64748B]">0 unreviewed</span>
+          <>
+            {item.ai.unreviewedAlerts > 0 ? (
+              <Badge variant="warn">{item.ai.unreviewedAlerts} unreviewed</Badge>
+            ) : (
+              <span className="text-[#64748B]">0 unreviewed</span>
+            )}
+            <span className="ml-1.5 text-[#94A3B8]">
+              {item.ai.openAlerts} open / {item.ai.totalAlerts} total
+            </span>
+            <span
+              className="ml-1.5 text-[#94A3B8]"
+              title="Raw accepted detections (grouped into alerts) and quarantined late/duplicate events"
+            >
+              {item.ai.detections} det{item.ai.quarantined > 0 ? ` · ${item.ai.quarantined} quarantined` : ""}
+            </span>
+          </>
         )}
-        <span className="ml-1.5 text-[#94A3B8]">
-          {item.ai.openAlerts} open / {item.ai.totalAlerts} total
-        </span>
       </td>
       <td className="px-3 py-2.5 text-xs text-[#0F172A]">
         {item.recording.mode === "NONE" ? (

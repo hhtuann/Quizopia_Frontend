@@ -208,13 +208,19 @@ test.describe("Scenario P2 — full recording ON (REAL egress)", () => {
     await expect(video).toHaveJSProperty("readyState", 4, { timeout: 60_000 } as never);
     await video.evaluate((el) => (el as HTMLVideoElement).play());
     await page.waitForTimeout(1_500);
-    const seeked = await video.evaluate(() => {
-      const el = document.querySelector("video");
-      if (!el) return -1;
-      el.currentTime = 3;
-      return el.currentTime;
+    // Seek commits asynchronously — Chrome clamps an unbuffered seek back
+    // to the current position, so the assertion must POLL until the seek
+    // lands (a synchronous read right after the set is a race).
+    await video.evaluate((el) => {
+      (el as HTMLVideoElement).currentTime = 3;
     });
-    expect(seeked).toBeGreaterThanOrEqual(3);
+    await expect
+      .poll(
+        async () =>
+          video.evaluate((el) => (el as HTMLVideoElement).currentTime),
+        { timeout: 20_000, intervals: [500] }
+      )
+      .toBeGreaterThanOrEqual(2.9);
     await page.screenshot({ path: `${__dirname}/evidence/P2-recording-playback.png`, fullPage: true });
 
     await studentPage.close();

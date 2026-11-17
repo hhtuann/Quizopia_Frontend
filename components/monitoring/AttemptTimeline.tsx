@@ -100,7 +100,7 @@ export function AttemptTimeline({
         </span>
       </div>
 
-      {/* Filters: source toggle + type-group select */}
+      {/* Filters: source toggle + type-group select + time range (F08) */}
       <div className="mb-4 flex flex-wrap items-start gap-3">
         <div>
           <p className="sr-only">Filter by source</p>
@@ -143,6 +143,38 @@ export function AttemptTimeline({
               </option>
             ))}
           </select>
+        </div>
+        <div className="min-w-44 flex-1">
+          <label
+            htmlFor={`timeline-from-${attemptId}`}
+            className="mb-2 block font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]"
+          >
+            From (your local time)
+          </label>
+          <input
+            id={`timeline-from-${attemptId}`}
+            type="datetime-local"
+            value={filters.from}
+            onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value }))}
+            aria-label="Filter events from this server time"
+            className="h-11 w-full rounded-lg border border-[#E2E8F0] bg-white px-3 text-sm font-medium text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2"
+          />
+        </div>
+        <div className="min-w-44 flex-1">
+          <label
+            htmlFor={`timeline-to-${attemptId}`}
+            className="mb-2 block font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]"
+          >
+            To (your local time)
+          </label>
+          <input
+            id={`timeline-to-${attemptId}`}
+            type="datetime-local"
+            value={filters.to}
+            onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value }))}
+            aria-label="Filter events up to this server time"
+            className="h-11 w-full rounded-lg border border-[#E2E8F0] bg-white px-3 text-sm font-medium text-[#0F172A] outline-none transition-all duration-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF] focus:ring-offset-2"
+          />
         </div>
         {showReviewFilter && (
           <div className="min-w-48 flex-1">

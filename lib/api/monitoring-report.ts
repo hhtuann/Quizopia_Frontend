@@ -87,6 +87,8 @@ export interface MonitoringReportSegment {
   durationMs: number | null;
   objectDeleted: boolean;
   expiresAt: string | null;
+  /** P4-D mint endpoint path — present only for playable states (F05). */
+  playbackRef: string | null;
 }
 
 export interface MonitoringReportGap {

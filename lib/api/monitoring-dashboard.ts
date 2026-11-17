@@ -20,11 +20,14 @@ export interface MonitoringOverviewResponse {
   };
   camera: {
     policyRequired: boolean;
+    /** Open transport connection (presence), per user. */
     connected: number;
+    /** Connected AND a verified published track (F04). */
+    publishing: number;
     reconnecting: number;
     idle: number;
     revoked: number;
-    };
+  };
   ai: {
     enabled: boolean;
     openAlerts: number;
@@ -73,12 +76,22 @@ export interface MonitoringParticipantItem {
     connectedSince: string | null;
     lastVerifiedAt: string | null;
     mediaIdentity: string | null;
+    /** F04: verified published track on the open connection. */
+    publishing: boolean;
+    /** F04: transport presence (open connection) — distinct from publishing. */
+    online: boolean;
   };
   ai: {
+    /** F04: session policy flag — false ⇒ the AI block is disabled. */
+    enabled: boolean;
     lastDetectionAt: string | null;
     openAlerts: number;
     totalAlerts: number;
     unreviewedAlerts: number;
+    /** F04: raw accepted detections — separate from alerts. */
+    detections: number;
+    /** F04: quarantined (late/dup) — honest degraded signal. */
+    quarantined: number;
   };
   recording: {
     mode: "FULL" | "ROLLING" | "NONE";
@@ -99,6 +112,11 @@ export interface MonitoringParticipantsResponse {
   items: MonitoringParticipantItem[];
   /** Opaque numeric cursor (last attemptId, DESC) — null = last page. */
   nextCursor: string | null;
+  /**
+   * F04: honestly "NOT_AVAILABLE" — the backend cannot observe which camera
+   * the TEACHER's browser subscribes to (client-side LiveKit state).
+   */
+  teacherSubscriptionState: "NOT_AVAILABLE";
 }
 
 /** Participants query params — `"ALL"` selects are dropped by the builder. */

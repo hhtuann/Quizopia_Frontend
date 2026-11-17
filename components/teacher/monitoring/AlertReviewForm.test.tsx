@@ -151,7 +151,7 @@ describe("AlertReviewForm submit (happy path + idempotency)", () => {
     ).not.toBeNull();
   });
 
-  it("invalidates alerts feed, dashboard keys and the attempt timeline on success", async () => {
+  it("invalidates alerts feed, dashboard keys, attempt timeline and the open report on success", async () => {
     submitMock.mockResolvedValue({
       alertId: 9,
       reviewVersion: 1,
@@ -175,6 +175,9 @@ describe("AlertReviewForm submit (happy path + idempotency)", () => {
     expect(keys).toContain(JSON.stringify(["exam-sessions", 5, "monitoring-participants"]));
     expect(keys).toContain(JSON.stringify(["attempts", 10, "timeline"]));
     expect(keys).toContain(JSON.stringify(["alerts", 9, "reviews"]));
+    expect(keys).toContain(
+      JSON.stringify(["attempts", 10, "monitoring-report"])
+    );
   });
 
   it("omits the note when the textarea is only whitespace", async () => {

@@ -116,6 +116,11 @@ export function AlertReviewForm({
       void queryClient.invalidateQueries({
         queryKey: ["alerts", alert.alertId, "reviews"],
       });
+      // F09: an ALREADY-OPEN report of this attempt refreshes too (the
+      // review counters/reviews list change) — no loop: mutation-driven.
+      void queryClient.invalidateQueries({
+        queryKey: ["attempts", alert.attemptId, "monitoring-report"],
+      });
     },
     onError: (err: unknown) => {
       const conflict = reviewConflictMessage(err);

@@ -8,6 +8,7 @@ import {
   isReportEvidencePlayable,
   sortTypeCounts,
 } from "./MonitoringReportView";
+import { fetchRecordingUrl } from "@/lib/api/evidence";
 import type { AttemptMonitoringReport } from "@/lib/api/monitoring-report";
 import type { SessionAttemptItem } from "@/lib/api/monitoring";
 
@@ -17,6 +18,10 @@ import type { SessionAttemptItem } from "@/lib/api/monitoring";
  * rows metadata-only (no play affordance) and the disclaimer rendered
  * verbatim. Query hooks + REST mocked (msw-free).
  */
+
+vi.mock("@/lib/api/evidence", () => ({
+  fetchRecordingUrl: vi.fn(),
+}));
 
 vi.mock("@/lib/api/monitoring-report", () => ({
   getAttemptMonitoringReport: vi.fn(),
@@ -114,6 +119,7 @@ function report(
           bytes: 936000,
           durationMs: 30000,
           objectDeleted: false,
+          playbackRef: "/api/exam-sessions/5/recordings/job-1/url",
           expiresAt: "2026-12-17T00:00:00Z",
         },
       ],
@@ -386,5 +392,27 @@ describe("report formatting helpers (pure)", () => {
       ["TAB_HIDDEN", 18],
       ["PAGE_RELOADED", 1],
     ]);
+  });
+
+  it("F05: clicking Play mints the audited recording URL and mounts the player", async () => {
+    vi.mocked(fetchRecordingUrl).mockResolvedValue({
+      url: "http://localhost:9000/quizopia-evidence/seg.mp4?X=1",
+      expiresAt: "2026-11-17T09:00:00Z",
+    });
+    renderCard();
+    fireEvent.change(screen.getByLabelText("Participant attempt"), {
+      target: { value: "7" },
+    });
+    await screen.findByTestId("monitoring-report-view");
+    // COMPLETE+playable fixture renders exactly one enabled Play control
+    const play = screen.getByRole("button", { name: "Play" });
+    expect((play as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(play);
+    await waitFor(() => expect(fetchRecordingUrl).toHaveBeenCalled());
+    await waitFor(() => {
+      const video = document.querySelector("video");
+      expect(video).not.toBeNull();
+      expect(video?.getAttribute("src")).toContain("seg.mp4");
+    });
   });
 });
