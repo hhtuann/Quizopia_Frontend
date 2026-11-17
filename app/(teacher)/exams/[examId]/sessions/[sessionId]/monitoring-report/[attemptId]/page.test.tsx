@@ -88,7 +88,11 @@ function minimalReport(): AttemptMonitoringReport {
       limitsNote: null,
     },
     evidence: [],
+  evidenceTotal: 1,
+  evidenceTruncated: false,
     reviews: [],
+  reviewsTotal: 1,
+  reviewsTruncated: false,
     retention: { mediaRetentionDays: 30, activityRetentionDays: 90, asOf: "2026-11-17T09:30:00Z" },
     disclaimer:
       "Monitoring observations only. No automated misconduct verdict; human review required.",
