@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils/cn";
 import { ConfirmDialog } from "@/components/teacher/exam-editor/ConfirmDialog";
 import { ClassAssignment } from "@/components/teacher/ClassAssignment";
 import { LiveMonitor } from "@/components/teacher/LiveMonitor";
+import { RecordingsCard } from "@/components/teacher/RecordingsCard";
 import { ReportingSection } from "@/components/teacher/reporting/ReportingSection";
 import { SessionShareCard } from "@/components/teacher/SessionShareCard";
 import type { NormalizedApiError } from "@/lib/api";
@@ -374,6 +375,9 @@ function DetailView({ data, backHref }: { data: ExamSessionDetailResponse; backH
       {monitored && (
         <CameraGridCard sessionId={data.id} participants={cameraParticipants} />
       )}
+
+      {/* P4-D: recording segments + derived gaps (collapsed by default). */}
+      {monitored && <RecordingsCard sessionId={data.id} />}
 
       {/* P4-A4: per-participant activity timeline (attempt picker + live refetch). */}
       <TeacherActivityPanel

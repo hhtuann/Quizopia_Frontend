@@ -4,10 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import { attachTrack } from "@/lib/media/livekit";
 import { getPublishedCameraTrack } from "@/lib/media/published-track";
 import {
+  fetchAttemptMediaStatus,
+  uploadEvidenceSnapshot,
+} from "@/lib/api/evidence";
+import {
   ingestAiDetections,
   type AiDetectionEventType,
+  type AiDetectionIngestResult,
   type AiDetectionItem,
   type AiDetectionPayloadBox,
+  type AiDetectionSnapshotRequest,
 } from "@/lib/api/ai-detections";
 import {
   MODEL,
@@ -86,7 +92,15 @@ export interface AttemptAiState {
   fps: number;
   /** True while the e2e FAKE detector is active (output labeled SIMULATED). */
   simulated: boolean;
+  /**
+   * P4-D snapshot upload (transient pill copy): 'sent' after a successful
+   * CLIENT_CAPTURE upload, 'failed' when capture/upload failed. NEVER
+   * affects the detection loop.
+   */
+  snapshotState: AttemptSnapshotState;
 }
+
+export type AttemptSnapshotState = "idle" | "sent" | "failed";
 
 /** Batch bound per request (CONTRACT §3.1). */
 const MAX_BATCH = 8;
@@ -107,6 +121,11 @@ const GAZE_MAX_FAILURES = 3;
 const TRACK_POLL_MS = 1_000;
 /** PERSON_NOT_OBSERVED needs 3 consecutive person-free analyzed frames. */
 const PERSON_ABSENT_FRAMES = 3;
+/** P4-D snapshot: longest captured side (no upscaling — mirrors the
+ * camera-fallback canvas sizing). */
+const SNAPSHOT_MAX_SIDE = 640;
+/** P4-D snapshot JPEG quality (≤2MB contract bound). */
+const SNAPSHOT_JPEG_QUALITY = 0.85;
 
 /* ------------------------------------------------------------------ */
 /* Event decisions (pure — unit-tested).                               */
@@ -212,6 +231,36 @@ function toPayloadBoxes(boxes: DetectionBox[]): AiDetectionPayloadBox[] {
   }));
 }
 
+/** P4-D idempotency key — fresh UUID per capture intent. */
+function newSnapshotKey(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `snap-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
+ * P4-D: capture the feeder's CURRENT frame as a JPEG blob. Sizing mirrors
+ * the camera-fallback canvas (decoded videoWidth/videoHeight, max side
+ * SNAPSHOT_MAX_SIDE, never upscaled). Resolves null when no frame has
+ * decoded or the environment cannot encode.
+ */
+function captureSnapshotBlob(video: HTMLVideoElement): Promise<Blob | null> {
+  const w = video.videoWidth;
+  const h = video.videoHeight;
+  if (!w || !h) return Promise.resolve(null);
+  const scale = Math.min(1, SNAPSHOT_MAX_SIDE / Math.max(w, h));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(w * scale);
+  canvas.height = Math.round(h * scale);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return Promise.resolve(null);
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const { promise, resolve } = Promise.withResolvers<Blob | null>();
+  canvas.toBlob(resolve, "image/jpeg", SNAPSHOT_JPEG_QUALITY);
+  return promise;
+}
+
 /* ------------------------------------------------------------------ */
 /* Hook.                                                               */
 /* ------------------------------------------------------------------ */
@@ -226,6 +275,7 @@ export function useAttemptAiDetection(
     runtime: null,
     fps: DEFAULT_ANALYSIS_FPS,
     simulated: false,
+    snapshotState: "idle",
   });
   // Mirrors status for stable comparisons inside the effect.
   const statusRef = useRef<AttemptAiStatus>("idle");
@@ -247,6 +297,57 @@ export function useAttemptAiDetection(
     let gazeFailures = 0;
     let lastFlushAt = Number.NEGATIVE_INFINITY;
     const gazeTracker = new GazeTracker();
+    // P4-D snapshot policy. Requests arriving while the policy is UNKNOWN
+    // are buffered, never dropped: resolve → on (upload), off (drop), or
+    // fetch-failure → attempt anyway (the server policy gate is the honest
+    // authority and rejects cleanly).
+    let snapshotPolicy: "unknown" | "on" | "off" | "attempt" = "unknown";
+    const pendingSnapshotRequests: AiDetectionSnapshotRequest[] = [];
+    /** Capture + upload one snapshot. Fire-and-forget — a failure ONLY
+     * flips snapshotState, never the detection loop. */
+    const uploadSnapshot = (request: AiDetectionSnapshotRequest): void => {
+      const video = feeder;
+      void (async () => {
+        try {
+          const blob = video ? await captureSnapshotBlob(video) : null;
+          if (blob == null) throw new Error("snapshot frame unavailable");
+          await uploadEvidenceSnapshot(attemptId, {
+            alertId: request.alertId,
+            capturedAtMs: Date.now(),
+            blob,
+            idempotencyKey: newSnapshotKey(),
+          });
+          if (!stopped) {
+            setState((prev) => ({ ...prev, snapshotState: "sent" }));
+          }
+        } catch {
+          if (!stopped) {
+            setState((prev) =>
+              prev.snapshotState === "failed"
+                ? prev
+                : { ...prev, snapshotState: "failed" }
+            );
+          }
+        }
+      })();
+    };
+    const resolveSnapshotPolicy = (next: "on" | "off" | "attempt"): void => {
+      snapshotPolicy = next;
+      if (stopped || next === "off") {
+        pendingSnapshotRequests.length = 0;
+        return;
+      }
+      for (const request of pendingSnapshotRequests.splice(0)) {
+        uploadSnapshot(request);
+      }
+    };
+    fetchAttemptMediaStatus(attemptId)
+      .then((status) => {
+        resolveSnapshotPolicy(status.snapshotsEnabled ? "on" : "off");
+      })
+      .catch(() => {
+        resolveSnapshotPolicy("attempt");
+      });
     const sentRecords: SentAiEventRecord[] = [];
 
     const setGaze = (next: AttemptGazeStatus): void => {
@@ -279,8 +380,28 @@ export function useAttemptAiDetection(
       publishAiSentEvents([...sentRecords]);
     };
 
+    /** P4-D: route every snapshotRequest the ingest response carries
+     * through the policy: unknown → buffer, on/attempt → upload, off →
+     * drop. Never touches the detection loop. */
+    const handleSnapshotRequests = (results: AiDetectionIngestResult[]): void => {
+      if (stopped) return;
+      const requests = results
+        .map((r) => r.snapshotRequest)
+        .filter((r): r is AiDetectionSnapshotRequest => r != null);
+      if (requests.length === 0) return;
+      if (snapshotPolicy === "off") return;
+      if (snapshotPolicy === "unknown") {
+        pendingSnapshotRequests.push(...requests);
+        return;
+      }
+      for (const request of requests) {
+        uploadSnapshot(request);
+      }
+    };
+
     /** Send the queue (≤8). Retry ×1 with the SAME eventIds (duplicate-safe);
-     * final failure → 'degraded' ONLY — never throws to the caller. */
+     * final failure → 'degraded' ONLY — never throws to the caller. On
+     * success the results are scanned for P4-D snapshotRequests. */
     const flush = async (): Promise<void> => {
       if (stopped || sending || queue.length === 0) return;
       if (queue.length < MAX_BATCH && Date.now() - lastFlushAt < MIN_FLUSH_GAP_MS) {
@@ -291,18 +412,15 @@ export function useAttemptAiDetection(
       const batch = queue;
       queue = [];
       try {
-        await ingestAiDetections(attemptId, batch);
+        const results = await ingestAiDetections(attemptId, batch)
+          .catch(() => ingestAiDetections(attemptId, batch))
+          .then((res) => res.results);
         recordSent(batch);
         if (statusRef.current === "degraded") enter("running");
+        handleSnapshotRequests(results);
       } catch {
-        try {
-          await ingestAiDetections(attemptId, batch);
-          recordSent(batch);
-          if (statusRef.current === "degraded") enter("running");
-        } catch {
-          // Batch is dropped (bounded memory); detection keeps running.
-          enter("degraded");
-        }
+        // Batch is dropped (bounded memory); detection keeps running.
+        enter("degraded");
       } finally {
         sending = false;
       }

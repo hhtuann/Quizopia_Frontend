@@ -17,6 +17,7 @@ function state(partial: Partial<AttemptAiState>): AttemptAiState {
     runtime: null,
     fps: 1.5,
     simulated: false,
+    snapshotState: "idle",
     ...partial,
   };
 }
@@ -70,6 +71,18 @@ describe("AiStatusPill", () => {
 
   it("appends the SIMULATED marker while the fake detector is active", () => {
     expect(pillText({ status: "running", simulated: true })).toContain("[SIMULATED]");
+  });
+
+  it("appends the transient snapshot-sent suffix only after a successful upload", () => {
+    expect(pillText({ snapshotState: "sent" })).toContain("Đã gửi ảnh minh chứng");
+    expect(pillText({ snapshotState: "idle" })).not.toContain("Đã gửi ảnh minh chứng");
+    expect(pillText({ snapshotState: "failed" })).not.toContain("Đã gửi ảnh minh chứng");
+  });
+
+  it("keeps the SIMULATED marker independent of the snapshot suffix", () => {
+    const text = pillText({ simulated: true, snapshotState: "sent" });
+    expect(text).toContain("[SIMULATED]");
+    expect(text).toContain("Đã gửi ảnh minh chứng");
   });
 
   it("is a polite status (never an alert)", () => {

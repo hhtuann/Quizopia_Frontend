@@ -67,7 +67,7 @@ describe("normalizeMonitoringConfig (cascade)", () => {
     expect(next).toEqual(DEFAULT_MONITORING_CONFIG);
   });
 
-  it("snapshots fall when AI falls; clips fall when recording falls", () => {
+  it("snapshots fall when AI falls; clips survive recording OFF (P4-D)", () => {
     expect(
       normalizeMonitoringConfig(
         config({
@@ -81,7 +81,7 @@ describe("normalizeMonitoringConfig (cascade)", () => {
     ).toEqual(
       config({
         monitoringEnabled: true,
-        activityTrackingEnabled: false,
+        evidenceClipsEnabled: true,
       })
     );
   });
@@ -108,21 +108,27 @@ describe("monitoringFlagAvailability (per-flag prerequisites)", () => {
     expect(availability.fullRecordingEnabled.disabled).toBe(true);
   });
 
-  it("snapshots additionally need AI; clips additionally need recording", () => {
+  it("snapshots additionally need AI; clips need monitoring only (P4-D)", () => {
     const availability = monitoringFlagAvailability(
       config({ monitoringEnabled: true })
     );
     expect(availability.evidenceSnapshotsEnabled.disabled).toBe(true);
     expect(availability.evidenceSnapshotsEnabled.prerequisite).toBe("aiDetectionEnabled");
-    expect(availability.evidenceClipsEnabled.disabled).toBe(true);
-    expect(availability.evidenceClipsEnabled.prerequisite).toBe("fullRecordingEnabled");
+    expect(availability.evidenceClipsEnabled.disabled).toBe(false);
+    expect(availability.evidenceClipsEnabled.prerequisite).toBe("monitoringEnabled");
 
     const withPrereqs = monitoringFlagAvailability(
-      config({ monitoringEnabled: true, aiDetectionEnabled: true, fullRecordingEnabled: true })
+      config({ monitoringEnabled: true, aiDetectionEnabled: true })
     );
     expect(withPrereqs.evidenceSnapshotsEnabled.disabled).toBe(false);
+    // Clips ride the rolling buffer: available WITHOUT full recording.
     expect(withPrereqs.evidenceClipsEnabled.disabled).toBe(false);
     expect(withPrereqs.aiDetectionEnabled.disabled).toBe(false);
+
+    const recordingOff = monitoringFlagAvailability(
+      config({ monitoringEnabled: true, fullRecordingEnabled: false })
+    );
+    expect(recordingOff.evidenceClipsEnabled.disabled).toBe(false);
   });
 });
 

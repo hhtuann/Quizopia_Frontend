@@ -82,6 +82,7 @@ export function AiStatusPill({ state }: { state: AttemptAiState }) {
       <span className={cn("mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle", dot)} />
       {label}
       {state.simulated ? " [SIMULATED]" : ""}
+      {state.snapshotState === "sent" ? " · Đã gửi ảnh minh chứng" : ""}
     </span>
   );
 }

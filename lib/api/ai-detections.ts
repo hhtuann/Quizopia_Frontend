@@ -49,10 +49,19 @@ export type AiDetectionIngestStatus =
   | "QUARANTINED_LATE"
   | "REJECTED";
 
+/** P4-D: present ONLY when this ACCEPTED event opened an alert window and
+ * the policy enables snapshots — asks the client to capture the current
+ * frame from the same stream the detector ran on. */
+export interface AiDetectionSnapshotRequest {
+  alertId: number;
+  reason: "ALERT_OPENED";
+}
+
 export interface AiDetectionIngestResult {
   eventId: string;
   status: AiDetectionIngestStatus;
   reason?: string;
+  snapshotRequest?: AiDetectionSnapshotRequest;
 }
 
 /** Batch ingest (≤8 items). One invalid item rejects the whole batch (400). */
