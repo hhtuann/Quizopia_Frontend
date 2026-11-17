@@ -83,6 +83,16 @@ export function AiStatusPill({ state }: { state: AttemptAiState }) {
       {label}
       {state.simulated ? " [SIMULATED]" : ""}
       {state.snapshotState === "sent" ? " · Đã gửi ảnh minh chứng" : ""}
+      {" · "}
+      <a
+        href="https://github.com/hhtuann/Quizopia_Frontend/blob/main/SOURCE-AVAILABILITY.md"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-2"
+        aria-label="Mã nguồn và giấy phép AGPL-3.0 của Quizopia"
+      >
+        Mã nguồn
+      </a>
     </span>
   );
 }

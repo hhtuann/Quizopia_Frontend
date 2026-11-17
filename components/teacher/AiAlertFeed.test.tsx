@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AiAlertCard,
@@ -465,7 +465,85 @@ describe("AiAlertFeed evidence snapshot in the bbox frame (P4-D)", () => {
     expect(screen.queryByTestId("ai-alert-snapshot")).toBeNull();
   });
 
-  it("a snapshot shows even when the alert carries no boxes", () => {
+  it("a LATER live frame (held frame unavailable) is never captioned as the detection frame", async () => {
+    alertsMock.mockResolvedValue({
+      items: [
+        alertItem({
+          alertId: 1,
+          latestDetections: [
+            { classId: 67, label: "cell phone", confidence: 0.6, bbox: [0.7, 0.7, 0.9, 0.9] },
+          ],
+          firstDetections: [
+            { classId: 67, label: "cell phone", confidence: 0.95, bbox: [0.1, 0.2, 0.3, 0.6] },
+          ],
+        }),
+      ],
+      nextCursor: null,
+    });
+    // firstDetectedAt 08:00:00 — this photo was taken 30s later.
+    evidenceMock.mockResolvedValue([snapshotItem({ capturedAt: "2026-11-15T08:00:30Z" })]);
+    evidenceUrlMock.mockResolvedValue({
+      url: "http://minio.test/late.jpg",
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    });
+    renderFeed(5);
+    await screen.findByTestId("ai-alert-snapshot");
+    const caption = screen.getByTestId("ai-alert-card").textContent ?? "";
+    expect(caption).toContain("không phải khung hình lúc phát hiện");
+    expect(caption).not.toContain("đúng khung hình lúc phát hiện");
+    // Boxes of the opening frame are NOT drawn over an unrelated photo.
+    const box = screen.getByTestId("ai-alert-bboxes").querySelector<HTMLElement>("div.absolute")!;
+    expect(box.style.left).toBe("70%");
+  });
+
+  it("a FULL snapshot page without this alert → the card looks its own snapshot up by alertId", async () => {
+    alertsMock.mockResolvedValue({ items: [alertItem({ alertId: 1, detectionCount: 1 })], nextCursor: null });
+    const others = Array.from({ length: 100 }, (_, i) =>
+      snapshotItem({ evidenceId: `o-${i}`, alertId: 1000 + i })
+    );
+    evidenceMock.mockImplementation(async (_sid, params) =>
+      params?.alertId === 1 ? [snapshotItem({ evidenceId: "own" })] : others
+    );
+    evidenceUrlMock.mockResolvedValue({
+      url: "http://minio.test/own.jpg",
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    });
+    renderFeed(5);
+    const img = (await screen.findByTestId("ai-alert-snapshot")) as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe("http://minio.test/own.jpg");
+    expect(evidenceMock).toHaveBeenCalledWith(5, { kind: "SNAPSHOT", alertId: 1, limit: 10 });
+    expect(evidenceUrlMock).toHaveBeenCalledWith(5, "own");
+  });
+
+  it("a page that is NOT full never triggers per-alert lookups", async () => {
+    alertsMock.mockResolvedValue({ items: [alertItem({ alertId: 1 })], nextCursor: null });
+    evidenceMock.mockResolvedValue([snapshotItem({ alertId: 99 })]);
+    renderFeed(5);
+    await screen.findByTestId("ai-alert-bboxes");
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(evidenceMock.mock.calls.every((c) => c[1]?.alertId == null)).toBe(true);
+  });
+
+  it("a snapshot whose URL cannot be minted claims no photo", async () => {
+    alertsMock.mockResolvedValue({ items: [alertItem({ alertId: 1 })], nextCursor: null });
+    evidenceMock.mockResolvedValue([snapshotItem()]);
+    evidenceUrlMock.mockRejectedValue(new Error("403"));
+    renderFeed(5);
+    await screen.findByTestId("ai-alert-bboxes");
+    await waitFor(() => expect(evidenceUrlMock).toHaveBeenCalled());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByTestId("ai-alert-snapshot")).toBeNull();
+    expect(screen.getByTestId("ai-alert-card").textContent).toContain(
+      "chưa có ảnh minh chứng cho cảnh báo này"
+    );
+    expect(screen.getByTestId("ai-alert-card").textContent).not.toContain("Ảnh do máy thí sinh gửi");
+  });
+
+  it("a snapshot shows even when the alert carries no boxes", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     evidenceUrlMock.mockResolvedValue({
       url: "http://minio.test/s.jpg",
@@ -480,6 +558,7 @@ describe("AiAlertFeed evidence snapshot in the bbox frame (P4-D)", () => {
         />
       </QueryClientProvider>
     );
+    expect(await screen.findByTestId("ai-alert-snapshot")).toBeTruthy();
     expect(screen.getByTestId("ai-alert-bboxes")).toBeTruthy();
   });
 });

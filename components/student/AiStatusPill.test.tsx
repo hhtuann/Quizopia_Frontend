@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { AiStatusPill } from "./AiStatusPill";
 import type { AttemptAiState } from "@/lib/ai/use-attempt-ai-detection";
@@ -28,9 +28,11 @@ function pillText(partial: Partial<AttemptAiState>): string {
 }
 
 describe("AiStatusPill", () => {
-  it("running shows a plain label — no model, FPS, runtime or source link", () => {
+  it("running shows a plain label (no model, FPS or runtime) plus the AGPL source link", () => {
     const text = pillText({ status: "running", runtime: "ORT_WEB_WEBGPU", fps: 1.5, gaze: "running" });
-    expect(text).toBe("AI giám sát: đang chạy");
+    expect(text).toBe("AI giám sát: đang chạy · Mã nguồn");
+    const link = screen.getByRole("link", { name: "Mã nguồn và giấy phép AGPL-3.0 của Quizopia" });
+    expect(link.getAttribute("href")).toContain("SOURCE-AVAILABILITY.md");
   });
 
   it("gaze sub-status is appended only while it needs attention — never an observation", () => {

@@ -138,10 +138,14 @@ export function AiAlertFeed({ sessionId }: { sessionId: number }) {
   // session without snapshots) just leaves the dark canvas.
   const { data: evidence } = useQuery({
     queryKey: ["exam-sessions", sessionId, "evidence", "feed-snapshots"],
-    queryFn: () => fetchSessionEvidence(sessionId, { kind: "SNAPSHOT", limit: 100 }),
+    queryFn: () =>
+      fetchSessionEvidence(sessionId, { kind: "SNAPSHOT", limit: FEED_SNAPSHOT_PAGE }),
     enabled: Number.isFinite(sessionId) && sessionId > 0,
   });
   const snapshots = useMemo(() => snapshotsByAlert(evidence ?? []), [evidence]);
+  // The list endpoint caps at 100 (newest first). When it came back full,
+  // older alerts may still have a snapshot — those cards look it up by id.
+  const snapshotListFull = (evidence?.length ?? 0) >= FEED_SNAPSHOT_PAGE;
 
   const loadOlder = async (): Promise<void> => {
     const cursor = items.length > 0 ? items[items.length - 1].alertId : undefined;
@@ -167,9 +171,14 @@ export function AiAlertFeed({ sessionId }: { sessionId: number }) {
         <button
           type="button"
           onClick={() =>
-            void queryClient.invalidateQueries({
-              queryKey: ["exam-sessions", sessionId, "ai-alerts"],
-            })
+            void Promise.all([
+              queryClient.invalidateQueries({
+                queryKey: ["exam-sessions", sessionId, "ai-alerts"],
+              }),
+              queryClient.invalidateQueries({
+                queryKey: ["exam-sessions", sessionId, "evidence"],
+              }),
+            ])
           }
           className="rounded-lg px-2 py-1 text-xs font-semibold text-[#64748B] outline-none transition-colors hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF]"
         >
@@ -198,6 +207,7 @@ export function AiAlertFeed({ sessionId }: { sessionId: number }) {
                 alert={alert}
                 sessionId={sessionId}
                 snapshot={snapshots.get(alert.alertId)}
+                lookUpSnapshot={snapshotListFull && !snapshots.has(alert.alertId)}
               />
             </li>
           ))}
@@ -218,31 +228,39 @@ export function AiAlertFeed({ sessionId }: { sessionId: number }) {
   );
 }
 
-/** The alert's evidence snapshot, filling the bbox frame. Own component so
- * the presigned-URL query only exists for cards that have a snapshot. */
-function AlertSnapshotImage({ sessionId, item }: { sessionId: number; item: EvidenceItem }) {
-  const { data } = useEvidenceUrl(sessionId, item.evidenceId, true);
-  if (!data?.url) return null;
-  return (
-    // eslint-disable-next-line @next/next/no-img-element -- presigned URL (300s TTL) must not pass through the Next image optimizer
-    <img
-      src={data.url}
-      alt="Ảnh minh chứng do máy thí sinh gửi"
-      data-testid="ai-alert-snapshot"
-      className="absolute inset-0 h-full w-full object-fill"
-    />
-  );
+/**
+ * A snapshot counts as "the detection frame" only when it was captured at
+ * the alert's first detection (the client holds that exact frame; if it
+ * could not, it uploads a later live frame stamped with its own time).
+ */
+export const SNAPSHOT_FRAME_TOLERANCE_MS = 1_500;
+
+/** Snapshot page the feed loads in one call (= backend MAX_PAGE). */
+export const FEED_SNAPSHOT_PAGE = 100;
+
+export function snapshotIsDetectionFrame(
+  snapshot: Pick<EvidenceItem, "capturedAt">,
+  firstDetectedAt: string
+): boolean {
+  if (!snapshot.capturedAt) return false;
+  const a = new Date(snapshot.capturedAt).getTime();
+  const b = new Date(firstDetectedAt).getTime();
+  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= SNAPSHOT_FRAME_TOLERANCE_MS;
 }
 
 export function AiAlertCard({
   alert,
   sessionId,
-  snapshot,
+  snapshot: listedSnapshot,
+  lookUpSnapshot = false,
 }: {
   alert: AiAlertItem;
   sessionId: number;
   /** P4-D snapshot for this alert, shown under the boxes when present. */
   snapshot?: EvidenceItem;
+  /** The feed's snapshot page was full and had none for this alert: ask
+   *  the server for this alert's snapshot directly. */
+  lookUpSnapshot?: boolean;
 }) {
   const confidence =
     alert.maxConfidence != null ? `${Math.round(alert.maxConfidence * 100)}%` : "—";
@@ -257,16 +275,33 @@ export function AiAlertCard({
         ? "CLIENT MODEL"
         : "—";
   const latestDetections = alert.latestDetections ?? [];
-  const hasSnapshot = snapshot != null;
+  const { data: ownSnapshots } = useQuery({
+    queryKey: ["exam-sessions", sessionId, "evidence", "alert-snapshot", alert.alertId],
+    queryFn: () =>
+      fetchSessionEvidence(sessionId, { kind: "SNAPSHOT", alertId: alert.alertId, limit: 10 }),
+    enabled: lookUpSnapshot && listedSnapshot == null,
+  });
+  const snapshot =
+    listedSnapshot ?? (ownSnapshots ? snapshotsByAlert(ownSnapshots).get(alert.alertId) : undefined);
+  // Presigned URL only for cards that have a snapshot; the photo (and every
+  // caption about it) appears only once the URL actually resolved.
+  const { data: snapshotUrl } = useEvidenceUrl(
+    sessionId,
+    snapshot?.evidenceId ?? "",
+    snapshot != null
+  );
+  const hasSnapshot = snapshot != null && Boolean(snapshotUrl?.url);
+  const isDetectionFrame =
+    hasSnapshot && snapshotIsDetectionFrame(snapshot, alert.firstDetectedAt);
   // The snapshot is the frame the alert's FIRST detection ran on, so over
   // a photo the boxes of THAT detection are drawn (same frame → they line
   // up). Without a photo, or on a backend that does not send them, the
   // latest boxes are shown as before.
   const firstDetections = alert.firstDetections ?? null;
   const boxesMatchPhoto =
-    hasSnapshot && (firstDetections != null || alert.detectionCount <= 1);
+    isDetectionFrame && (firstDetections != null || alert.detectionCount <= 1);
   const detections =
-    hasSnapshot && firstDetections != null ? firstDetections : latestDetections;
+    isDetectionFrame && firstDetections != null ? firstDetections : latestDetections;
   const isGaze = alert.alertType === "LOOKING_AWAY";
   const gazeSummary = isGaze
     ? latestDetections.map((d) => describeGazeLabel(d.label)).find((s) => s != null) ?? null
@@ -279,7 +314,9 @@ export function AiAlertCard({
       : "4 / 3";
   const boxCaption = !hasSnapshot
     ? "bbox từ khung phân tích — chưa có ảnh minh chứng cho cảnh báo này"
-    : boxesMatchPhoto
+    : !isDetectionFrame
+      ? `Ảnh do máy thí sinh gửi lúc ${formatTime(snapshot.capturedAt ?? snapshot.createdAt)} — không phải khung hình lúc phát hiện; khung bbox là của lần phát hiện gần nhất`
+      : boxesMatchPhoto
       ? alert.detectionCount <= 1
         ? "Ảnh do máy thí sinh gửi — đúng khung hình lúc phát hiện"
         : "Ảnh do máy thí sinh gửi — khung hình và bbox của lần phát hiện đầu tiên"
@@ -368,7 +405,15 @@ export function AiAlertCard({
             data-testid="ai-alert-bboxes"
             aria-label={boxCaption}
           >
-            {hasSnapshot && <AlertSnapshotImage sessionId={sessionId} item={snapshot} />}
+            {hasSnapshot && (
+              // eslint-disable-next-line @next/next/no-img-element -- presigned URL (300s TTL) must not pass through the Next image optimizer
+              <img
+                src={snapshotUrl!.url}
+                alt="Ảnh minh chứng do máy thí sinh gửi"
+                data-testid="ai-alert-snapshot"
+                className="absolute inset-0 h-full w-full object-fill"
+              />
+            )}
             {detections.map((d, i) => {
               const [x1, y1, x2, y2] = d.bbox;
               return (

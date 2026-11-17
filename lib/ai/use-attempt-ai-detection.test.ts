@@ -7,11 +7,12 @@ import {
   decideDetectionEvents,
   gazeEventBox,
   useAttemptAiDetection,
+  GAZE_ESTIMATE_TIMEOUT_MS,
 } from "./use-attempt-ai-detection";
 import type * as ModelAdapter from "./model-adapter";
 import type * as GazeAdapter from "./gaze-adapter";
 import type { GazeEstimator } from "./gaze-adapter";
-import { GAZE_FACE_CLASS_ID, type GazeObservation } from "./gaze-core";
+import { GAZE_FACE_CLASS_ID, GazeTracker, type GazeObservation } from "./gaze-core";
 import type { DetectionBox, DetectionFrame, Detector } from "./model-adapter";
 import { getPublishedCameraTrack, setPublishedCameraTrack } from "@/lib/media/published-track";
 import { resetAiTestHooks, setFakeDetectorForTest } from "./test-hooks";
@@ -546,6 +547,77 @@ describe("useAttemptAiDetection — gaze", () => {
     const before = vi.mocked(detector.detect).mock.calls.length;
     await settle(TICK_MS * 3);
     expect(vi.mocked(detector.detect).mock.calls.length).toBeGreaterThan(before);
+  });
+
+  it("a HANGING gaze estimate never stalls yolo26s: phone still reported, gaze dropped", async () => {
+    setPublishedCameraTrack(fakeTrack());
+    ingestMock.mockResolvedValue({ results: [] });
+    const detector: Detector = {
+      status: "running",
+      runtime: "ORT_WEB_WASM",
+      detect: vi.fn(async () => ({
+        ...frame([box(0, 0.9), box(67, 0.9)], Date.now()),
+        simulated: false,
+      })),
+      release: vi.fn(async () => undefined),
+    };
+    createDetectorMock.mockResolvedValue(detector);
+    const estimator: GazeEstimator = {
+      status: "running",
+      runtime: "ORT_WEB_WASM",
+      // Never settles — a wedged gaze model.
+      estimate: vi.fn(() => new Promise<GazeObservation | null>(() => undefined)),
+      release: vi.fn(async () => undefined),
+    };
+    createGazeEstimatorMock.mockResolvedValue(estimator);
+
+    render(createElement(Harness, {}));
+    // 3 timed-out readings drop the gaze estimator; object frames still flow.
+    await settle((GAZE_ESTIMATE_TIMEOUT_MS + TICK_MS) * 4);
+    expect(gazeOf()).toBe("unavailable");
+    expect(estimator.estimate).toHaveBeenCalledTimes(3);
+    expect(estimator.release).toHaveBeenCalledTimes(1);
+    expect(statusOf()).toBe("running");
+    const sent = ingestMock.mock.calls.flatMap((c) => c[1]).map((e) => e.eventType);
+    expect(sent).toContain("PHONE_OBSERVED");
+    expect(sent).not.toContain("LOOKING_AWAY_OBSERVED");
+    const before = vi.mocked(detector.detect).mock.calls.length;
+    await settle(TICK_MS * 3);
+    expect(vi.mocked(detector.detect).mock.calls.length).toBeGreaterThan(before);
+  });
+
+  it("a gaze reading that breaks the tracker never costs the frame's phone event", async () => {
+    setPublishedCameraTrack(fakeTrack());
+    ingestMock.mockResolvedValue({ results: [] });
+    createDetectorMock.mockResolvedValue({
+      status: "running",
+      runtime: "ORT_WEB_WASM",
+      detect: vi.fn(async () => ({
+        ...frame([box(0, 0.9), box(67, 0.9)], Date.now()),
+        simulated: false,
+      })),
+      release: vi.fn(async () => undefined),
+    });
+    const trackerSpy = vi
+      .spyOn(GazeTracker.prototype, "update")
+      .mockImplementation(() => {
+        throw new Error("SIMULATED tracker failure");
+      });
+    createGazeEstimatorMock.mockResolvedValue({
+      status: "running",
+      runtime: "ORT_WEB_WASM",
+      estimate: vi.fn(async () => gazeObs(0, 0)),
+      release: vi.fn(async () => undefined),
+    });
+
+    render(createElement(Harness, {}));
+    await settle(TICK_MS * 6 + 3_000);
+    expect(trackerSpy).toHaveBeenCalled();
+    expect(statusOf()).toBe("running");
+    expect(gazeOf()).toBe("unavailable");
+    const sent = ingestMock.mock.calls.flatMap((c) => c[1]).map((e) => e.eventType);
+    expect(sent).toContain("PHONE_OBSERVED");
+    trackerSpy.mockRestore();
   });
 });
 

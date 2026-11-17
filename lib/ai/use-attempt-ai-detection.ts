@@ -117,6 +117,12 @@ const FLUSH_INTERVAL_MS = 2_000;
 const MIN_FLUSH_GAP_MS = 11_000;
 /** Consecutive gaze failures before the gaze estimator is given up on. */
 const GAZE_MAX_FAILURES = 3;
+/**
+ * Longest a gaze reading may take before the object frame is handed on
+ * without it (counted as a gaze failure). Keeps a stalled gaze model from
+ * stalling yolo26s, which runs in the same analysis tick.
+ */
+export const GAZE_ESTIMATE_TIMEOUT_MS = 2_500;
 /** Poll cadence while waiting for the camera publish. */
 const TRACK_POLL_MS = 1_000;
 /** PERSON_NOT_OBSERVED needs 3 consecutive person-free analyzed frames. */
@@ -344,6 +350,9 @@ export function useAttemptAiDetection(
     let simulated = false;
     let gazeEstimator: GazeEstimator | null = null;
     let gazeFailures = 0;
+    /** Separate from gazeFailures: a successful estimate must not mask a
+     * tracker that fails on every reading. */
+    let gazeTrackerFailures = 0;
     let lastFlushAt = Number.NEGATIVE_INFINITY;
     const gazeTracker = new GazeTracker();
     // P4-D snapshot policy. Requests arriving while the policy is UNKNOWN
@@ -582,13 +591,21 @@ export function useAttemptAiDetection(
       }
 
       // Gaze: the tracker owns calibration / smoothing / sustain rules; a
-      // report is only ever an observation for the teacher feed.
+      // report is only ever an observation for the teacher feed. Isolated:
+      // a gaze-side error never costs this frame's object events (above)
+      // nor the flush below.
       if (gaze) {
-        const update = gazeTracker.update(frame.capturedAt / 1000, gaze);
-        setGaze(update.calibrated ? "running" : "calibrating");
-        const box = update.report ? gazeEventBox(update.report, gaze) : null;
-        if (box) {
-          enqueue("LOOKING_AWAY_OBSERVED", [box], GAZE_MODEL, gaze.runtime, gaze.processingMs, "gaze");
+        try {
+          const update = gazeTracker.update(frame.capturedAt / 1000, gaze);
+          gazeTrackerFailures = 0;
+          setGaze(update.calibrated ? "running" : "calibrating");
+          const box = update.report ? gazeEventBox(update.report, gaze) : null;
+          if (box) {
+            enqueue("LOOKING_AWAY_OBSERVED", [box], GAZE_MODEL, gaze.runtime, gaze.processingMs, "gaze");
+          }
+        } catch {
+          gazeTrackerFailures += 1;
+          if (gazeTrackerFailures >= GAZE_MAX_FAILURES) dropGaze(gazeEstimator);
         }
       }
       if (queue.length >= MAX_BATCH) void flush();
@@ -633,8 +650,24 @@ export function useAttemptAiDetection(
       if (g) void g.release().catch(() => undefined);
     };
 
-    /** Attach the gaze reading of the same frame; a gaze failure never
-     * costs the object-detection frame. */
+    /** Count one gaze failure; after GAZE_MAX_FAILURES in a row the gaze
+     * estimator is dropped (object detection is unaffected). */
+    const noteGazeFailure = (estimator: GazeEstimator | null): void => {
+      gazeFailures += 1;
+      if (gazeFailures >= GAZE_MAX_FAILURES) dropGaze(estimator);
+    };
+    /** Give up on gaze for this attempt — honest 'unavailable'. */
+    const dropGaze = (estimator: GazeEstimator | null): void => {
+      if (estimator != null && gazeEstimator === estimator) {
+        gazeEstimator = null;
+        void estimator.release().catch(() => undefined);
+      }
+      setGaze("unavailable");
+    };
+
+    /** Attach the gaze reading of the same frame; a gaze failure — throw
+     * OR a reading slower than GAZE_ESTIMATE_TIMEOUT_MS — never costs the
+     * object-detection frame. */
     const withGaze = async (
       frame: DetectionFrame | null,
       video: HTMLVideoElement
@@ -650,15 +683,29 @@ export function useAttemptAiDetection(
             gazeFrameReady = true;
           }
         }
-        frame.gaze = await estimator.estimate(video);
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const timeout = new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("gaze estimate timed out")),
+            GAZE_ESTIMATE_TIMEOUT_MS
+          );
+        });
+        try {
+          frame.gaze = await Promise.race([estimator.estimate(video), timeout]);
+        } finally {
+          clearTimeout(timer);
+        }
+        if (estimator.status !== "running") {
+          // The estimator retired itself (an onnxruntime call overran its
+          // lease) — gaze is gone for this attempt; yolo26s is unaffected.
+          frame.gaze = null;
+          dropGaze(estimator);
+          return frame;
+        }
         gazeFailures = 0;
       } catch {
-        gazeFailures += 1;
-        if (gazeFailures >= GAZE_MAX_FAILURES && gazeEstimator === estimator) {
-          gazeEstimator = null;
-          void estimator.release().catch(() => undefined);
-          setGaze("unavailable");
-        }
+        frame.gaze = null;
+        noteGazeFailure(estimator);
       }
       return frame;
     };

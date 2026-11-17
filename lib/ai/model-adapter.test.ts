@@ -276,3 +276,52 @@ describe("createDetector().detect (mocked ort)", () => {
     await det.release();
   });
 });
+
+describe("runOrtExclusive (shared onnxruntime queue)", () => {
+  it("serializes jobs in order", async () => {
+    const { runOrtExclusive } = await import("./model-adapter");
+    const order: string[] = [];
+    let active = 0;
+    let peak = 0;
+    const job = (name: string) => async () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await new Promise((r) => setTimeout(r, 5));
+      order.push(name);
+      active -= 1;
+      return name;
+    };
+    await Promise.all([runOrtExclusive(job("a")), runOrtExclusive(job("b")), runOrtExclusive(job("c"))]);
+    expect(order).toEqual(["a", "b", "c"]);
+    expect(peak).toBe(1);
+  });
+
+  it("a leased job that finishes in time never reports an overrun and frees the queue at once", async () => {
+    const { runOrtExclusive } = await import("./model-adapter");
+    const onOverrun = vi.fn();
+    expect(await runOrtExclusive(async () => 1, { ms: 1_000, onOverrun })).toBe(1);
+    expect(await runOrtExclusive(async () => 2)).toBe(2);
+    expect(onOverrun).not.toHaveBeenCalled();
+  });
+
+  it("a leased job that never settles is reported once and the next job still runs", async () => {
+    vi.useFakeTimers();
+    try {
+      const { runOrtExclusive } = await import("./model-adapter");
+      const onOverrun = vi.fn();
+      void runOrtExclusive(() => new Promise<never>(() => undefined), { ms: 3_000, onOverrun });
+      const next = runOrtExclusive(async () => "next");
+      await vi.advanceTimersByTimeAsync(3_001);
+      expect(await next).toBe("next");
+      expect(onOverrun).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a rejected job never blocks the queue", async () => {
+    const { runOrtExclusive } = await import("./model-adapter");
+    await expect(runOrtExclusive(async () => Promise.reject(new Error("x")))).rejects.toThrow("x");
+    expect(await runOrtExclusive(async () => "ok")).toBe("ok");
+  });
+});

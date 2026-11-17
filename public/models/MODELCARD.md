@@ -27,10 +27,12 @@ AGPL-3.0 license text: [../../LICENSE](../../LICENSE); application source offer:
 
 # Model Card — gaze pipeline (`yolov11n-face.onnx` → `mobileone_s0_gaze.onnx`)
 
-Added on branch `kido` (2026-11-16). Source of both artifacts: owner-provided
-demo folder `D:\PTIT\2026-1\Lap-trinh-Web\Test\models\`, copied verbatim
-(checksums below verified identical). The I/O facts were measured by loading
-the graphs, not assumed.
+Added on branch `feature/p4-c-gaze-tracking` (2026-11-16), copied from the
+owner-provided demo folder. **Upstream provenance verified 2026-11-17** by
+byte-identical SHA-256 against the public release assets — see
+`LICENSE-THIRD-PARTY.md` §3 (face: akanametov/yolo-face `1.0.0`, GPL-3.0 /
+Ultralytics AGPL-3.0; gaze: yakhyo/gaze-estimation `weights`, MIT). The I/O
+facts were measured by loading the graphs, not assumed.
 
 ## 1. Face detector — `yolov11n-face.onnx`
 
@@ -40,7 +42,8 @@ SHA-256 `61d8cf127ff377939cf009565457aaddf216f4d9fdd9ac24f5aab3cb10ee67b5` (10,5
 |---|---|
 | Architecture | Ultralytics YOLO11n (detect task), 1 class `face` |
 | Graph metadata | "Ultralytics YOLO11n model trained on datasets/widerface.yaml", ultralytics 8.3.20, exported 2024-10-22, pytorch 2.4.1, ONNX opset 19, IR 10 |
-| License | **AGPL-3.0** (stated in the graph metadata; Ultralytics) |
+| Upstream | https://github.com/akanametov/yolo-face release `1.0.0` (hash-identical) |
+| License | **AGPL-3.0** (graph metadata; Ultralytics) — repository GPL-3.0; dataset WIDER FACE (non-commercial research) |
 | Input | `images` `[1,3,640,640]` float32, RGB, /255, letterbox pad rgb(114,114,114) |
 | Output | `output0` `[1,5,8400]` — channel-major `(cx, cy, w, h, score)` in 640-letterbox pixels; **no built-in NMS** (the adapter applies greedy NMS, IoU 0.45, score ≥ 0.5) |
 
@@ -54,8 +57,9 @@ SHA-256 `8b4fdc4e3da44733c9a82e7776b411e4a39f94e8e285aee0fc85a548a55f7d9f` (4,97
 | Export | pytorch 2.8.0, ONNX opset 20, IR 9 |
 | Input | `input` `[1,3,448,448]` float32, RGB, ImageNet mean/std, the face crop stretched to 448² |
 | Output | `yaw` `[1,90]`, `pitch` `[1,90]` logits; angle = softmax expectation × 4° − 180° |
-| Training data | Gaze360 according to the reference demo's source comment — **not verifiable from the artifact** |
-| License / provenance | **Not recorded in the artifact — owner must confirm** the upstream repository, its license and the dataset's usage terms before any public redistribution (see `LICENSE-THIRD-PARTY.md` §3) |
+| Upstream | MobileGaze, https://github.com/yakhyo/gaze-estimation release `weights` (hash-identical) |
+| License | **MIT** (Copyright (c) 2024 Yakhyokhuja Valikhujaev) |
+| Training data | Gaze360 per upstream README (non-commercial research dataset); upstream reports MAE 12.58° on the Gaze360 test set |
 
 The demo folder also holds `resnet18_gaze.onnx` (45 MB, same I/O). It is NOT
 shipped: MobileOne-S0 is 9× smaller and ~5× faster on CPU (below).

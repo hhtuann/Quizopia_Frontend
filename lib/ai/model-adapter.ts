@@ -244,11 +244,46 @@ let ortQueue: Promise<unknown> = Promise.resolve();
  * safe, so every session call goes through this single queue. A rejected
  * job never blocks the queue.
  */
-export function runOrtExclusive<T>(job: () => Promise<T>): Promise<T> {
-  const next = ortQueue.then(job, job);
-  ortQueue = next.catch(() => undefined);
+export function runOrtExclusive<T>(
+  job: () => Promise<T>,
+  lease?: OrtLease
+): Promise<T> {
+  const prev = ortQueue;
+  const next = prev.then(job, job);
+  const settled = next.then(noop, noop);
+  if (!lease) {
+    ortQueue = settled;
+    return next;
+  }
+  // Leased job (the optional gaze pipeline): the queue waits for it at most
+  // `lease.ms` after it STARTS. A job that overruns is reported once via
+  // `onOverrun` (the caller retires that pipeline) and the queue moves on,
+  // so a wedged gaze run can never stall yolo26s behind it.
+  ortQueue = prev.then(noop, noop).then(
+    () =>
+      new Promise<void>((resolve) => {
+        const timer = setTimeout(() => {
+          lease.onOverrun();
+          resolve();
+        }, lease.ms);
+        void settled.then(() => {
+          clearTimeout(timer);
+          resolve();
+        });
+      })
+  );
   return next;
 }
+
+/** Time lease for {@link runOrtExclusive}. */
+export interface OrtLease {
+  /** Longest the shared queue waits for this job once it has started. */
+  ms: number;
+  /** Called once if the job is still running when the lease expires. */
+  onOverrun: () => void;
+}
+
+const noop = (): void => undefined;
 
 /** RGB /255 CHW plane extraction from raw RGBA ImageData. */
 export function rgbaToChw(
@@ -386,7 +421,9 @@ export async function createDetector(): Promise<Detector> {
       const s = session;
       session = null;
       canvas = null;
-      if (s) await s.release().catch(() => undefined);
+      // Through the queue: never overlap a session call on the shared
+      // runtime (a frame may still be in flight at teardown).
+      if (s) await runOrtExclusive(() => s.release()).catch(() => undefined);
     },
   };
 }

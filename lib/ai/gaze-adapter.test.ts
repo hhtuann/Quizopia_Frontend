@@ -22,6 +22,9 @@ const ortMock = vi.hoisted(() => ({
     pitchBin: 45,
     active: 0,
     maxActive: 0,
+    /** When true, the FACE session's run never settles (wedged runtime). */
+    hangFace: false,
+    releases: 0,
   },
 }));
 
@@ -43,6 +46,9 @@ vi.mock("onnxruntime-web", () => {
         return {
           run: async (feeds: Record<string, { dims: number[] }>) => {
             const s = ortMock.state;
+            if (s.hangFace && Object.keys(feeds)[0] === "images") {
+              return new Promise(() => undefined);
+            }
             s.active += 1;
             s.maxActive = Math.max(s.maxActive, s.active);
             await Promise.resolve();
@@ -60,7 +66,9 @@ vi.mock("onnxruntime-web", () => {
               pitch: { dims: [1, 90], data: peak(s.pitchBin) },
             };
           },
-          release: async () => undefined,
+          release: async () => {
+            ortMock.state.releases += 1;
+          },
         };
       },
     },
@@ -95,6 +103,8 @@ beforeEach(() => {
     pitchBin: 45,
     active: 0,
     maxActive: 0,
+    hangFace: false,
+    releases: 0,
   });
   vi.stubGlobal(
     "fetch",
@@ -259,6 +269,43 @@ describe("createGazeEstimator (mocked ort)", () => {
     ]);
     expect(ortMock.state.maxActive).toBe(1);
     await est.release();
+  });
+
+  it("a WEDGED gaze run never stalls yolo26s: lease expires, gaze retires, the queue moves on", async () => {
+    const { createGazeEstimator, GAZE_RUN_LEASE_MS } = await import("./gaze-adapter");
+    // Same module instance the adapter uses — the REAL shared queue.
+    const { runOrtExclusive } = await import("./model-adapter");
+    const est = await createGazeEstimator();
+    expect(est.status).toBe("running");
+    vi.useFakeTimers();
+    try {
+      ortMock.state.hangFace = true;
+      const pending = est.estimate(videoOf(640, 480)); // never settles
+      // A yolo26s frame queued behind the wedged gaze run.
+      const yolo = runOrtExclusive(async () => "yolo26s frame");
+      let yoloDone = false;
+      void yolo.then(() => (yoloDone = true));
+      await vi.advanceTimersByTimeAsync(GAZE_RUN_LEASE_MS - 100);
+      expect(yoloDone).toBe(false); // still inside the lease
+      await vi.advanceTimersByTimeAsync(200);
+      expect(await yolo).toBe("yolo26s frame");
+      expect(est.status).toBe("unavailable");
+      // Retired: no further session calls, and release never touches the
+      // sessions the runtime may still be inside.
+      expect(await est.estimate(videoOf(640, 480))).toBeNull();
+      await est.release();
+      expect(ortMock.state.releases).toBe(0);
+      void pending;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a healthy estimator releases its sessions through the shared queue", async () => {
+    const { createGazeEstimator } = await import("./gaze-adapter");
+    const est = await createGazeEstimator();
+    await est.release();
+    expect(ortMock.state.releases).toBe(2);
   });
 
   it("the gaze head has the 90 bins the decoder assumes", () => {
