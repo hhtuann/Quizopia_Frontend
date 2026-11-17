@@ -35,6 +35,8 @@ export const TIMELINE_TYPE_LABEL: Record<string, string> = {
   CAMERA_RECONNECTED: "Camera reconnected",
   CAMERA_REVOKED: "Camera access revoked",
   MONITORING_GAP: "Monitoring gap",
+  // SERVER (P4-E teacher review — recorded by the review transaction)
+  ALERT_REVIEW_RECORDED: "Alert review recorded",
 }
 
 export type TimelineGroupValue =

@@ -94,6 +94,7 @@ export function TeacherActivityPanel({
           attemptId={selectedAttemptId}
           className="mt-6 border-0 p-0 shadow-none"
           emptyHint="No activity recorded for this attempt yet."
+          showReviewFilter
         />
       ) : (
         <p className="mt-6 rounded-lg border border-dashed border-[#E2E8F0] bg-[#F1F5F9]/50 px-4 py-6 text-center text-xs text-[#64748B]">

@@ -15,7 +15,13 @@ const fetchNextPage = vi.fn();
 
 vi.mock("@/hooks/queries/use-monitoring", () => ({
   useAttemptTimelineQuery: vi.fn(),
-  DEFAULT_TIMELINE_FILTERS: { source: "ALL", group: "ALL" },
+  DEFAULT_TIMELINE_FILTERS: {
+    source: "ALL",
+    group: "ALL",
+    reviewsOnly: false,
+    from: "",
+    to: "",
+  },
 }));
 
 const timelineQuery = vi.mocked(useAttemptTimelineQuery);
@@ -129,6 +135,9 @@ describe("AttemptTimeline", () => {
     expect(timelineQuery).toHaveBeenLastCalledWith(12, {
       source: "CLIENT",
       group: "ALL",
+      reviewsOnly: false,
+      from: "",
+      to: "",
     });
 
     const groupSelect = screen.getByLabelText("Event type");
@@ -136,6 +145,9 @@ describe("AttemptTimeline", () => {
     expect(timelineQuery).toHaveBeenLastCalledWith(12, {
       source: "CLIENT",
       group: "ANSWERS",
+      reviewsOnly: false,
+      from: "",
+      to: "",
     });
 
     // Filter controls exist inside the labelled group.
@@ -146,5 +158,49 @@ describe("AttemptTimeline", () => {
     mockQuery({ pages: [page([], null)] });
     render(<AttemptTimeline attemptId={12} emptyHint="Nothing here." />);
     expect(screen.getByText("Nothing here.")).toBeTruthy();
+  });
+});
+
+describe("AttemptTimeline reviews-only toggle (P4-E)", () => {
+  it("is absent by default and rendered for teacher panels", () => {
+    mockQuery({ pages: [page([], null)] });
+    const { rerender } = render(<AttemptTimeline attemptId={12} />);
+    expect(screen.queryByRole("button", { name: /Reviews only/ })).toBeNull();
+
+    rerender(<AttemptTimeline attemptId={12} showReviewFilter />);
+    const toggle = screen.getByRole("button", { name: "Reviews only" });
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("toggles reviewsOnly into the filters and disables the type-group select", () => {
+    mockQuery({ pages: [page([], null)] });
+    render(<AttemptTimeline attemptId={12} showReviewFilter />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Reviews only" }));
+    expect(timelineQuery).toHaveBeenLastCalledWith(12, {
+      source: "ALL",
+      group: "ALL",
+      reviewsOnly: true,
+      from: "",
+      to: "",
+    });
+    expect(screen.getByLabelText("Event type")).toHaveProperty("disabled", true);
+    expect(
+      screen.getByRole("button", { name: "Reviews only (on)" }).getAttribute("aria-pressed")
+    ).toBe("true");
+  });
+
+  it("drives the query with the F08 time-range filters", () => {
+    render(<AttemptTimeline attemptId={12} />);
+    fireEvent.change(screen.getByLabelText("Filter events from this server time"), {
+      target: { value: "2026-11-17T10:00" },
+    });
+    fireEvent.change(screen.getByLabelText("Filter events up to this server time"), {
+      target: { value: "2026-11-17T11:00" },
+    });
+    const calls = timelineQuery.mock.calls;
+    const lastFilters = calls[calls.length - 1]?.[1];
+    expect(lastFilters?.from).toBe("2026-11-17T10:00");
+    expect(lastFilters?.to).toBe("2026-11-17T11:00");
   });
 });

@@ -225,3 +225,23 @@ select {
     background-image: none;
   }
 }
+
+/* ===== P4-E printable monitoring report =====
+   The monitoring-report route prints as a standalone document: app chrome
+   (topbar, sidebar, footer) is suppressed and the content column goes
+   edge-to-edge. The page's own controls use `print:hidden`; report sections
+   keep themselves unbroken via Tailwind `break-inside-avoid`. */
+@media print {
+  .app-topbar,
+  .app-sidebar,
+  .app-shell footer {
+    display: none !important;
+  }
+  .app-shell {
+    background: #fff;
+  }
+  .app-main {
+    margin-left: 0 !important;
+    padding-block: 0 !important;
+  }
+}

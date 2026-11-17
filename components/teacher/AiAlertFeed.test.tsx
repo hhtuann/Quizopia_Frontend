@@ -219,6 +219,22 @@ describe("AiAlertFeed", () => {
 });
 
 describe("AiAlertCard", () => {
+  function renderCard(item: AiAlertItem): {
+    container: HTMLElement;
+    client: QueryClient;
+    unmount: () => void;
+  } {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const rendered = render(
+      <QueryClientProvider client={client}>
+        <AiAlertCard alert={item} sessionId={5} />
+      </QueryClientProvider>
+    );
+    return { container: rendered.container, client, unmount: rendered.unmount };
+  }
+
   it("labels each VN alert type", () => {
     const types: Array<[AiAlertItem["alertType"], string]> = [
       ["PHONE_DETECTED", "Phát hiện điện thoại"],
@@ -227,8 +243,8 @@ describe("AiAlertCard", () => {
       ["PERSON_NOT_VISIBLE", "Không thấy người làm bài"],
     ];
     for (const [alertType, label] of types) {
-      const { container, unmount } = render(
-        <AiAlertCard alert={alertItem({ alertType, latestDetections: null })} />
+      const { container, unmount } = renderCard(
+        alertItem({ alertType, latestDetections: null })
       );
       expect(container.textContent).toContain(label);
       unmount();
@@ -236,18 +252,16 @@ describe("AiAlertCard", () => {
   });
 
   it("LOOKING_AWAY: VN label, direction + deviation summary, review-only note", () => {
-    const { container } = render(
-      <AiAlertCard
-        alert={alertItem({
-          alertType: "LOOKING_AWAY",
-          modelId: "mobilegaze-mobileone-s0",
-          modelVersion: "gaze360-onnx",
-          maxConfidence: 0.91,
-          latestDetections: [
-            { classId: 1000, label: "gaze:left:-38:3", confidence: 0.91, bbox: [0.3, 0.2, 0.6, 0.7] },
-          ],
-        })}
-      />
+    const { container } = renderCard(
+      alertItem({
+        alertType: "LOOKING_AWAY",
+        modelId: "mobilegaze-mobileone-s0",
+        modelVersion: "gaze360-onnx",
+        maxConfidence: 0.91,
+        latestDetections: [
+          { classId: 1000, label: "gaze:left:-38:3", confidence: 0.91, bbox: [0.3, 0.2, 0.6, 0.7] },
+        ],
+      })
     );
     expect(screen.getByText("Nhìn lệch khỏi màn hình")).toBeTruthy();
     const note = container.querySelector('[data-testid="ai-alert-gaze"]')?.textContent ?? "";
@@ -261,8 +275,8 @@ describe("AiAlertCard", () => {
   });
 
   it("LOOKING_AWAY without a parsable payload still shows the review-only note", () => {
-    const { container } = render(
-      <AiAlertCard alert={alertItem({ alertType: "LOOKING_AWAY", latestDetections: null })} />
+    const { container } = renderCard(
+      alertItem({ alertType: "LOOKING_AWAY", latestDetections: null })
     );
     const note = container.querySelector('[data-testid="ai-alert-gaze"]')?.textContent ?? "";
     expect(note).toContain("Hướng nhìn là ước lượng của mô hình");
@@ -270,24 +284,39 @@ describe("AiAlertCard", () => {
   });
 
   it("non-gaze alerts carry no gaze note", () => {
-    const { container } = render(<AiAlertCard alert={alertItem()} />);
+    const { container } = renderCard(alertItem());
     expect(container.querySelector('[data-testid="ai-alert-gaze"]')).toBeNull();
   });
 
   it("shows the WORKER chip for worker-verified provenance", () => {
-    const { container } = render(
-      <AiAlertCard
-        alert={alertItem({ provenance: "WORKER_VERIFIED", latestDetections: null })}
-      />
+    const { container } = renderCard(
+      alertItem({ provenance: "WORKER_VERIFIED", latestDetections: null })
     );
     expect(container.textContent).toContain("WORKER");
   });
 
   it("renders without detections (no bbox area)", () => {
-    const { container } = render(
-      <AiAlertCard alert={alertItem({ latestDetections: null })} />
-    );
+    const { container } = renderCard(alertItem({ latestDetections: null }));
     expect(container.querySelector('[data-testid="ai-alert-bboxes"]')).toBeNull();
+  });
+
+  // P4-E provenance distinction chips.
+  it("shows AI phát hiện + Chưa được xác minh when no review exists", () => {
+    const { container } = renderCard(alertItem({ latestDetections: null }));
+    expect(container.textContent).toContain("AI phát hiện");
+    expect(container.textContent).toContain("Chưa được xác minh");
+  });
+
+  it("shows the Giảng viên đánh giá outcome chip once reviewed", () => {
+    const { container } = renderCard(
+      alertItem({
+        latestDetections: null,
+        reviewStatus: "FALSE_POSITIVE",
+        reviewVersion: 2,
+      })
+    );
+    expect(container.textContent).toContain("Giảng viên đánh giá · Báo động sai");
+    expect(container.textContent).not.toContain("Chưa được xác minh");
   });
 });
 

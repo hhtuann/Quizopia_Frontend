@@ -117,6 +117,32 @@ describe("LiveMonitor reconnect forwarding (FE-3)", () => {
   });
 });
 
+describe("LiveMonitor participant-started backfill (P4-E)", () => {
+  it("ATTEMPT_STARTED also refreshes the dashboard aggregates", () => {
+    render(
+      <LiveMonitor
+        sessionId={5}
+        initial={{
+          activeCount: 0,
+          startedCount: 0,
+          submittedCount: 0,
+          sessionStatus: "OPEN",
+        }}
+      />
+    );
+
+    callbacks.participantStarted!({
+      eventId: "e",
+      eventType: "ATTEMPT_STARTED",
+      occurredAt: "2026-11-17T08:00:00Z",
+      serverTime: "2026-11-17T08:00:00Z",
+    } as RealtimeEventEnvelope);
+
+    expect(onceFor(["exam-sessions", 5, "monitoring-overview"])).toBe(true);
+    expect(onceFor(["exam-sessions", 5, "monitoring-participants"])).toBe(true);
+  });
+});
+
 describe("LiveMonitor evidence invalidation (P4-D)", () => {
   function envelope(activityType: string | null): RealtimeEventEnvelope {
     return {

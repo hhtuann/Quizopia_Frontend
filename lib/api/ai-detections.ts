@@ -7,6 +7,7 @@
  * degraded-status only and never block answering.
  */
 import { http } from "@/lib/api/http-client";
+import type { AlertReviewStatus } from "@/lib/api/alert-review";
 
 export type AiDetectionEventType =
   | "PHONE_OBSERVED"
@@ -104,6 +105,13 @@ export interface AiAlertItem {
   /** Boxes of the detection that OPENED the alert — the frame its
    *  evidence snapshot (P4-D) shows. Absent on older backends. */
   firstDetections?: AiDetectionPayloadBox[] | null;
+  /**
+   * P4-E §3.5 (additive): review rollup on the alert. Optional on the wire so
+   * the feed keeps rendering against a pre-P4-E backend during rollout.
+   */
+  reviewStatus?: AlertReviewStatus;
+  reviewVersion?: number;
+  reviewedAt?: string | null;
 }
 
 export interface AiAlertListParams {
@@ -111,6 +119,8 @@ export interface AiAlertListParams {
   cursor?: number;
   limit?: number;
   status?: "OPEN";
+  /** P4-E §3.5: filter by denormalized review status. */
+  review?: AlertReviewStatus;
 }
 
 export interface AiAlertListResponse {
@@ -127,6 +137,7 @@ export function getSessionAiAlerts(
   if (params.cursor != null) search.set("cursor", String(params.cursor));
   if (params.limit != null) search.set("limit", String(params.limit));
   if (params.status != null) search.set("status", params.status);
+  if (params.review != null) search.set("review", params.review);
   const qs = search.toString();
   return http.get(`/api/exam-sessions/${sessionId}/ai-alerts${qs ? `?${qs}` : ""}`);
 }
