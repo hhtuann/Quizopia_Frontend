@@ -120,9 +120,33 @@ test.describe("P4-F physical camera gate, no fake media", () => {
 
       const cameraReports: Array<Record<string, unknown>> = [];
       for (let i = 0; i < 5; i++) {
-        const device = unique[i]!;
         const ctx = await browser.newContext({ permissions: ["camera"] });
         contexts.push(ctx);
+        // Browser deviceId values may be salted PER isolated context. Never
+        // carry one context's raw deviceId into a different context! Re-enumerate
+        // after granting camera permission inside this SAME context.
+        const calibration = await ctx.newPage();
+        await calibration.goto("/");
+        const localDevices = await calibration.evaluate(async () => {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+          stream.getTracks().forEach((t) => t.stop());
+          return (await navigator.mediaDevices.enumerateDevices())
+            .filter((d) => d.kind === "videoinput" && Boolean(d.deviceId))
+            .map((d) => ({ deviceId: d.deviceId, label: d.label }))
+            .filter((d) => !/virtual|fake|obs|loopback|manycam|screen capture/i.test(d.label));
+        });
+        await calibration.close();
+        // Chrome's stable per-device order is only a candidate mapping.
+        // Matching same-index labels plus a human's physical-device witness
+        // is required, particularly for identically named webcam models.
+        expect(localDevices.length, "Expected five local camera candidates").toBeGreaterThanOrEqual(5);
+        const device = localDevices[i]!;
+        expect(device.label, "Physical device list changed across browser contexts").toBe(
+          unique[i]!.label
+        );
         // App gets the genuine selected hardware sensor, not the browser's
         // default device reused five times; retain all other constraints.
         // No simulated tracks or synthetic camera implementation is injected.
