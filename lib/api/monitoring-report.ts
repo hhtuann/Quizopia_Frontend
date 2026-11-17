@@ -163,7 +163,12 @@ export interface AttemptMonitoringReport {
   recording: MonitoringReportRecording;
   ai: MonitoringReportAi;
   evidence: MonitoringReportEvidenceItem[];
+  /** F11: honest completeness — totals + truncation flags. */
+  evidenceTotal: number;
+  evidenceTruncated: boolean;
   reviews: MonitoringReportReviewItem[];
+  reviewsTotal: number;
+  reviewsTruncated: boolean;
   retention: {
     mediaRetentionDays: number;
     activityRetentionDays: number;
@@ -180,4 +185,34 @@ export function getAttemptMonitoringReport(
   attemptId: number
 ): Promise<AttemptMonitoringReport> {
   return http.get(`/api/attempts/${attemptId}/monitoring/report`);
+}
+
+/** F11 drilldown: cursor-paged attempt-scoped review history. */
+export interface AttemptReviewRow {
+  reviewId: number;
+  alertId: number;
+  version: number;
+  action: string;
+  note: string | null;
+  reviewerName: string | null;
+  reviewedAt: string;
+}
+
+export interface AttemptReviewPage {
+  attemptId: number;
+  items: AttemptReviewRow[];
+  nextCursor: string | null;
+}
+
+export function getAttemptReviewPage(
+  attemptId: number,
+  cursor?: string,
+  limit = 100
+): Promise<AttemptReviewPage> {
+  const params = new URLSearchParams();
+  if (cursor != null) params.set("cursor", cursor);
+  params.set("limit", String(limit));
+  return http.get(
+    `/api/attempts/${attemptId}/monitoring/reviews?${params.toString()}`
+  );
 }

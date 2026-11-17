@@ -18,6 +18,8 @@ import type {
 } from "@/lib/api/monitoring-report";
 import { formatDateTime, formatTime } from "@/lib/utils/format";
 import { fetchRecordingUrl } from "@/lib/api/evidence";
+import { getAttemptReviewPage } from "@/lib/api/monitoring-report";
+import { useQuery } from "@tanstack/react-query";
 import React from "react";
 
 /**
@@ -235,8 +237,17 @@ export function MonitoringReportView({
         sessionId={report.attempt.sessionId}
       />
       <ReportAiSection ai={report.ai} />
-      <ReportEvidenceSection evidence={report.evidence} />
-      <ReportReviewsSection reviews={report.reviews} />
+      <ReportEvidenceSection
+        evidence={report.evidence}
+        total={report.evidenceTotal}
+        truncated={report.evidenceTruncated}
+      />
+      <ReportReviewsSection
+        attemptId={report.attempt.attemptId}
+        reviews={report.reviews}
+        total={report.reviewsTotal}
+        truncated={report.reviewsTruncated}
+      />
       <ReportRetentionSection retention={report.retention} />
     </div>
   );
@@ -538,8 +549,12 @@ function ReportAiSection({ ai }: { ai: MonitoringReportAi }) {
 
 function ReportEvidenceSection({
   evidence,
+  total,
+  truncated,
 }: {
   evidence: MonitoringReportEvidenceItem[];
+  total: number;
+  truncated: boolean;
 }) {
   const [openErrors, setOpenErrors] = useState<Record<string, string>>({});
 
@@ -561,6 +576,15 @@ function ReportEvidenceSection({
 
   return (
     <ReportSection title="Evidence">
+      {truncated && (
+        <p
+          data-testid="evidence-truncated-note"
+          className="mb-2 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/5 px-3 py-1.5 text-[11px] font-semibold text-[#F59E0B]"
+        >
+          Showing latest {evidence.length} of {total} evidence rows (newest
+          first; full list in the session Evidence panel).
+        </p>
+      )}
       {evidence.length === 0 ? (
         <p className="text-xs text-[#64748B]">No evidence recorded.</p>
       ) : (
@@ -637,17 +661,59 @@ function ReportEvidenceSection({
 }
 
 function ReportReviewsSection({
+  attemptId,
   reviews,
+  total,
+  truncated,
 }: {
+  attemptId: number;
   reviews: MonitoringReportReviewItem[];
+  total: number;
+  truncated: boolean;
 }) {
+  const [full, setFull] = React.useState(false);
+  const historyQuery = useQuery({
+    queryKey: ["attempts", attemptId, "monitoring-reviews", "full"],
+    // Follow every nextCursor (bounded) — "full history" must be FULL, not
+    // the newest 200-row page (security review P3).
+    queryFn: async () => {
+      const all: Awaited<ReturnType<typeof getAttemptReviewPage>>["items"] = [];
+      let cursor: string | undefined;
+      for (let page = 0; page < 10; page++) {
+        const res = await getAttemptReviewPage(attemptId, cursor, 200);
+        all.push(...res.items);
+        if (res.nextCursor == null) return all;
+        cursor = res.nextCursor;
+      }
+      return all;
+    },
+    enabled: full && truncated,
+  });
+  const items = truncated && full && historyQuery.data
+    ? historyQuery.data
+    : reviews;
   return (
     <ReportSection title="Teacher reviews">
-      {reviews.length === 0 ? (
+      {truncated && (
+        <p
+          data-testid="reviews-truncated-note"
+          className="mb-2 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/5 px-3 py-1.5 text-[11px] font-semibold text-[#F59E0B]"
+        >
+          Showing latest {reviews.length} of {total} reviews.
+          <button
+            type="button"
+            onClick={() => setFull((v) => !v)}
+            className="ml-2 underline underline-offset-2"
+          >
+            {full ? "Show latest page" : "Load full history"}
+          </button>
+        </p>
+      )}
+      {items.length === 0 ? (
         <p className="text-xs text-[#64748B]">No reviews recorded.</p>
       ) : (
         <ul className="space-y-1.5" data-testid="report-reviews-list">
-          {reviews.map((review) => (
+          {items.map((review) => (
             <li
               key={review.reviewId}
               className="rounded-lg border border-[#E2E8F0] bg-white px-3 py-2 text-xs"
@@ -657,7 +723,7 @@ function ReportReviewsSection({
                   v{review.version}
                 </span>
                 <span className="font-semibold text-[#0F172A]">
-                  {REPORT_ACTION_LABEL_EN[review.action] ?? review.action}
+                  {REPORT_ACTION_LABEL_EN[review.action as AlertReviewAction] ?? review.action}
                 </span>
                 <span className="text-[#64748B]">
                   alert #{review.alertId} · {review.reviewerName ?? "—"}

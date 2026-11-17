@@ -9,6 +9,7 @@ import {
   sortTypeCounts,
 } from "./MonitoringReportView";
 import { fetchRecordingUrl } from "@/lib/api/evidence";
+import { getAttemptReviewPage } from "@/lib/api/monitoring-report";
 import type { AttemptMonitoringReport } from "@/lib/api/monitoring-report";
 import type { SessionAttemptItem } from "@/lib/api/monitoring";
 
@@ -23,9 +24,18 @@ vi.mock("@/lib/api/evidence", () => ({
   fetchRecordingUrl: vi.fn(),
 }));
 
-vi.mock("@/lib/api/monitoring-report", () => ({
-  getAttemptMonitoringReport: vi.fn(),
-}));
+vi.mock("@/lib/api/monitoring-report", async () => {
+  const actual = await vi.importActual<Record<string, unknown>>(
+    "@/lib/api/monitoring-report"
+  );
+  return {
+    ...actual,
+    getAttemptMonitoringReport: vi.fn(),
+    getAttemptReviewPage: vi.fn(),
+  };
+});
+
+
 
 vi.mock("@/hooks/queries/use-exam-sessions", () => ({
   useSessionRosterQuery: () => ({
@@ -177,6 +187,8 @@ function report(
         playbackRef: null,
       },
     ],
+  evidenceTotal: 1,
+  evidenceTruncated: false,
     reviews: [
       {
         reviewId: 1,
@@ -188,6 +200,8 @@ function report(
         version: 1,
       },
     ],
+  reviewsTotal: 1,
+  reviewsTruncated: false,
     retention: { mediaRetentionDays: 30, activityRetentionDays: 90, asOf: "2026-11-17T09:30:00Z" },
     disclaimer:
       "Monitoring observations only. No automated misconduct verdict; human review required.",
@@ -414,5 +428,50 @@ describe("report formatting helpers (pure)", () => {
       expect(video).not.toBeNull();
       expect(video?.getAttribute("src")).toContain("seg.mp4");
     });
+  });
+
+  it("F11: truncation notice renders and Load full history fetches the page", async () => {
+    const { getAttemptReviewPage: pageMock } = await import(
+      "@/lib/api/monitoring-report"
+    );
+    vi.mocked(pageMock).mockResolvedValue({
+      attemptId: 7,
+      items: [
+        {
+          reviewId: 2,
+          version: 2,
+          action: "NOTED",
+          note: null,
+          reviewerName: "Te",
+          reviewedAt: "2026-11-17T09:00:00Z",
+          alertId: 9,
+        },
+        {
+          reviewId: 1,
+          version: 1,
+          action: "MARK_VIEWED",
+          note: null,
+          reviewerName: "Te",
+          reviewedAt: "2026-11-17T08:00:00Z",
+          alertId: 9,
+        },
+      ],
+      nextCursor: null,
+    });
+    reportMock.mockResolvedValue(
+      report({ reviewsTotal: 202, reviewsTruncated: true })
+    );
+    renderCard();
+    fireEvent.change(screen.getByLabelText("Participant attempt"), {
+      target: { value: "7" },
+    });
+    await screen.findByTestId("monitoring-report-view");
+    const notice = await screen.findByTestId("reviews-truncated-note");
+    expect(notice.textContent).toContain("Showing latest");
+    expect(notice.textContent).toContain("202");
+    fireEvent.click(screen.getByRole("button", { name: "Load full history" }));
+    await waitFor(() =>
+      expect(vi.mocked(pageMock)).toHaveBeenCalledWith(7, undefined, 200)
+    );
   });
 });
