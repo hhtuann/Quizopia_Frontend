@@ -1,5 +1,7 @@
 "use client";
 
+import type { GazeObservation } from "./gaze-core";
+
 /**
  * P4-C AI proctoring — YOLO26s model adapter (CONTRACT §6, ADR-008 D8).
  *
@@ -68,6 +70,12 @@ export interface DetectionFrame {
   runtime: AiRuntime;
   /** True when produced by the e2e FAKE detector (labeled SIMULATED). */
   simulated?: boolean;
+  /**
+   * Gaze reading of the SAME frame (face detector + gaze model), attached
+   * by the attempt hook when the gaze estimator is running. Absent/null =
+   * no gaze analysis for this frame.
+   */
+  gaze?: GazeObservation | null;
 }
 
 export type DetectorStatus = "loading" | "running" | "unavailable" | "released";
@@ -183,15 +191,15 @@ export function parseModelOutput(
 /* ------------------------------------------------------------------ */
 
 /** Minimal surface of `ort` used here (keeps the dynamic import typed). */
-interface OrtTensorLike {
+export interface OrtTensorLike {
   data: Float32Array;
   dims: readonly number[];
 }
-interface OrtSessionLike {
+export interface OrtSessionLike {
   run(feeds: Record<string, unknown>): Promise<Record<string, OrtTensorLike>>;
   release(): Promise<void>;
 }
-interface OrtModuleLike {
+export interface OrtModuleLike {
   Tensor: new (
     type: "float32",
     data: Float32Array,
@@ -210,7 +218,7 @@ let ortModulePromise: Promise<OrtModuleLike> | null = null;
 
 /** Load onnxruntime-web once; a transient failure does NOT poison the cache
  *  (the next createDetector() retries the import). */
-async function loadOrt(): Promise<OrtModuleLike> {
+export async function loadOrt(): Promise<OrtModuleLike> {
   if (!ortModulePromise) {
     ortModulePromise = import("onnxruntime-web").then(
       (mod) => {
@@ -225,6 +233,21 @@ async function loadOrt(): Promise<OrtModuleLike> {
     );
   }
   return ortModulePromise;
+}
+
+let ortQueue: Promise<unknown> = Promise.resolve();
+
+/**
+ * Serialize onnxruntime-web work across ALL sessions on the page (yolo26s,
+ * face detector, gaze model). The JSEP/wasm backend shares one runtime —
+ * overlapping `run()`/`create()` calls from different sessions are not
+ * safe, so every session call goes through this single queue. A rejected
+ * job never blocks the queue.
+ */
+export function runOrtExclusive<T>(job: () => Promise<T>): Promise<T> {
+  const next = ortQueue.then(job, job);
+  ortQueue = next.catch(() => undefined);
+  return next;
 }
 
 /** RGB /255 CHW plane extraction from raw RGBA ImageData. */
@@ -265,7 +288,9 @@ export async function createDetector(): Promise<Detector> {
     const createSession = async (
       executionProviders: string[]
     ): Promise<OrtSessionLike> =>
-      ortLoaded.InferenceSession.create(new Uint8Array(bytes), { executionProviders });
+      runOrtExclusive(() =>
+        ortLoaded.InferenceSession.create(new Uint8Array(bytes), { executionProviders })
+      );
 
     // Runtime pick: navigator.gpu → WebGPU session with wasm fallback EP;
     // on failure fall back to a wasm-only session; both failing = unavailable.
@@ -329,9 +354,9 @@ export async function createDetector(): Promise<Detector> {
       const imageData = ctx.getImageData(0, 0, MODEL.inputSize, MODEL.inputSize);
       const chw = rgbaToChw(imageData.data);
 
-      const results = await session.run({
-        [inputName]: new ort.Tensor("float32", chw, [1, 3, MODEL.inputSize, MODEL.inputSize]),
-      });
+      const activeSession = session;
+      const input = new ort.Tensor("float32", chw, [1, 3, MODEL.inputSize, MODEL.inputSize]);
+      const results = await runOrtExclusive(() => activeSession.run({ [inputName]: input }));
       const output = results[outputName];
       if (!output) return null;
 

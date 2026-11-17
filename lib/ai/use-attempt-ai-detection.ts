@@ -24,6 +24,19 @@ import {
   type DetectionScheduler,
 } from "./detection-scheduler";
 import {
+  GAZE_ENABLED,
+  GAZE_MODEL,
+  createGazeEstimator,
+  type GazeEstimator,
+} from "./gaze-adapter";
+import {
+  GAZE_FACE_CLASS_ID,
+  GazeTracker,
+  formatGazeLabel,
+  type GazeObservation,
+  type GazeReport,
+} from "./gaze-core";
+import {
   getFakeDetector,
   publishAiDroppedFrames,
   publishAiFrameSample,
@@ -52,8 +65,22 @@ export type AttemptAiStatus =
   | "unavailable"
   | "released";
 
+/**
+ * Gaze sub-pipeline state (independent of the object detector):
+ * off = not started / disabled; loading = models downloading;
+ * calibrating = collecting the on-screen baseline; running = tracking.
+ */
+export type AttemptGazeStatus =
+  | "off"
+  | "loading"
+  | "calibrating"
+  | "running"
+  | "unavailable";
+
 export interface AttemptAiState {
   status: AttemptAiStatus;
+  /** Gaze estimator state — its failure never affects `status`. */
+  gaze: AttemptGazeStatus;
   runtime: AiRuntime | null;
   /** Current analysis FPS budget (pill copy). */
   fps: number;
@@ -64,9 +91,18 @@ export interface AttemptAiState {
 /** Batch bound per request (CONTRACT §3.1). */
 const MAX_BATCH = 8;
 /** Backend contract: at most 8 boxes per event payload. */
-const MAX_PAYLOAD_BOXES = 8;;
+const MAX_PAYLOAD_BOXES = 8;
 /** Coalescing window before a partial batch is sent. */
 const FLUSH_INTERVAL_MS = 2_000;
+/**
+ * Minimum gap between two batch sends. Five event types, each paced at one
+ * per 10s, can otherwise stagger into far more than the server's 6
+ * batches/min (e.g. a phone held low: PHONE + LOOKING_AWAY together) and
+ * get 429-dropped. A full batch still goes out immediately.
+ */
+const MIN_FLUSH_GAP_MS = 11_000;
+/** Consecutive gaze failures before the gaze estimator is given up on. */
+const GAZE_MAX_FAILURES = 3;
 /** Poll cadence while waiting for the camera publish. */
 const TRACK_POLL_MS = 1_000;
 /** PERSON_NOT_OBSERVED needs 3 consecutive person-free analyzed frames. */
@@ -131,6 +167,31 @@ export function decideDetectionEvents(
   return { events, counters: { personAbsentStreak: streak } };
 }
 
+/**
+ * The payload box for a looking-away report: the test taker's face box
+ * (normalized), face-detector score as confidence, and the direction +
+ * deviation encoded in the label (`gaze:<direction>:<yaw>:<pitch>`).
+ * Null when the frame has no face box or no direction to report.
+ */
+export function gazeEventBox(
+  report: GazeReport,
+  obs: GazeObservation
+): DetectionBox | null {
+  if (!obs.faceBox || obs.faceScore == null) return null;
+  const direction = report.kind === "frequent" ? "frequent" : report.direction;
+  if (!direction) return null;
+  return {
+    classId: GAZE_FACE_CLASS_ID,
+    label: formatGazeLabel({
+      direction,
+      deltaYaw: report.deltaYaw,
+      deltaPitch: report.deltaPitch,
+    }),
+    confidence: obs.faceScore,
+    bbox: [obs.faceBox[0], obs.faceBox[1], obs.faceBox[2], obs.faceBox[3]],
+  };
+}
+
 /** UUID with a stable fallback for non-secure contexts. */
 function newEventId(sequence: number): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -161,6 +222,7 @@ export function useAttemptAiDetection(
 ): AttemptAiState {
   const [state, setState] = useState<AttemptAiState>({
     status: "idle",
+    gaze: "off",
     runtime: null,
     fps: DEFAULT_ANALYSIS_FPS,
     simulated: false,
@@ -181,7 +243,16 @@ export function useAttemptAiDetection(
     let queue: AiDetectionItem[] = [];
     let sending = false;
     let simulated = false;
+    let gazeEstimator: GazeEstimator | null = null;
+    let gazeFailures = 0;
+    let lastFlushAt = Number.NEGATIVE_INFINITY;
+    const gazeTracker = new GazeTracker();
     const sentRecords: SentAiEventRecord[] = [];
+
+    const setGaze = (next: AttemptGazeStatus): void => {
+      if (stopped) return;
+      setState((prev) => (prev.gaze === next ? prev : { ...prev, gaze: next }));
+    };
 
     const enter = (next: AttemptAiStatus): void => {
       if (stopped) return;
@@ -212,6 +283,10 @@ export function useAttemptAiDetection(
      * final failure → 'degraded' ONLY — never throws to the caller. */
     const flush = async (): Promise<void> => {
       if (stopped || sending || queue.length === 0) return;
+      if (queue.length < MAX_BATCH && Date.now() - lastFlushAt < MIN_FLUSH_GAP_MS) {
+        return; // paced — the next interval tick retries
+      }
+      lastFlushAt = Date.now();
       sending = true;
       const batch = queue;
       queue = [];
@@ -240,6 +315,7 @@ export function useAttemptAiDetection(
     const EVENT_SUPPRESS_MS = 10_000;
 
     const handleFrame = (frame: DetectionFrame): void => {
+      const gaze = frame.gaze ?? null;
       publishAiFrameSample({
         processingMs: frame.processingMs,
         frameWidth: frame.frameWidth,
@@ -248,29 +324,52 @@ export function useAttemptAiDetection(
         simulated: frame.simulated ?? false,
         at: frame.capturedAt,
         detectionCount: frame.detections.length,
+        gazeMs: gaze ? gaze.processingMs : null,
       });
-      const decision = decideDetectionEvents(frame.detections, counters);
-      counters = decision.counters;
       const observedAt = new Date(frame.capturedAt).toISOString();
       const now = Date.now();
-      for (const event of decision.events) {
-        const last = lastQueuedAt[event.eventType] ?? 0;
-        if (now - last < EVENT_SUPPRESS_MS) continue; // suppressed, not lost truth
-        lastQueuedAt[event.eventType] = now;
+      /** Queue one event unless its type was sent within the pacing window. */
+      const enqueue = (
+        eventType: AiDetectionEventType,
+        boxes: DetectionBox[],
+        model: { id: string; version: string },
+        runtime: AiRuntime,
+        processingMs: number
+      ): void => {
+        const last = lastQueuedAt[eventType] ?? 0;
+        if (now - last < EVENT_SUPPRESS_MS) return; // suppressed, not lost truth
+        lastQueuedAt[eventType] = now;
         sequence += 1;
         queue.push({
           eventId: newEventId(sequence),
-          eventType: event.eventType,
+          eventType,
           observedAt,
           sequence,
-          modelId: MODEL.id,
-          modelVersion: MODEL.version,
-          runtime: frame.runtime,
+          modelId: model.id,
+          modelVersion: model.version,
+          runtime,
           frameWidth: frame.frameWidth,
           frameHeight: frame.frameHeight,
-          processingMs: frame.processingMs,
-          detections: toPayloadBoxes(event.detections),
+          processingMs,
+          detections: toPayloadBoxes(boxes),
         });
+      };
+
+      const decision = decideDetectionEvents(frame.detections, counters);
+      counters = decision.counters;
+      for (const event of decision.events) {
+        enqueue(event.eventType, event.detections, MODEL, frame.runtime, frame.processingMs);
+      }
+
+      // Gaze: the tracker owns calibration / smoothing / sustain rules; a
+      // report is only ever an observation for the teacher feed.
+      if (gaze) {
+        const update = gazeTracker.update(frame.capturedAt / 1000, gaze);
+        setGaze(update.calibrated ? "running" : "calibrating");
+        const box = update.report ? gazeEventBox(update.report, gaze) : null;
+        if (box) {
+          enqueue("LOOKING_AWAY_OBSERVED", [box], GAZE_MODEL, gaze.runtime, gaze.processingMs);
+        }
       }
       if (queue.length >= MAX_BATCH) void flush();
     };
@@ -306,6 +405,51 @@ export function useAttemptAiDetection(
       const d = detector;
       detector = null;
       if (d) void d.release().catch(() => undefined);
+      const g = gazeEstimator;
+      gazeEstimator = null;
+      if (g) void g.release().catch(() => undefined);
+    };
+
+    /** Attach the gaze reading of the same frame; a gaze failure never
+     * costs the object-detection frame. */
+    const withGaze = async (
+      frame: DetectionFrame | null,
+      video: HTMLVideoElement
+    ): Promise<DetectionFrame | null> => {
+      const estimator = gazeEstimator;
+      if (!frame || !estimator) return frame;
+      try {
+        frame.gaze = await estimator.estimate(video);
+        gazeFailures = 0;
+      } catch {
+        gazeFailures += 1;
+        if (gazeFailures >= GAZE_MAX_FAILURES && gazeEstimator === estimator) {
+          gazeEstimator = null;
+          void estimator.release().catch(() => undefined);
+          setGaze("unavailable");
+        }
+      }
+      return frame;
+    };
+
+    /** Load the gaze models in the background — object detection is
+     * already running and stays independent of the outcome. */
+    const startGaze = (): void => {
+      setGaze("loading");
+      void createGazeEstimator().then(
+        (estimator) => {
+          if (stopped) {
+            void estimator.release().catch(() => undefined);
+            return;
+          }
+          if (estimator.status !== "running") {
+            setGaze("unavailable");
+            return;
+          }
+          gazeEstimator = estimator;
+        },
+        () => setGaze("unavailable")
+      );
     };
 
     const run = async (): Promise<void> => {
@@ -384,7 +528,7 @@ export function useAttemptAiDetection(
           simulated = false;
           setState((prev) => ({ ...prev, simulated: false }));
         }
-        return activeDetector.detect(video);
+        return activeDetector.detect(video).then((frame) => withGaze(frame, video));
       };
       scheduler = createDetectionScheduler({
         detect: detectFrame,
@@ -400,6 +544,8 @@ export function useAttemptAiDetection(
       scheduler.start();
       flushTimer = setInterval(() => void flush(), FLUSH_INTERVAL_MS);
       enter("running");
+      // The fake detector (tests/e2e) supplies its own `gaze` readings.
+      if (GAZE_ENABLED && !hasFakeNow()) startGaze();
     };
 
     void run();

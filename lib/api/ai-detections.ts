@@ -12,7 +12,8 @@ export type AiDetectionEventType =
   | "PHONE_OBSERVED"
   | "SCREEN_OBSERVED"
   | "MULTIPLE_PERSONS_OBSERVED"
-  | "PERSON_NOT_OBSERVED";
+  | "PERSON_NOT_OBSERVED"
+  | "LOOKING_AWAY_OBSERVED";
 
 export type AiDetectionRuntime = "ORT_WEB_WASM" | "ORT_WEB_WEBGPU" | "WORKER_ORT";
 
@@ -71,7 +72,8 @@ export type AiAlertType =
   | "PHONE_DETECTED"
   | "SCREEN_DETECTED"
   | "MULTIPLE_PERSONS_DETECTED"
-  | "PERSON_NOT_VISIBLE";
+  | "PERSON_NOT_VISIBLE"
+  | "LOOKING_AWAY";
 
 export type AiAlertProvenance = "CLIENT_MODEL" | "WORKER_VERIFIED";
 

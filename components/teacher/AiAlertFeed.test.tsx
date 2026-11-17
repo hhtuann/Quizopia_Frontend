@@ -2,7 +2,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AiAlertCard, AiAlertFeed, isAiAlertActivity, mergeAlertItems } from "./AiAlertFeed";
+import {
+  AiAlertCard,
+  AiAlertFeed,
+  describeGazeLabel,
+  isAiAlertActivity,
+  mergeAlertItems,
+} from "./AiAlertFeed";
 import type { AiAlertItem } from "@/lib/api/ai-detections";
 import type { RealtimeEventEnvelope } from "@/lib/realtime/types";
 
@@ -197,6 +203,45 @@ describe("AiAlertCard", () => {
     }
   });
 
+  it("LOOKING_AWAY: VN label, direction + deviation summary, review-only note", () => {
+    const { container } = render(
+      <AiAlertCard
+        alert={alertItem({
+          alertType: "LOOKING_AWAY",
+          modelId: "mobilegaze-mobileone-s0",
+          modelVersion: "gaze360-onnx",
+          maxConfidence: 0.91,
+          latestDetections: [
+            { classId: 1000, label: "gaze:left:-38:3", confidence: 0.91, bbox: [0.3, 0.2, 0.6, 0.7] },
+          ],
+        })}
+      />
+    );
+    expect(screen.getByText("Nhìn lệch khỏi màn hình")).toBeTruthy();
+    const note = container.querySelector('[data-testid="ai-alert-gaze"]')?.textContent ?? "";
+    expect(note).toContain("Nhìn lệch sang trái · lệch ngang -38°, dọc +3° so với mốc");
+    expect(note).toContain("chỉ để giáo viên tham khảo");
+    expect(screen.getByText("Độ tin cậy (khuôn mặt)")).toBeTruthy();
+    // The face box is drawn and tagged as a face, never as a COCO class.
+    const boxes = container.querySelector('[data-testid="ai-alert-bboxes"]');
+    expect(boxes?.textContent).toContain("face 91%");
+    expect(boxes?.textContent).not.toContain("gaze:");
+  });
+
+  it("LOOKING_AWAY without a parsable payload still shows the review-only note", () => {
+    const { container } = render(
+      <AiAlertCard alert={alertItem({ alertType: "LOOKING_AWAY", latestDetections: null })} />
+    );
+    const note = container.querySelector('[data-testid="ai-alert-gaze"]')?.textContent ?? "";
+    expect(note).toContain("Hướng nhìn là ước lượng của mô hình");
+    expect(note).not.toContain("so với mốc");
+  });
+
+  it("non-gaze alerts carry no gaze note", () => {
+    const { container } = render(<AiAlertCard alert={alertItem()} />);
+    expect(container.querySelector('[data-testid="ai-alert-gaze"]')).toBeNull();
+  });
+
   it("shows the WORKER chip for worker-verified provenance", () => {
     const { container } = render(
       <AiAlertCard
@@ -211,5 +256,21 @@ describe("AiAlertCard", () => {
       <AiAlertCard alert={alertItem({ latestDetections: null })} />
     );
     expect(container.querySelector('[data-testid="ai-alert-bboxes"]')).toBeNull();
+  });
+});
+
+describe("describeGazeLabel", () => {
+  it("summarizes each direction in VN", () => {
+    expect(describeGazeLabel("gaze:right:31:0")).toBe(
+      "Nhìn lệch sang phải · lệch ngang +31°, dọc 0° so với mốc"
+    );
+    expect(describeGazeLabel("gaze:down:2:-27")).toContain("xuống dưới");
+    expect(describeGazeLabel("gaze:up:0:24")).toContain("lên trên");
+    expect(describeGazeLabel("gaze:frequent:0:0")).toContain("lặp lại nhiều lần");
+  });
+
+  it("is null for non-gaze labels", () => {
+    expect(describeGazeLabel("cell phone")).toBeNull();
+    expect(describeGazeLabel(null)).toBeNull();
   });
 });

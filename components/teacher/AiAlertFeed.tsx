@@ -6,6 +6,7 @@ import {
   getSessionAiAlerts,
   type AiAlertItem,
 } from "@/lib/api/ai-detections";
+import { parseGazeLabel, type GazeLabelInfo } from "@/lib/ai/gaze-core";
 import { cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { RealtimeEventEnvelope } from "@/lib/realtime/types";
@@ -45,7 +46,27 @@ const ALERT_LABEL: Record<AiAlertItem["alertType"], string> = {
   SCREEN_DETECTED: "Phát hiện màn hình phụ",
   MULTIPLE_PERSONS_DETECTED: "Nhiều người trong khung hình",
   PERSON_NOT_VISIBLE: "Không thấy người làm bài",
+  LOOKING_AWAY: "Nhìn lệch khỏi màn hình",
 };
+
+const GAZE_DIRECTION_LABEL: Record<GazeLabelInfo["direction"], string> = {
+  left: "sang trái",
+  right: "sang phải",
+  up: "lên trên",
+  down: "xuống dưới",
+  frequent: "lặp lại nhiều lần",
+};
+
+const signedDeg = (v: number): string => `${v > 0 ? "+" : ""}${v}°`;
+
+/** VN summary of a gaze payload label; null for non-gaze boxes. Pure. */
+export function describeGazeLabel(label: string | null | undefined): string | null {
+  const info = parseGazeLabel(label);
+  if (!info) return null;
+  return `Nhìn lệch ${GAZE_DIRECTION_LABEL[info.direction]} · lệch ngang ${signedDeg(
+    info.deltaYaw
+  )}, dọc ${signedDeg(info.deltaPitch)} so với mốc`;
+}
 
 const BOX_CLASS_LABEL: Record<number, string> = {
   0: "person",
@@ -170,6 +191,10 @@ export function AiAlertCard({ alert }: { alert: AiAlertItem }) {
         ? "CLIENT MODEL"
         : "—";
   const detections = alert.latestDetections ?? [];
+  const isGaze = alert.alertType === "LOOKING_AWAY";
+  const gazeSummary = isGaze
+    ? detections.map((d) => describeGazeLabel(d.label)).find((s) => s != null) ?? null
+    : null;
 
   return (
     <div
@@ -193,7 +218,9 @@ export function AiAlertCard({ alert }: { alert: AiAlertItem }) {
 
       <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] sm:grid-cols-4">
         <div>
-          <dt className="text-[#94A3B8]">Độ tin cậy</dt>
+          <dt className="text-[#94A3B8]">
+            {isGaze ? "Độ tin cậy (khuôn mặt)" : "Độ tin cậy"}
+          </dt>
           <dd className="font-semibold text-[#0F172A]">{confidence}</dd>
         </div>
         <div>
@@ -213,6 +240,13 @@ export function AiAlertCard({ alert }: { alert: AiAlertItem }) {
           </dd>
         </div>
       </dl>
+
+      {isGaze && (
+        <p className="mt-2 text-[11px] font-medium text-[#64748B]" data-testid="ai-alert-gaze">
+          {gazeSummary ? `${gazeSummary}. ` : ""}
+          Hướng nhìn là ước lượng của mô hình — chỉ để giáo viên tham khảo.
+        </p>
+      )}
 
       {detections.length > 0 && (
         <div className="mt-3">
@@ -236,7 +270,8 @@ export function AiAlertCard({ alert }: { alert: AiAlertItem }) {
                   }}
                 >
                   <span className="absolute left-0 top-0 -translate-y-full whitespace-nowrap bg-[#F59E0B] px-1 text-[8px] font-bold leading-tight text-[#0F172A]">
-                    {BOX_CLASS_LABEL[d.classId] ?? d.label} {Math.round(d.confidence * 100)}%
+                    {parseGazeLabel(d.label) ? "face" : BOX_CLASS_LABEL[d.classId] ?? d.label}{" "}
+                    {Math.round(d.confidence * 100)}%
                   </span>
                 </div>
               );

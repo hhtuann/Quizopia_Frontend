@@ -13,6 +13,7 @@ afterEach(cleanup);
 function state(partial: Partial<AttemptAiState>): AttemptAiState {
   return {
     status: "running",
+    gaze: "off",
     runtime: null,
     fps: 1.5,
     simulated: false,
@@ -26,15 +27,20 @@ function pillText(partial: Partial<AttemptAiState>): string {
 }
 
 describe("AiStatusPill", () => {
-  it("running shows the yolo26s + FPS + WebGPU runtime label", () => {
-    const text = pillText({ status: "running", runtime: "ORT_WEB_WEBGPU", fps: 1.5 });
-    expect(text).toContain("AI giám sát: đang chạy (yolo26s, ~1.5FPS, WebGPU)");
+  it("running shows a plain label — no model, FPS, runtime or source link", () => {
+    const text = pillText({ status: "running", runtime: "ORT_WEB_WEBGPU", fps: 1.5, gaze: "running" });
+    expect(text).toBe("AI giám sát: đang chạy");
   });
 
-  it("running shows WASM when that is the runtime", () => {
-    expect(pillText({ status: "running", runtime: "ORT_WEB_WASM", fps: 0.5 })).toContain(
-      "~0.5FPS, WASM"
+  it("gaze sub-status is appended only while it needs attention — never an observation", () => {
+    const base = { status: "running" as const, runtime: "ORT_WEB_WEBGPU" as const, fps: 1.5 };
+    expect(pillText({ ...base, gaze: "off" })).not.toContain("hướng nhìn");
+    expect(pillText({ ...base, gaze: "loading" })).toContain("hướng nhìn: đang tải…");
+    expect(pillText({ ...base, gaze: "calibrating" })).toContain(
+      "hướng nhìn: đang lấy mốc, hãy nhìn vào màn hình"
     );
+    expect(pillText({ ...base, gaze: "running" })).not.toContain("hướng nhìn");
+    expect(pillText({ ...base, gaze: "unavailable" })).toContain("hướng nhìn: không khả dụng");
   });
 
   it("degraded stays informational — analysis continues", () => {
