@@ -204,16 +204,40 @@ test.describe("P4-F physical camera gate, no fake media", () => {
       const tiles = grid.locator("[data-media-identity]");
       await expect(tiles).toHaveCount(5, { timeout: 90_000 });
 
-      const frames = async (): Promise<Array<{ width: number; frames: number }>> =>
-        tiles.locator("video").evaluateAll((videos) =>
-          videos.map((v) => {
-            const video = v as HTMLVideoElement;
+      // Bind each teacher tile to the exact LiveKit CAMERA trackSid of its
+      // remote participant, not an assumed DOM tile order. Otherwise sorting
+      // or grid reordering could falsely attribute one webcam's frame count
+      // to a different participant.
+      const frames = async (): Promise<
+        Array<{ trackSid: string | null; width: number; frames: number }>
+      > =>
+        teacherPage.evaluate(() => {
+          const room = (window as unknown as {
+            __quizopiaMedia?: { getRoom?: (role: string) => unknown };
+          }).__quizopiaMedia?.getRoom?.("teacher");
+          const remote = (room as {
+            remoteParticipants?: Map<string, {
+              trackPublications?: Map<string, { source?: string; trackSid?: string }>;
+            }>;
+          } | null)?.remoteParticipants;
+          return Array.from(
+            document.querySelectorAll<HTMLElement>(
+              "[data-testid='camera-grid'] [data-media-identity]"
+            )
+          ).map((tile) => {
+            const identity = tile.getAttribute("data-media-identity") ?? "";
+            const participant = remote?.get(identity);
+            const camera = Array.from(participant?.trackPublications?.values() ?? []).find(
+              (pub) => pub.source === "camera"
+            );
+            const video = tile.querySelector("video");
             return {
-              width: video.videoWidth,
-              frames: video.getVideoPlaybackQuality?.().totalVideoFrames ?? 0,
+              trackSid: camera?.trackSid ?? null,
+              width: video?.videoWidth ?? 0,
+              frames: video?.getVideoPlaybackQuality?.().totalVideoFrames ?? 0,
             };
-          })
-        );
+          });
+        });
 
       await expect.poll(async () => (await frames()).filter((v) => v.width > 0).length,
         { timeout: 60_000 }).toBe(5);
@@ -222,12 +246,19 @@ test.describe("P4-F physical camera gate, no fake media", () => {
       const last = await frames();
       expect(last.length).toBe(5);
       const gridObservedAt = new Date().toISOString();
-      for (let i = 0; i < 5; i++) {
-        const delta = last[i]!.frames - first[i]!.frames;
-        expect(delta, "Every teacher tile must decode NEW frames").toBeGreaterThan(0);
-        cameraReports[i]!.teacherSubscribed = true;
-        cameraReports[i]!.decodedFrames = delta;
-        cameraReports[i]!.measuredFps = Math.round((delta / 5) * 10) / 10;
+      const firstBySid = new Map(first.map((frame) => [frame.trackSid, frame]));
+      const lastBySid = new Map(last.map((frame) => [frame.trackSid, frame]));
+      expect(firstBySid.size, "Each teacher tile must map to a unique LiveKit track").toBe(5);
+      for (const camera of cameraReports) {
+        const sid = String(camera.trackSid);
+        const a = firstBySid.get(sid);
+        const b = lastBySid.get(sid);
+        expect(a && b, "Camera's actual trackSid must appear in the teacher grid").toBeTruthy();
+        const delta = b!.frames - a!.frames;
+        expect(delta, "Every exact CAMERA track must decode NEW frames").toBeGreaterThan(0);
+        camera.teacherSubscribed = true;
+        camera.decodedFrames = delta;
+        camera.measuredFps = Math.round((delta / 5) * 10) / 10;
       }
       report.teacherGrid = {
         observedAt: gridObservedAt,
