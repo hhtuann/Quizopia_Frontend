@@ -70,7 +70,7 @@ export function parseCoverageGaps(
  * never silently breaks mid-review. */
 const URL_REFRESH_MARGIN_MS = 30_000;
 
-function useEvidenceUrl(sessionId: number, evidenceId: string, enabled: boolean) {
+export function useEvidenceUrl(sessionId: number, evidenceId: string, enabled: boolean) {
   return useQuery({
     queryKey: ["exam-sessions", sessionId, "evidence-url", evidenceId],
     queryFn: () => fetchEvidenceUrl(sessionId, evidenceId),

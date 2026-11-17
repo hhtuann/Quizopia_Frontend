@@ -6,7 +6,9 @@ import {
   getSessionAiAlerts,
   type AiAlertItem,
 } from "@/lib/api/ai-detections";
+import { fetchSessionEvidence, type EvidenceItem } from "@/lib/api/evidence";
 import { parseGazeLabel, type GazeLabelInfo } from "@/lib/ai/gaze-core";
+import { useEvidenceUrl } from "./EvidenceSection";
 import { cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { RealtimeEventEnvelope } from "@/lib/realtime/types";
@@ -20,8 +22,13 @@ import type { RealtimeEventEnvelope } from "@/lib/realtime/types";
  *
  * Honesty (CONTRACT §8): cards show observations with confidence + provenance
  * and the disclaimer "Quan sát bằng AI — không tự động kết luận vi phạm."
- * The bbox mini-render draws ONLY normalized boxes from latestDetections —
- * no image is ever stored or shown (evidence media is P4-D).
+ * The bbox mini-render draws the normalized boxes from latestDetections.
+ * When the session stores evidence snapshots (P4-D) and one is AVAILABLE
+ * for the alert, that snapshot is shown underneath the boxes; otherwise
+ * the frame stays a neutral dark canvas. The snapshot is the frame the
+ * alert's FIRST detection was computed on (captured client-side at that
+ * moment), and over a photo the boxes drawn are that same detection's
+ * (`firstDetections`), so they line up; the caption says which frame.
  */
 
 /** True when an ATTEMPT_ACTIVITY ping concerns the AI alert feed. */
@@ -58,6 +65,19 @@ const GAZE_DIRECTION_LABEL: Record<GazeLabelInfo["direction"], string> = {
 };
 
 const signedDeg = (v: number): string => `${v > 0 ? "+" : ""}${v}°`;
+
+/** Newest AVAILABLE snapshot per alertId. Pure — unit-tested. */
+export function snapshotsByAlert(items: EvidenceItem[]): Map<number, EvidenceItem> {
+  const stamp = (e: EvidenceItem): number =>
+    new Date(e.capturedAt ?? e.createdAt).getTime() || 0;
+  const byAlert = new Map<number, EvidenceItem>();
+  for (const item of items) {
+    if (item.kind !== "SNAPSHOT" || item.status !== "AVAILABLE") continue;
+    const current = byAlert.get(item.alertId);
+    if (current == null || stamp(item) > stamp(current)) byAlert.set(item.alertId, item);
+  }
+  return byAlert;
+}
 
 /** VN summary of a gaze payload label; null for non-gaze boxes. Pure. */
 export function describeGazeLabel(label: string | null | undefined): string | null {
@@ -105,6 +125,16 @@ export function AiAlertFeed({ sessionId }: { sessionId: number }) {
     () => mergeAlertItems(olderItems, data?.items ?? []),
     [olderItems, data]
   );
+
+  // P4-D snapshots for the cards. Key sits under the ["…","evidence"]
+  // prefix LiveMonitor invalidates on EVIDENCE_* pings. A failure (or a
+  // session without snapshots) just leaves the dark canvas.
+  const { data: evidence } = useQuery({
+    queryKey: ["exam-sessions", sessionId, "evidence", "feed-snapshots"],
+    queryFn: () => fetchSessionEvidence(sessionId, { kind: "SNAPSHOT", limit: 100 }),
+    enabled: Number.isFinite(sessionId) && sessionId > 0,
+  });
+  const snapshots = useMemo(() => snapshotsByAlert(evidence ?? []), [evidence]);
 
   const loadOlder = async (): Promise<void> => {
     const cursor = items.length > 0 ? items[items.length - 1].alertId : undefined;
@@ -157,7 +187,11 @@ export function AiAlertFeed({ sessionId }: { sessionId: number }) {
         <ul className="space-y-3">
           {items.map((alert) => (
             <li key={alert.alertId}>
-              <AiAlertCard alert={alert} />
+              <AiAlertCard
+                alert={alert}
+                sessionId={sessionId}
+                snapshot={snapshots.get(alert.alertId)}
+              />
             </li>
           ))}
         </ul>
@@ -177,7 +211,32 @@ export function AiAlertFeed({ sessionId }: { sessionId: number }) {
   );
 }
 
-export function AiAlertCard({ alert }: { alert: AiAlertItem }) {
+/** The alert's evidence snapshot, filling the bbox frame. Own component so
+ * the presigned-URL query only exists for cards that have a snapshot. */
+function AlertSnapshotImage({ sessionId, item }: { sessionId: number; item: EvidenceItem }) {
+  const { data } = useEvidenceUrl(sessionId, item.evidenceId, true);
+  if (!data?.url) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- presigned URL (300s TTL) must not pass through the Next image optimizer
+    <img
+      src={data.url}
+      alt="Ảnh minh chứng do máy thí sinh gửi"
+      data-testid="ai-alert-snapshot"
+      className="absolute inset-0 h-full w-full object-fill"
+    />
+  );
+}
+
+export function AiAlertCard({
+  alert,
+  sessionId,
+  snapshot,
+}: {
+  alert: AiAlertItem;
+  /** With `snapshot`: lets the card show the alert's evidence image. */
+  sessionId?: number;
+  snapshot?: EvidenceItem;
+}) {
   const confidence =
     alert.maxConfidence != null ? `${Math.round(alert.maxConfidence * 100)}%` : "—";
   const first = formatTime(alert.firstDetectedAt);
@@ -190,11 +249,34 @@ export function AiAlertCard({ alert }: { alert: AiAlertItem }) {
       : alert.provenance === "CLIENT_MODEL"
         ? "CLIENT MODEL"
         : "—";
-  const detections = alert.latestDetections ?? [];
+  const latestDetections = alert.latestDetections ?? [];
+  const hasSnapshot = snapshot != null && sessionId != null;
+  // The snapshot is the frame the alert's FIRST detection ran on, so over
+  // a photo the boxes of THAT detection are drawn (same frame → they line
+  // up). Without a photo, or on a backend that does not send them, the
+  // latest boxes are shown as before.
+  const firstDetections = alert.firstDetections ?? null;
+  const boxesMatchPhoto =
+    hasSnapshot && (firstDetections != null || alert.detectionCount <= 1);
+  const detections =
+    hasSnapshot && firstDetections != null ? firstDetections : latestDetections;
   const isGaze = alert.alertType === "LOOKING_AWAY";
   const gazeSummary = isGaze
-    ? detections.map((d) => describeGazeLabel(d.label)).find((s) => s != null) ?? null
+    ? latestDetections.map((d) => describeGazeLabel(d.label)).find((s) => s != null) ?? null
     : null;
+  // Match the frame to the snapshot's real shape so the boxes keep their
+  // proportions over it; 4:3 when there is no image.
+  const aspectRatio =
+    hasSnapshot && snapshot.width && snapshot.height
+      ? `${snapshot.width} / ${snapshot.height}`
+      : "4 / 3";
+  const boxCaption = !hasSnapshot
+    ? "bbox từ khung phân tích — chưa có ảnh minh chứng cho cảnh báo này"
+    : boxesMatchPhoto
+      ? alert.detectionCount <= 1
+        ? "Ảnh do máy thí sinh gửi — đúng khung hình lúc phát hiện"
+        : "Ảnh do máy thí sinh gửi — khung hình và bbox của lần phát hiện đầu tiên"
+      : "Ảnh do máy thí sinh gửi — khung hình của lần phát hiện đầu tiên; khung bbox là của lần phát hiện gần nhất";
 
   return (
     <div
@@ -248,14 +330,18 @@ export function AiAlertCard({ alert }: { alert: AiAlertItem }) {
         </p>
       )}
 
-      {detections.length > 0 && (
+      {(detections.length > 0 || hasSnapshot) && (
         <div className="mt-3">
           <div
-            className="relative w-full max-w-[240px] overflow-hidden rounded-lg border border-[#334155] bg-[#0F172A]"
-            style={{ aspectRatio: "4 / 3" }}
+            className={cn(
+              "relative w-full overflow-hidden rounded-lg border border-[#334155] bg-[#0F172A]",
+              hasSnapshot ? "max-w-[360px]" : "max-w-[240px]"
+            )}
+            style={{ aspectRatio }}
             data-testid="ai-alert-bboxes"
-            aria-label="bbox từ khung phân tích — không lưu ảnh (P4-D)"
+            aria-label={boxCaption}
           >
+            {hasSnapshot && <AlertSnapshotImage sessionId={sessionId} item={snapshot} />}
             {detections.map((d, i) => {
               const [x1, y1, x2, y2] = d.bbox;
               return (
@@ -277,9 +363,7 @@ export function AiAlertCard({ alert }: { alert: AiAlertItem }) {
               );
             })}
           </div>
-          <p className="mt-1 text-[10px] font-medium text-[#94A3B8]">
-            bbox từ khung phân tích — không lưu ảnh (P4-D)
-          </p>
+          <p className="mt-1 text-[10px] font-medium text-[#94A3B8]">{boxCaption}</p>
         </div>
       )}
     </div>

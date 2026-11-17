@@ -8,8 +8,10 @@ import {
   describeGazeLabel,
   isAiAlertActivity,
   mergeAlertItems,
+  snapshotsByAlert,
 } from "./AiAlertFeed";
 import type { AiAlertItem } from "@/lib/api/ai-detections";
+import type { EvidenceItem } from "@/lib/api/evidence";
 import type { RealtimeEventEnvelope } from "@/lib/realtime/types";
 
 /**
@@ -26,9 +28,36 @@ vi.mock("@/lib/api/ai-detections", async (importOriginal) => {
   return { ...actual, getSessionAiAlerts: vi.fn() };
 });
 
+import type * as EvidenceApi from "@/lib/api/evidence";
+
+vi.mock("@/lib/api/evidence", async (importOriginal) => {
+  const actual = await importOriginal<typeof EvidenceApi>();
+  return { ...actual, fetchSessionEvidence: vi.fn(), fetchEvidenceUrl: vi.fn() };
+});
+
 import { getSessionAiAlerts } from "@/lib/api/ai-detections";
+import { fetchEvidenceUrl, fetchSessionEvidence } from "@/lib/api/evidence";
 
 const alertsMock = vi.mocked(getSessionAiAlerts);
+const evidenceMock = vi.mocked(fetchSessionEvidence);
+const evidenceUrlMock = vi.mocked(fetchEvidenceUrl);
+
+function snapshotItem(overrides: Partial<EvidenceItem> = {}): EvidenceItem {
+  return {
+    evidenceId: "ev-1",
+    attemptId: 10,
+    alertId: 1,
+    kind: "SNAPSHOT",
+    status: "AVAILABLE",
+    provenance: "CLIENT_CAPTURE",
+    width: 640,
+    height: 360,
+    capturedAt: "2026-11-15T08:00:01Z",
+    createdAt: "2026-11-15T08:00:02Z",
+    expiresAt: "2026-12-15T08:00:02Z",
+    ...overrides,
+  };
+}
 
 function alertItem(overrides: Partial<AiAlertItem> = {}): AiAlertItem {
   return {
@@ -66,6 +95,8 @@ function renderFeed(sessionId = 5): { container: HTMLElement; client: QueryClien
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Default: a session without stored snapshots.
+  evidenceMock.mockResolvedValue([]);
 });
 
 afterEach(cleanup);
@@ -149,11 +180,12 @@ describe("AiAlertFeed", () => {
     expect(phone.style.height).toBe("40%");
     expect(person.style.left).toBe("0%");
     expect(person.style.width).toBe("100%");
-    // Honesty label: boxes only, no stored image (P4-D).
+    // Honesty label: boxes only while no snapshot exists for the alert.
     expect(canvas.textContent).toContain("cell phone 90%");
     expect(screen.getByTestId("ai-alert-card").textContent).toContain(
-      "bbox từ khung phân tích — không lưu ảnh (P4-D)"
+      "bbox từ khung phân tích — chưa có ảnh minh chứng cho cảnh báo này"
     );
+    expect(screen.queryByTestId("ai-alert-snapshot")).toBeNull();
   });
 
   it("shows the empty state when no alerts exist", async () => {
@@ -272,5 +304,153 @@ describe("describeGazeLabel", () => {
   it("is null for non-gaze labels", () => {
     expect(describeGazeLabel("cell phone")).toBeNull();
     expect(describeGazeLabel(null)).toBeNull();
+  });
+});
+
+describe("snapshotsByAlert", () => {
+  it("keeps the newest AVAILABLE snapshot per alert and ignores the rest", () => {
+    const map = snapshotsByAlert([
+      snapshotItem({ evidenceId: "old", capturedAt: "2026-11-15T08:00:01Z" }),
+      snapshotItem({ evidenceId: "new", capturedAt: "2026-11-15T08:00:09Z" }),
+      snapshotItem({ evidenceId: "pending", status: "PENDING", capturedAt: "2026-11-15T08:00:30Z" }),
+      snapshotItem({ evidenceId: "clip", kind: "CLIP", capturedAt: "2026-11-15T08:00:40Z" }),
+      snapshotItem({ evidenceId: "other", alertId: 2 }),
+      snapshotItem({ evidenceId: "expired", alertId: 3, status: "EXPIRED" }),
+    ]);
+    expect(map.get(1)?.evidenceId).toBe("new");
+    expect(map.get(2)?.evidenceId).toBe("other");
+    expect(map.has(3)).toBe(false);
+  });
+});
+
+describe("AiAlertFeed evidence snapshot in the bbox frame (P4-D)", () => {
+  it("shows the alert's snapshot under the boxes, sized to the image", async () => {
+    alertsMock.mockResolvedValue({ items: [alertItem({ alertId: 1 })], nextCursor: null });
+    evidenceMock.mockResolvedValue([snapshotItem()]);
+    evidenceUrlMock.mockResolvedValue({
+      url: "http://minio.test/snap.jpg?sig=x",
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    });
+    renderFeed(5);
+    const img = (await screen.findByTestId("ai-alert-snapshot")) as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe("http://minio.test/snap.jpg?sig=x");
+    expect(evidenceMock).toHaveBeenCalledWith(5, { kind: "SNAPSHOT", limit: 100 });
+    expect(evidenceUrlMock).toHaveBeenCalledWith(5, "ev-1");
+    const frame = screen.getByTestId("ai-alert-bboxes");
+    expect(frame.style.aspectRatio).toBe("640 / 360");
+    expect(frame.textContent).toContain("cell phone 87%"); // boxes stay on top
+    // alertItem() has detectionCount 3 and (older backend) no
+    // firstDetections → boxes are from a newer frame, and it says so.
+    expect(screen.getByTestId("ai-alert-card").textContent).toContain(
+      "khung hình của lần phát hiện đầu tiên; khung bbox là của lần phát hiện gần nhất"
+    );
+  });
+
+  it("over a photo it draws the FIRST detection's boxes, not the latest", async () => {
+    alertsMock.mockResolvedValue({
+      items: [
+        alertItem({
+          alertId: 1,
+          detectionCount: 4,
+          latestDetections: [
+            { classId: 67, label: "cell phone", confidence: 0.6, bbox: [0.7, 0.7, 0.9, 0.9] },
+          ],
+          firstDetections: [
+            { classId: 67, label: "cell phone", confidence: 0.95, bbox: [0.1, 0.2, 0.3, 0.6] },
+          ],
+        }),
+      ],
+      nextCursor: null,
+    });
+    evidenceMock.mockResolvedValue([snapshotItem()]);
+    evidenceUrlMock.mockResolvedValue({
+      url: "http://minio.test/snap.jpg",
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    });
+    renderFeed(5);
+    await screen.findByTestId("ai-alert-snapshot");
+    const frame = screen.getByTestId("ai-alert-bboxes");
+    const box = frame.querySelector<HTMLElement>("div.absolute")!;
+    expect(box.style.left).toBe("10%");
+    expect(box.style.top).toBe("20%");
+    expect(frame.textContent).toContain("cell phone 95%");
+    expect(screen.getByTestId("ai-alert-card").textContent).toContain(
+      "khung hình và bbox của lần phát hiện đầu tiên"
+    );
+  });
+
+  it("without a photo the latest boxes are shown even if firstDetections exist", async () => {
+    alertsMock.mockResolvedValue({
+      items: [
+        alertItem({
+          alertId: 1,
+          latestDetections: [
+            { classId: 67, label: "cell phone", confidence: 0.6, bbox: [0.7, 0.7, 0.9, 0.9] },
+          ],
+          firstDetections: [
+            { classId: 67, label: "cell phone", confidence: 0.95, bbox: [0.1, 0.2, 0.3, 0.6] },
+          ],
+        }),
+      ],
+      nextCursor: null,
+    });
+    renderFeed(5);
+    const frame = await screen.findByTestId("ai-alert-bboxes");
+    expect(frame.querySelector<HTMLElement>("div.absolute")!.style.left).toBe("70%");
+  });
+
+  it("a single-detection alert says photo and boxes are the same frame", async () => {
+    alertsMock.mockResolvedValue({
+      items: [alertItem({ alertId: 1, detectionCount: 1 })],
+      nextCursor: null,
+    });
+    evidenceMock.mockResolvedValue([snapshotItem()]);
+    evidenceUrlMock.mockResolvedValue({
+      url: "http://minio.test/snap.jpg",
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    });
+    renderFeed(5);
+    await screen.findByTestId("ai-alert-snapshot");
+    expect(screen.getByTestId("ai-alert-card").textContent).toContain(
+      "đúng khung hình lúc phát hiện"
+    );
+  });
+
+  it("an alert without a snapshot keeps the dark frame and mints no URL", async () => {
+    alertsMock.mockResolvedValue({ items: [alertItem({ alertId: 1 })], nextCursor: null });
+    evidenceMock.mockResolvedValue([snapshotItem({ alertId: 99 })]);
+    renderFeed(5);
+    await screen.findByTestId("ai-alert-bboxes");
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByTestId("ai-alert-snapshot")).toBeNull();
+    expect(evidenceUrlMock).not.toHaveBeenCalled();
+  });
+
+  it("an evidence fetch failure never breaks the feed", async () => {
+    alertsMock.mockResolvedValue({ items: [alertItem({ alertId: 1 })], nextCursor: null });
+    evidenceMock.mockRejectedValue(new Error("403"));
+    renderFeed(5);
+    expect((await screen.findAllByTestId("ai-alert-card")).length).toBe(1);
+    expect(screen.queryByTestId("ai-alert-snapshot")).toBeNull();
+  });
+
+  it("a snapshot shows even when the alert carries no boxes", () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    evidenceUrlMock.mockResolvedValue({
+      url: "http://minio.test/s.jpg",
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <AiAlertCard
+          alert={alertItem({ latestDetections: null })}
+          sessionId={5}
+          snapshot={snapshotItem()}
+        />
+      </QueryClientProvider>
+    );
+    expect(screen.getByTestId("ai-alert-bboxes")).toBeTruthy();
   });
 });

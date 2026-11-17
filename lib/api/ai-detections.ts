@@ -101,6 +101,9 @@ export interface AiAlertItem {
   modelVersion: string | null;
   provenance: AiAlertProvenance | null;
   latestDetections: AiDetectionPayloadBox[] | null;
+  /** Boxes of the detection that OPENED the alert — the frame its
+   *  evidence snapshot (P4-D) shows. Absent on older backends. */
+  firstDetections?: AiDetectionPayloadBox[] | null;
 }
 
 export interface AiAlertListParams {
