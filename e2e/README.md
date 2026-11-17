@@ -84,3 +84,27 @@ Additional environment on top of the P4-A contract:
 
 State files: `.smoke-camera-e.json` (E), `.smoke-camera-f.json` (F, consumed
 by G). Evidence: `evidence/E3-*`, `F1-*`, `G3-*`.
+
+
+## P4-F final physical-camera gate (issue #98; manual/hardware required)
+
+The normal Playwright suite above uses SIMULATED Chrome camera devices and can never prove Phase 4's five DISTINCT simultaneous physical webcam criterion.
+
+This branch adds a separate explicit test:
+- e2e/p4f-physical.config.ts — headed Chromium with NO fake camera launch flags, run only by explicit command.
+- e2e/p4f-five-physical.spec.ts — enumerates at least five DIFFERENT browser video input IDs on the same workstation, opens independent student contexts, forces each app capture to a distinct device through real getUserMedia, publishes real LiveKit video for five monitored Attempts and verifies five simultaneously decoding teacher-grid videos. It emits a PRIVATE pseudonymized candidate JSON + grid screenshot in gitignored e2e/evidence/.
+- Requires five physical USB cameras on the SAME machine. The alternative of five laptops with one camera each uses the witnessed System runbook and is not automatically implemented by this script.
+- Device IDs/labels cannot authenticate physical hardware. The generated report intentionally has status HUMAN_HARDWARE_ATTESTATION_PENDING and source UNVERIFIED_PHYSICAL_CANDIDATE; a separate adult witness must verify physical serials offline. It is not sufficient by itself to close #98.
+
+Run from Frontend repo with isolated Backend, Next, LiveKit, Mailpit, class test DB and five real webcams connected:
+
+~~~powershell
+$env:P4F_PHYSICAL_CAMERAS="1"
+npx playwright test --config e2e/p4f-physical.config.ts
+~~~
+
+For Bash: P4F_PHYSICAL_CAMERAS=1 npx playwright test --config e2e/p4f-physical.config.ts
+
+Do NOT use the normal config for this test, or set any Chromium fake-device flag. If fewer than five physical devices are present, report a HARDWARE NO-GO and preserve the existing five-synthetic-publisher evidence only as transport proof. The test does not cover real model phone/multiple-person accuracy, full recording and outage matrix — follow System/docs/phase4/DEMO_RUNBOOK.md and the P4-F evidence manifest contract separately.
+
+The script is NOT executed in the GitHub-hosted CI job (which has no physical webcams). Local execution, private media evidence and independent hardware attestation are required.
