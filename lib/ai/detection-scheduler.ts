@@ -125,7 +125,8 @@ export function createDetectionScheduler(
       try {
         const frame = await detect?.();
         if (!stopped && frame) {
-          adapt(frame.processingMs);
+          // Budget against the whole per-frame cost (object + gaze models).
+          adapt(frame.processingMs + (frame.gaze?.processingMs ?? 0));
           onFrame?.(frame);
         }
       } catch (err) {

@@ -1,5 +1,6 @@
 import type { DetectionFrame } from "./model-adapter";
 import type { Detector } from "./model-adapter";
+import type { GazeEstimator } from "./gaze-adapter";
 
 /**
  * P4-C AI test hooks (mirrors lib/media/test-hooks.ts). e2e (Playwright) and
@@ -44,6 +45,8 @@ export interface QuizopiaAiTestHooks {
    * fake; output is real-model output.
    */
   createRealDetector(): Promise<Detector>;
+  /** The REAL gaze estimator (face + gaze models) — benchmark surface. */
+  createRealGazeEstimator(): Promise<GazeEstimator>;
 }
 
 /** One analyzed frame's honest telemetry (benchmark + debugging). */
@@ -56,6 +59,8 @@ export interface AiFrameSample {
   at: number;
   /** Detections above threshold this frame (count only). */
   detectionCount: number;
+  /** Face + gaze time for this frame (ms); null when gaze did not run. */
+  gazeMs: number | null;
 }
 
 const MAX_SENT_RECORDS = 50;
@@ -88,6 +93,10 @@ function exposeHooks(): void {
         // module — static import would ship 30MB of wasm to every visitor).
         const mod = await import("./model-adapter");
         return mod.createDetector();
+      },
+      createRealGazeEstimator: async () => {
+        const mod = await import("./gaze-adapter");
+        return mod.createGazeEstimator();
       },
     };
   }

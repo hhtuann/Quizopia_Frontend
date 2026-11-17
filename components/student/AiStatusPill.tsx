@@ -1,7 +1,10 @@
 "use client";
 
 import { cn } from "@/lib/utils/cn";
-import type { AttemptAiState } from "@/lib/ai/use-attempt-ai-detection";
+import type {
+  AttemptAiState,
+  AttemptGazeStatus,
+} from "@/lib/ai/use-attempt-ai-detection";
 
 /**
  * AI proctoring status pill for the attempt header (P4-C) — sits beside the
@@ -10,9 +13,14 @@ import type { AttemptAiState } from "@/lib/ai/use-attempt-ai-detection";
  * unavailable state spells that out. Renders nothing once released.
  */
 
-const RUNTIME_LABEL: Record<string, string> = {
-  ORT_WEB_WEBGPU: "WebGPU",
-  ORT_WEB_WASM: "WASM",
+/** Gaze sub-status suffix — neutral, never shows what was observed. Nothing
+ * extra once gaze is running normally (the pill stays a plain "đang chạy"). */
+const GAZE_LABEL: Record<AttemptGazeStatus, string> = {
+  off: "",
+  loading: " · hướng nhìn: đang tải…",
+  calibrating: " · hướng nhìn: đang lấy mốc, hãy nhìn vào màn hình",
+  running: "",
+  unavailable: " · hướng nhìn: không khả dụng",
 };
 
 interface PillView {
@@ -23,18 +31,12 @@ interface PillView {
 
 function pillView(state: AttemptAiState): PillView {
   switch (state.status) {
-    case "running": {
-      const runtime = state.runtime
-        ? RUNTIME_LABEL[state.runtime] ?? state.runtime
-        : null;
-      const parts = [`~${state.fps}FPS`];
-      if (runtime) parts.push(runtime);
+    case "running":
       return {
-        label: `AI giám sát: đang chạy (yolo26s, ${parts.join(", ")})`,
+        label: `AI giám sát: đang chạy${GAZE_LABEL[state.gaze] ?? ""}`,
         dot: "bg-[#10B981]",
         text: "text-[#10B981]",
       };
-    }
     case "degraded":
       // Analysis continues; only event delivery is failing.
       return {

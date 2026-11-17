@@ -30,6 +30,19 @@ import {
   type DetectionScheduler,
 } from "./detection-scheduler";
 import {
+  GAZE_ENABLED,
+  GAZE_MODEL,
+  createGazeEstimator,
+  type GazeEstimator,
+} from "./gaze-adapter";
+import {
+  GAZE_FACE_CLASS_ID,
+  GazeTracker,
+  formatGazeLabel,
+  type GazeObservation,
+  type GazeReport,
+} from "./gaze-core";
+import {
   getFakeDetector,
   publishAiDroppedFrames,
   publishAiFrameSample,
@@ -58,8 +71,22 @@ export type AttemptAiStatus =
   | "unavailable"
   | "released";
 
+/**
+ * Gaze sub-pipeline state (independent of the object detector):
+ * off = not started / disabled; loading = models downloading;
+ * calibrating = collecting the on-screen baseline; running = tracking.
+ */
+export type AttemptGazeStatus =
+  | "off"
+  | "loading"
+  | "calibrating"
+  | "running"
+  | "unavailable";
+
 export interface AttemptAiState {
   status: AttemptAiStatus;
+  /** Gaze estimator state — its failure never affects `status`. */
+  gaze: AttemptGazeStatus;
   runtime: AiRuntime | null;
   /** Current analysis FPS budget (pill copy). */
   fps: number;
@@ -78,9 +105,24 @@ export type AttemptSnapshotState = "idle" | "sent" | "failed";
 /** Batch bound per request (CONTRACT §3.1). */
 const MAX_BATCH = 8;
 /** Backend contract: at most 8 boxes per event payload. */
-const MAX_PAYLOAD_BOXES = 8;;
+const MAX_PAYLOAD_BOXES = 8;
 /** Coalescing window before a partial batch is sent. */
 const FLUSH_INTERVAL_MS = 2_000;
+/**
+ * Minimum gap between two batch sends. Five event types, each paced at one
+ * per 10s, can otherwise stagger into far more than the server's 6
+ * batches/min (e.g. a phone held low: PHONE + LOOKING_AWAY together) and
+ * get 429-dropped. A full batch still goes out immediately.
+ */
+const MIN_FLUSH_GAP_MS = 11_000;
+/** Consecutive gaze failures before the gaze estimator is given up on. */
+const GAZE_MAX_FAILURES = 3;
+/**
+ * Longest a gaze reading may take before the object frame is handed on
+ * without it (counted as a gaze failure). Keeps a stalled gaze model from
+ * stalling yolo26s, which runs in the same analysis tick.
+ */
+export const GAZE_ESTIMATE_TIMEOUT_MS = 2_500;
 /** Poll cadence while waiting for the camera publish. */
 const TRACK_POLL_MS = 1_000;
 /** PERSON_NOT_OBSERVED needs 3 consecutive person-free analyzed frames. */
@@ -150,6 +192,31 @@ export function decideDetectionEvents(
   return { events, counters: { personAbsentStreak: streak } };
 }
 
+/**
+ * The payload box for a looking-away report: the test taker's face box
+ * (normalized), face-detector score as confidence, and the direction +
+ * deviation encoded in the label (`gaze:<direction>:<yaw>:<pitch>`).
+ * Null when the frame has no face box or no direction to report.
+ */
+export function gazeEventBox(
+  report: GazeReport,
+  obs: GazeObservation
+): DetectionBox | null {
+  if (!obs.faceBox || obs.faceScore == null) return null;
+  const direction = report.kind === "frequent" ? "frequent" : report.direction;
+  if (!direction) return null;
+  return {
+    classId: GAZE_FACE_CLASS_ID,
+    label: formatGazeLabel({
+      direction,
+      deltaYaw: report.deltaYaw,
+      deltaPitch: report.deltaPitch,
+    }),
+    confidence: obs.faceScore,
+    bbox: [obs.faceBox[0], obs.faceBox[1], obs.faceBox[2], obs.faceBox[3]],
+  };
+}
+
 /** UUID with a stable fallback for non-secure contexts. */
 function newEventId(sequence: number): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -200,6 +267,55 @@ function captureSnapshotBlob(video: HTMLVideoElement): Promise<Blob | null> {
   return promise;
 }
 
+/** Encode a canvas' CURRENT bitmap as JPEG (the bitmap is copied at call
+ * time, so later draws on the same canvas do not change the result). */
+function canvasToJpeg(canvas: HTMLCanvasElement): Promise<Blob | null> {
+  const { promise, resolve } = Promise.withResolvers<Blob | null>();
+  try {
+    canvas.toBlob(resolve, "image/jpeg", SNAPSHOT_JPEG_QUALITY);
+  } catch {
+    resolve(null);
+  }
+  return promise;
+}
+
+/**
+ * Copy the video's current frame onto a reusable canvas (snapshot sizing).
+ * Cheap (one drawImage, no encode) — done for EVERY analyzed frame so the
+ * exact pixels a detection was computed on are still at hand if that frame
+ * turns into an event. Returns the canvas, or null when no frame decoded.
+ */
+function stashFrame(
+  video: HTMLVideoElement,
+  reuse: HTMLCanvasElement | null
+): HTMLCanvasElement | null {
+  const w = video.videoWidth;
+  const h = video.videoHeight;
+  if (!w || !h) return null;
+  try {
+    const scale = Math.min(1, SNAPSHOT_MAX_SIDE / Math.max(w, h));
+    const canvas = reuse ?? document.createElement("canvas");
+    const cw = Math.round(w * scale);
+    const ch = Math.round(h * scale);
+    if (canvas.width !== cw) canvas.width = cw;
+    if (canvas.height !== ch) canvas.height = ch;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0, cw, ch);
+    return canvas;
+  } catch {
+    return null;
+  }
+}
+
+/** Frames kept for events that have not been answered by the server yet. */
+const MAX_HELD_EVENT_FRAMES = 16;
+
+interface HeldEventFrame {
+  blob: Promise<Blob | null>;
+  capturedAtMs: number;
+}
+
 /* ------------------------------------------------------------------ */
 /* Hook.                                                               */
 /* ------------------------------------------------------------------ */
@@ -210,6 +326,7 @@ export function useAttemptAiDetection(
 ): AttemptAiState {
   const [state, setState] = useState<AttemptAiState>({
     status: "idle",
+    gaze: "off",
     runtime: null,
     fps: DEFAULT_ANALYSIS_FPS,
     simulated: false,
@@ -231,23 +348,64 @@ export function useAttemptAiDetection(
     let queue: AiDetectionItem[] = [];
     let sending = false;
     let simulated = false;
+    let gazeEstimator: GazeEstimator | null = null;
+    let gazeFailures = 0;
+    /** Separate from gazeFailures: a successful estimate must not mask a
+     * tracker that fails on every reading. */
+    let gazeTrackerFailures = 0;
+    let lastFlushAt = Number.NEGATIVE_INFINITY;
+    const gazeTracker = new GazeTracker();
     // P4-D snapshot policy. Requests arriving while the policy is UNKNOWN
     // are buffered, never dropped: resolve → on (upload), off (drop), or
     // fetch-failure → attempt anyway (the server policy gate is the honest
     // authority and rejects cleanly).
     let snapshotPolicy: "unknown" | "on" | "off" | "attempt" = "unknown";
-    const pendingSnapshotRequests: AiDetectionSnapshotRequest[] = [];
-    /** Capture + upload one snapshot. Fire-and-forget — a failure ONLY
+    const pendingSnapshotRequests: {
+      request: AiDetectionSnapshotRequest;
+      eventId: string;
+    }[] = [];
+    // The frame each analysis ran on (object model / gaze model read the
+    // video at slightly different moments), and the JPEG of that frame for
+    // every queued event — so the snapshot the server asks for is the
+    // picture the detection was made on, not a later one.
+    let objectFrameCanvas: HTMLCanvasElement | null = null;
+    let gazeFrameCanvas: HTMLCanvasElement | null = null;
+    let objectFrameReady = false;
+    let gazeFrameReady = false;
+    const heldEventFrames = new Map<string, HeldEventFrame>();
+    const holdEventFrame = (
+      eventId: string,
+      canvas: HTMLCanvasElement | null,
+      capturedAtMs: number
+    ): void => {
+      if (snapshotPolicy === "off" || canvas == null) return;
+      heldEventFrames.set(eventId, { blob: canvasToJpeg(canvas), capturedAtMs });
+      while (heldEventFrames.size > MAX_HELD_EVENT_FRAMES) {
+        const oldest = heldEventFrames.keys().next().value;
+        if (oldest === undefined) break;
+        heldEventFrames.delete(oldest);
+      }
+    };
+    /** Upload one snapshot: the frame held for the event that opened the
+     * alert; only if none is held (e.g. fake detector without video
+     * pixels) the feeder's current frame. Fire-and-forget — a failure ONLY
      * flips snapshotState, never the detection loop. */
-    const uploadSnapshot = (request: AiDetectionSnapshotRequest): void => {
+    const uploadSnapshot = (request: AiDetectionSnapshotRequest, eventId: string): void => {
       const video = feeder;
+      const held = heldEventFrames.get(eventId);
+      heldEventFrames.delete(eventId);
       void (async () => {
         try {
-          const blob = video ? await captureSnapshotBlob(video) : null;
+          let blob = held ? await held.blob : null;
+          let capturedAtMs = held ? held.capturedAtMs : Date.now();
+          if (blob == null) {
+            blob = video ? await captureSnapshotBlob(video) : null;
+            capturedAtMs = Date.now();
+          }
           if (blob == null) throw new Error("snapshot frame unavailable");
           await uploadEvidenceSnapshot(attemptId, {
             alertId: request.alertId,
-            capturedAtMs: Date.now(),
+            capturedAtMs,
             blob,
             idempotencyKey: newSnapshotKey(),
           });
@@ -269,10 +427,11 @@ export function useAttemptAiDetection(
       snapshotPolicy = next;
       if (stopped || next === "off") {
         pendingSnapshotRequests.length = 0;
+        heldEventFrames.clear();
         return;
       }
-      for (const request of pendingSnapshotRequests.splice(0)) {
-        uploadSnapshot(request);
+      for (const pending of pendingSnapshotRequests.splice(0)) {
+        uploadSnapshot(pending.request, pending.eventId);
       }
     };
     fetchAttemptMediaStatus(attemptId)
@@ -283,6 +442,11 @@ export function useAttemptAiDetection(
         resolveSnapshotPolicy("attempt");
       });
     const sentRecords: SentAiEventRecord[] = [];
+
+    const setGaze = (next: AttemptGazeStatus): void => {
+      if (stopped) return;
+      setState((prev) => (prev.gaze === next ? prev : { ...prev, gaze: next }));
+    };
 
     const enter = (next: AttemptAiStatus): void => {
       if (stopped) return;
@@ -314,17 +478,24 @@ export function useAttemptAiDetection(
      * drop. Never touches the detection loop. */
     const handleSnapshotRequests = (results: AiDetectionIngestResult[]): void => {
       if (stopped) return;
-      const requests = results
-        .map((r) => r.snapshotRequest)
-        .filter((r): r is AiDetectionSnapshotRequest => r != null);
+      const requests = results.flatMap((r) =>
+        r.snapshotRequest != null
+          ? [{ request: r.snapshotRequest, eventId: r.eventId }]
+          : []
+      );
+      // Answered events that need no snapshot release their held frame.
+      const wanted = new Set(requests.map((r) => r.eventId));
+      for (const r of results) {
+        if (!wanted.has(r.eventId)) heldEventFrames.delete(r.eventId);
+      }
       if (requests.length === 0) return;
       if (snapshotPolicy === "off") return;
       if (snapshotPolicy === "unknown") {
         pendingSnapshotRequests.push(...requests);
         return;
       }
-      for (const request of requests) {
-        uploadSnapshot(request);
+      for (const pending of requests) {
+        uploadSnapshot(pending.request, pending.eventId);
       }
     };
 
@@ -333,6 +504,10 @@ export function useAttemptAiDetection(
      * success the results are scanned for P4-D snapshotRequests. */
     const flush = async (): Promise<void> => {
       if (stopped || sending || queue.length === 0) return;
+      if (queue.length < MAX_BATCH && Date.now() - lastFlushAt < MIN_FLUSH_GAP_MS) {
+        return; // paced — the next interval tick retries
+      }
+      lastFlushAt = Date.now();
       sending = true;
       const batch = queue;
       queue = [];
@@ -345,6 +520,7 @@ export function useAttemptAiDetection(
         handleSnapshotRequests(results);
       } catch {
         // Batch is dropped (bounded memory); detection keeps running.
+        for (const item of batch) heldEventFrames.delete(item.eventId);
         enter("degraded");
       } finally {
         sending = false;
@@ -358,6 +534,7 @@ export function useAttemptAiDetection(
     const EVENT_SUPPRESS_MS = 10_000;
 
     const handleFrame = (frame: DetectionFrame): void => {
+      const gaze = frame.gaze ?? null;
       publishAiFrameSample({
         processingMs: frame.processingMs,
         frameWidth: frame.frameWidth,
@@ -366,29 +543,70 @@ export function useAttemptAiDetection(
         simulated: frame.simulated ?? false,
         at: frame.capturedAt,
         detectionCount: frame.detections.length,
+        gazeMs: gaze ? gaze.processingMs : null,
       });
-      const decision = decideDetectionEvents(frame.detections, counters);
-      counters = decision.counters;
       const observedAt = new Date(frame.capturedAt).toISOString();
       const now = Date.now();
-      for (const event of decision.events) {
-        const last = lastQueuedAt[event.eventType] ?? 0;
-        if (now - last < EVENT_SUPPRESS_MS) continue; // suppressed, not lost truth
-        lastQueuedAt[event.eventType] = now;
+      /** Queue one event unless its type was sent within the pacing window. */
+      const enqueue = (
+        eventType: AiDetectionEventType,
+        boxes: DetectionBox[],
+        model: { id: string; version: string },
+        runtime: AiRuntime,
+        processingMs: number,
+        source: "object" | "gaze" = "object"
+      ): void => {
+        const last = lastQueuedAt[eventType] ?? 0;
+        if (now - last < EVENT_SUPPRESS_MS) return; // suppressed, not lost truth
+        lastQueuedAt[eventType] = now;
         sequence += 1;
+        const eventId = newEventId(sequence);
+        // P4-D: keep the exact frame this event was computed on.
+        const useGazeFrame = source === "gaze" && gazeFrameReady;
+        const frameCanvas = useGazeFrame
+          ? gazeFrameCanvas
+          : objectFrameReady
+            ? objectFrameCanvas
+            : null;
+        holdEventFrame(eventId, frameCanvas, frame.capturedAt);
         queue.push({
-          eventId: newEventId(sequence),
-          eventType: event.eventType,
+          eventId,
+          eventType,
           observedAt,
           sequence,
-          modelId: MODEL.id,
-          modelVersion: MODEL.version,
-          runtime: frame.runtime,
+          modelId: model.id,
+          modelVersion: model.version,
+          runtime,
           frameWidth: frame.frameWidth,
           frameHeight: frame.frameHeight,
-          processingMs: frame.processingMs,
-          detections: toPayloadBoxes(event.detections),
+          processingMs,
+          detections: toPayloadBoxes(boxes),
         });
+      };
+
+      const decision = decideDetectionEvents(frame.detections, counters);
+      counters = decision.counters;
+      for (const event of decision.events) {
+        enqueue(event.eventType, event.detections, MODEL, frame.runtime, frame.processingMs);
+      }
+
+      // Gaze: the tracker owns calibration / smoothing / sustain rules; a
+      // report is only ever an observation for the teacher feed. Isolated:
+      // a gaze-side error never costs this frame's object events (above)
+      // nor the flush below.
+      if (gaze) {
+        try {
+          const update = gazeTracker.update(frame.capturedAt / 1000, gaze);
+          gazeTrackerFailures = 0;
+          setGaze(update.calibrated ? "running" : "calibrating");
+          const box = update.report ? gazeEventBox(update.report, gaze) : null;
+          if (box) {
+            enqueue("LOOKING_AWAY_OBSERVED", [box], GAZE_MODEL, gaze.runtime, gaze.processingMs, "gaze");
+          }
+        } catch {
+          gazeTrackerFailures += 1;
+          if (gazeTrackerFailures >= GAZE_MAX_FAILURES) dropGaze(gazeEstimator);
+        }
       }
       if (queue.length >= MAX_BATCH) void flush();
     };
@@ -412,6 +630,9 @@ export function useAttemptAiDetection(
     };
 
     const teardown = (): void => {
+      heldEventFrames.clear();
+      objectFrameCanvas = null;
+      gazeFrameCanvas = null;
       if (feeder) {
         feeder.pause();
         feeder.srcObject = null;
@@ -424,6 +645,89 @@ export function useAttemptAiDetection(
       const d = detector;
       detector = null;
       if (d) void d.release().catch(() => undefined);
+      const g = gazeEstimator;
+      gazeEstimator = null;
+      if (g) void g.release().catch(() => undefined);
+    };
+
+    /** Count one gaze failure; after GAZE_MAX_FAILURES in a row the gaze
+     * estimator is dropped (object detection is unaffected). */
+    const noteGazeFailure = (estimator: GazeEstimator | null): void => {
+      gazeFailures += 1;
+      if (gazeFailures >= GAZE_MAX_FAILURES) dropGaze(estimator);
+    };
+    /** Give up on gaze for this attempt — honest 'unavailable'. */
+    const dropGaze = (estimator: GazeEstimator | null): void => {
+      if (estimator != null && gazeEstimator === estimator) {
+        gazeEstimator = null;
+        void estimator.release().catch(() => undefined);
+      }
+      setGaze("unavailable");
+    };
+
+    /** Attach the gaze reading of the same frame; a gaze failure — throw
+     * OR a reading slower than GAZE_ESTIMATE_TIMEOUT_MS — never costs the
+     * object-detection frame. */
+    const withGaze = async (
+      frame: DetectionFrame | null,
+      video: HTMLVideoElement
+    ): Promise<DetectionFrame | null> => {
+      const estimator = gazeEstimator;
+      if (!frame || !estimator) return frame;
+      try {
+        gazeFrameReady = false;
+        if (snapshotPolicy !== "off") {
+          const stashed = stashFrame(video, gazeFrameCanvas);
+          if (stashed) {
+            gazeFrameCanvas = stashed;
+            gazeFrameReady = true;
+          }
+        }
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const timeout = new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("gaze estimate timed out")),
+            GAZE_ESTIMATE_TIMEOUT_MS
+          );
+        });
+        try {
+          frame.gaze = await Promise.race([estimator.estimate(video), timeout]);
+        } finally {
+          clearTimeout(timer);
+        }
+        if (estimator.status !== "running") {
+          // The estimator retired itself (an onnxruntime call overran its
+          // lease) — gaze is gone for this attempt; yolo26s is unaffected.
+          frame.gaze = null;
+          dropGaze(estimator);
+          return frame;
+        }
+        gazeFailures = 0;
+      } catch {
+        frame.gaze = null;
+        noteGazeFailure(estimator);
+      }
+      return frame;
+    };
+
+    /** Load the gaze models in the background — object detection is
+     * already running and stays independent of the outcome. */
+    const startGaze = (): void => {
+      setGaze("loading");
+      void createGazeEstimator().then(
+        (estimator) => {
+          if (stopped) {
+            void estimator.release().catch(() => undefined);
+            return;
+          }
+          if (estimator.status !== "running") {
+            setGaze("unavailable");
+            return;
+          }
+          gazeEstimator = estimator;
+        },
+        () => setGaze("unavailable")
+      );
     };
 
     const run = async (): Promise<void> => {
@@ -487,6 +791,16 @@ export function useAttemptAiDetection(
       const video = feeder;
       const activeDetector = detector;
       const detectFrame = (): Promise<DetectionFrame | null> => {
+        // P4-D: remember the pixels this analysis runs on (see stashFrame).
+        objectFrameReady = false;
+        gazeFrameReady = false;
+        if (snapshotPolicy !== "off") {
+          const stashed = stashFrame(video, objectFrameCanvas);
+          if (stashed) {
+            objectFrameCanvas = stashed;
+            objectFrameReady = true;
+          }
+        }
         // A fake injected after the real detector loaded takes over
         // immediately; clearing it resumes the REAL model (status stays
         // honest — frames are labeled by their producer).
@@ -502,7 +816,7 @@ export function useAttemptAiDetection(
           simulated = false;
           setState((prev) => ({ ...prev, simulated: false }));
         }
-        return activeDetector.detect(video);
+        return activeDetector.detect(video).then((frame) => withGaze(frame, video));
       };
       scheduler = createDetectionScheduler({
         detect: detectFrame,
@@ -518,6 +832,8 @@ export function useAttemptAiDetection(
       scheduler.start();
       flushTimer = setInterval(() => void flush(), FLUSH_INTERVAL_MS);
       enter("running");
+      // The fake detector (tests/e2e) supplies its own `gaze` readings.
+      if (GAZE_ENABLED && !hasFakeNow()) startGaze();
     };
 
     void run();

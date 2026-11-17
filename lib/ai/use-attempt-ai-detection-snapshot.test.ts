@@ -155,6 +155,36 @@ afterEach(() => {
 });
 
 describe("useAttemptAiDetection snapshot capture (P4-D)", () => {
+  it("uploads the frame the detection ran on, not a later one", async () => {
+    setFakeDetectorForTest(() => frame([phone()]));
+    vi.spyOn(HTMLVideoElement.prototype, "videoWidth", "get").mockReturnValue(1280);
+    vi.spyOn(HTMLVideoElement.prototype, "videoHeight", "get").mockReturnValue(720);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    // Every encode yields a distinguishable blob: "frame-1" is the encode
+    // made when the event was queued, later numbers are later captures.
+    let encodes = 0;
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(
+      (callback: BlobCallback) => {
+        encodes += 1;
+        callback(new Blob([`frame-${encodes}`], { type: "image/jpeg" }));
+      }
+    );
+    ingestAsksForSnapshot();
+
+    render(createElement(Harness, {}));
+    // First analyzed frame queues the event; the batch is only sent later
+    // (flush pacing), after more frames have been analyzed.
+    await settle(TICK_MS + FLUSH_MS + 100);
+
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    const request = uploadMock.mock.calls[0][1];
+    expect(await (request.blob as Blob).text()).toBe("frame-1");
+    // Capture time is the analyzed frame's, not the upload moment.
+    expect(request.capturedAtMs).toBe(1_700_000_000_000);
+  });
+
   it("uploads ONE snapshot per snapshotRequest with a fresh idempotencyKey", async () => {
     setFakeDetectorForTest(() => frame([phone()]));
     stubCanvasCapture(true);

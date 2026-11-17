@@ -6,6 +6,9 @@ import {
   getSessionAiAlerts,
   type AiAlertItem,
 } from "@/lib/api/ai-detections";
+import { fetchSessionEvidence, type EvidenceItem } from "@/lib/api/evidence";
+import { parseGazeLabel, type GazeLabelInfo } from "@/lib/ai/gaze-core";
+import { useEvidenceUrl } from "./EvidenceSection";
 import { cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { RealtimeEventEnvelope } from "@/lib/realtime/types";
@@ -21,8 +24,13 @@ import type { AlertReviewStatus } from "@/lib/api/alert-review";
  *
  * Honesty (CONTRACT §8): cards show observations with confidence + provenance
  * and the disclaimer "Quan sát bằng AI — không tự động kết luận vi phạm."
- * The bbox mini-render draws ONLY normalized boxes from latestDetections —
- * no image is ever stored or shown (evidence media is P4-D).
+ * The bbox mini-render draws the normalized boxes from latestDetections.
+ * When the session stores evidence snapshots (P4-D) and one is AVAILABLE
+ * for the alert, that snapshot is shown underneath the boxes; otherwise
+ * the frame stays a neutral dark canvas. The snapshot is the frame the
+ * alert's FIRST detection was computed on (captured client-side at that
+ * moment), and over a photo the boxes drawn are that same detection's
+ * (`firstDetections`), so they line up; the caption says which frame.
  *
  * P4-E: each card gains teacher review controls (action + note + history,
  * `AlertReviewForm`) and provenance chips — "AI phát hiện" (detector
@@ -52,7 +60,40 @@ const ALERT_LABEL: Record<AiAlertItem["alertType"], string> = {
   SCREEN_DETECTED: "Phát hiện màn hình phụ",
   MULTIPLE_PERSONS_DETECTED: "Nhiều người trong khung hình",
   PERSON_NOT_VISIBLE: "Không thấy người làm bài",
+  LOOKING_AWAY: "Nhìn lệch khỏi màn hình",
 };
+
+const GAZE_DIRECTION_LABEL: Record<GazeLabelInfo["direction"], string> = {
+  left: "sang trái",
+  right: "sang phải",
+  up: "lên trên",
+  down: "xuống dưới",
+  frequent: "lặp lại nhiều lần",
+};
+
+const signedDeg = (v: number): string => `${v > 0 ? "+" : ""}${v}°`;
+
+/** Newest AVAILABLE snapshot per alertId. Pure — unit-tested. */
+export function snapshotsByAlert(items: EvidenceItem[]): Map<number, EvidenceItem> {
+  const stamp = (e: EvidenceItem): number =>
+    new Date(e.capturedAt ?? e.createdAt).getTime() || 0;
+  const byAlert = new Map<number, EvidenceItem>();
+  for (const item of items) {
+    if (item.kind !== "SNAPSHOT" || item.status !== "AVAILABLE") continue;
+    const current = byAlert.get(item.alertId);
+    if (current == null || stamp(item) > stamp(current)) byAlert.set(item.alertId, item);
+  }
+  return byAlert;
+}
+
+/** VN summary of a gaze payload label; null for non-gaze boxes. Pure. */
+export function describeGazeLabel(label: string | null | undefined): string | null {
+  const info = parseGazeLabel(label);
+  if (!info) return null;
+  return `Nhìn lệch ${GAZE_DIRECTION_LABEL[info.direction]} · lệch ngang ${signedDeg(
+    info.deltaYaw
+  )}, dọc ${signedDeg(info.deltaPitch)} so với mốc`;
+}
 
 const BOX_CLASS_LABEL: Record<number, string> = {
   0: "person",
@@ -92,6 +133,20 @@ export function AiAlertFeed({ sessionId }: { sessionId: number }) {
     [olderItems, data]
   );
 
+  // P4-D snapshots for the cards. Key sits under the ["…","evidence"]
+  // prefix LiveMonitor invalidates on EVIDENCE_* pings. A failure (or a
+  // session without snapshots) just leaves the dark canvas.
+  const { data: evidence } = useQuery({
+    queryKey: ["exam-sessions", sessionId, "evidence", "feed-snapshots"],
+    queryFn: () =>
+      fetchSessionEvidence(sessionId, { kind: "SNAPSHOT", limit: FEED_SNAPSHOT_PAGE }),
+    enabled: Number.isFinite(sessionId) && sessionId > 0,
+  });
+  const snapshots = useMemo(() => snapshotsByAlert(evidence ?? []), [evidence]);
+  // The list endpoint caps at 100 (newest first). When it came back full,
+  // older alerts may still have a snapshot — those cards look it up by id.
+  const snapshotListFull = (evidence?.length ?? 0) >= FEED_SNAPSHOT_PAGE;
+
   const loadOlder = async (): Promise<void> => {
     const cursor = items.length > 0 ? items[items.length - 1].alertId : undefined;
     if (cursor == null || loadingOlder) return;
@@ -116,9 +171,14 @@ export function AiAlertFeed({ sessionId }: { sessionId: number }) {
         <button
           type="button"
           onClick={() =>
-            void queryClient.invalidateQueries({
-              queryKey: ["exam-sessions", sessionId, "ai-alerts"],
-            })
+            void Promise.all([
+              queryClient.invalidateQueries({
+                queryKey: ["exam-sessions", sessionId, "ai-alerts"],
+              }),
+              queryClient.invalidateQueries({
+                queryKey: ["exam-sessions", sessionId, "evidence"],
+              }),
+            ])
           }
           className="rounded-lg px-2 py-1 text-xs font-semibold text-[#64748B] outline-none transition-colors hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF]"
         >
@@ -143,7 +203,12 @@ export function AiAlertFeed({ sessionId }: { sessionId: number }) {
         <ul className="space-y-3">
           {items.map((alert) => (
             <li key={alert.alertId}>
-              <AiAlertCard alert={alert} sessionId={sessionId} />
+              <AiAlertCard
+                alert={alert}
+                sessionId={sessionId}
+                snapshot={snapshots.get(alert.alertId)}
+                lookUpSnapshot={snapshotListFull && !snapshots.has(alert.alertId)}
+              />
             </li>
           ))}
         </ul>
@@ -163,12 +228,39 @@ export function AiAlertFeed({ sessionId }: { sessionId: number }) {
   );
 }
 
+/**
+ * A snapshot counts as "the detection frame" only when it was captured at
+ * the alert's first detection (the client holds that exact frame; if it
+ * could not, it uploads a later live frame stamped with its own time).
+ */
+export const SNAPSHOT_FRAME_TOLERANCE_MS = 1_500;
+
+/** Snapshot page the feed loads in one call (= backend MAX_PAGE). */
+export const FEED_SNAPSHOT_PAGE = 100;
+
+export function snapshotIsDetectionFrame(
+  snapshot: Pick<EvidenceItem, "capturedAt">,
+  firstDetectedAt: string
+): boolean {
+  if (!snapshot.capturedAt) return false;
+  const a = new Date(snapshot.capturedAt).getTime();
+  const b = new Date(firstDetectedAt).getTime();
+  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= SNAPSHOT_FRAME_TOLERANCE_MS;
+}
+
 export function AiAlertCard({
   alert,
   sessionId,
+  snapshot: listedSnapshot,
+  lookUpSnapshot = false,
 }: {
   alert: AiAlertItem;
   sessionId: number;
+  /** P4-D snapshot for this alert, shown under the boxes when present. */
+  snapshot?: EvidenceItem;
+  /** The feed's snapshot page was full and had none for this alert: ask
+   *  the server for this alert's snapshot directly. */
+  lookUpSnapshot?: boolean;
 }) {
   const confidence =
     alert.maxConfidence != null ? `${Math.round(alert.maxConfidence * 100)}%` : "—";
@@ -182,7 +274,53 @@ export function AiAlertCard({
       : alert.provenance === "CLIENT_MODEL"
         ? "CLIENT MODEL"
         : "—";
-  const detections = alert.latestDetections ?? [];
+  const latestDetections = alert.latestDetections ?? [];
+  const { data: ownSnapshots } = useQuery({
+    queryKey: ["exam-sessions", sessionId, "evidence", "alert-snapshot", alert.alertId],
+    queryFn: () =>
+      fetchSessionEvidence(sessionId, { kind: "SNAPSHOT", alertId: alert.alertId, limit: 10 }),
+    enabled: lookUpSnapshot && listedSnapshot == null,
+  });
+  const snapshot =
+    listedSnapshot ?? (ownSnapshots ? snapshotsByAlert(ownSnapshots).get(alert.alertId) : undefined);
+  // Presigned URL only for cards that have a snapshot; the photo (and every
+  // caption about it) appears only once the URL actually resolved.
+  const { data: snapshotUrl } = useEvidenceUrl(
+    sessionId,
+    snapshot?.evidenceId ?? "",
+    snapshot != null
+  );
+  const hasSnapshot = snapshot != null && Boolean(snapshotUrl?.url);
+  const isDetectionFrame =
+    hasSnapshot && snapshotIsDetectionFrame(snapshot, alert.firstDetectedAt);
+  // The snapshot is the frame the alert's FIRST detection ran on, so over
+  // a photo the boxes of THAT detection are drawn (same frame → they line
+  // up). Without a photo, or on a backend that does not send them, the
+  // latest boxes are shown as before.
+  const firstDetections = alert.firstDetections ?? null;
+  const boxesMatchPhoto =
+    isDetectionFrame && (firstDetections != null || alert.detectionCount <= 1);
+  const detections =
+    isDetectionFrame && firstDetections != null ? firstDetections : latestDetections;
+  const isGaze = alert.alertType === "LOOKING_AWAY";
+  const gazeSummary = isGaze
+    ? latestDetections.map((d) => describeGazeLabel(d.label)).find((s) => s != null) ?? null
+    : null;
+  // Match the frame to the snapshot's real shape so the boxes keep their
+  // proportions over it; 4:3 when there is no image.
+  const aspectRatio =
+    hasSnapshot && snapshot.width && snapshot.height
+      ? `${snapshot.width} / ${snapshot.height}`
+      : "4 / 3";
+  const boxCaption = !hasSnapshot
+    ? "bbox từ khung phân tích — chưa có ảnh minh chứng cho cảnh báo này"
+    : !isDetectionFrame
+      ? `Ảnh do máy thí sinh gửi lúc ${formatTime(snapshot.capturedAt ?? snapshot.createdAt)} — không phải khung hình lúc phát hiện; khung bbox là của lần phát hiện gần nhất`
+      : boxesMatchPhoto
+      ? alert.detectionCount <= 1
+        ? "Ảnh do máy thí sinh gửi — đúng khung hình lúc phát hiện"
+        : "Ảnh do máy thí sinh gửi — khung hình và bbox của lần phát hiện đầu tiên"
+      : "Ảnh do máy thí sinh gửi — khung hình của lần phát hiện đầu tiên; khung bbox là của lần phát hiện gần nhất";
   // P4-E review rollup — absent field (pre-P4-E backend) reads UNREVIEWED.
   const reviewStatus: AlertReviewStatus = alert.reviewStatus ?? "UNREVIEWED";
   const reviewStatusChip =
@@ -226,7 +364,9 @@ export function AiAlertCard({
 
       <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] sm:grid-cols-4">
         <div>
-          <dt className="text-[#94A3B8]">Độ tin cậy</dt>
+          <dt className="text-[#94A3B8]">
+            {isGaze ? "Độ tin cậy (khuôn mặt)" : "Độ tin cậy"}
+          </dt>
           <dd className="font-semibold text-[#0F172A]">{confidence}</dd>
         </div>
         <div>
@@ -247,14 +387,33 @@ export function AiAlertCard({
         </div>
       </dl>
 
-      {detections.length > 0 && (
+      {isGaze && (
+        <p className="mt-2 text-[11px] font-medium text-[#64748B]" data-testid="ai-alert-gaze">
+          {gazeSummary ? `${gazeSummary}. ` : ""}
+          Hướng nhìn là ước lượng của mô hình — chỉ để giáo viên tham khảo.
+        </p>
+      )}
+
+      {(detections.length > 0 || hasSnapshot) && (
         <div className="mt-3">
           <div
-            className="relative w-full max-w-[240px] overflow-hidden rounded-lg border border-[#334155] bg-[#0F172A]"
-            style={{ aspectRatio: "4 / 3" }}
+            className={cn(
+              "relative w-full overflow-hidden rounded-lg border border-[#334155] bg-[#0F172A]",
+              hasSnapshot ? "max-w-[360px]" : "max-w-[240px]"
+            )}
+            style={{ aspectRatio }}
             data-testid="ai-alert-bboxes"
-            aria-label="bbox từ khung phân tích — không lưu ảnh (P4-D)"
+            aria-label={boxCaption}
           >
+            {hasSnapshot && (
+              // eslint-disable-next-line @next/next/no-img-element -- presigned URL (300s TTL) must not pass through the Next image optimizer
+              <img
+                src={snapshotUrl!.url}
+                alt="Ảnh minh chứng do máy thí sinh gửi"
+                data-testid="ai-alert-snapshot"
+                className="absolute inset-0 h-full w-full object-fill"
+              />
+            )}
             {detections.map((d, i) => {
               const [x1, y1, x2, y2] = d.bbox;
               return (
@@ -269,15 +428,14 @@ export function AiAlertCard({
                   }}
                 >
                   <span className="absolute left-0 top-0 -translate-y-full whitespace-nowrap bg-[#F59E0B] px-1 text-[8px] font-bold leading-tight text-[#0F172A]">
-                    {BOX_CLASS_LABEL[d.classId] ?? d.label} {Math.round(d.confidence * 100)}%
+                    {parseGazeLabel(d.label) ? "face" : BOX_CLASS_LABEL[d.classId] ?? d.label}{" "}
+                    {Math.round(d.confidence * 100)}%
                   </span>
                 </div>
               );
             })}
           </div>
-          <p className="mt-1 text-[10px] font-medium text-[#94A3B8]">
-            bbox từ khung phân tích — không lưu ảnh (P4-D)
-          </p>
+          <p className="mt-1 text-[10px] font-medium text-[#94A3B8]">{boxCaption}</p>
         </div>
       )}
 

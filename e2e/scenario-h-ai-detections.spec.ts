@@ -19,7 +19,7 @@ import type { SeededUser, SmokeState } from "./helpers";
  * H3 ingest after attempt submitted → QUARANTINED_LATE, no new alert
  * H4 teacher reload → alerts persist (REST is source of truth)
  * H5 autosave + submit still work while AI status is degraded
- * H6 gaze warnings never appear (stub unsupported)
+ * H6 gaze warnings never appear to the STUDENT (observations go to the teacher feed only)
  * H7 PERSON_NOT_OBSERVED never sent for single-frame gaps (3-frame streak
  *    contract — unit-covered in use-attempt-ai-detection tests; here we
  *    assert the H1 session sent only PHONE_OBSERVED)
@@ -235,7 +235,8 @@ test.describe("Scenario H — AI detections (SIMULATED detector)", () => {
     expect(replay.status).toBe(200);
     expect(replay.body!.results[0]!.status).toBe("DUPLICATE");
 
-    // H6 gaze warnings never appear anywhere in the student page.
+    // H6 gaze warnings never appear anywhere in the student page (the pill
+    // only shows a neutral "hướng nhìn" status, never an observation).
     const bodyText = (await page.textContent("body")) ?? "";
     expect(bodyText).not.toContain("hướng mắt");
     expect(bodyText).not.toContain("LOOKING_AWAY");
