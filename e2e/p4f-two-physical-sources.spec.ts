@@ -205,7 +205,7 @@ test.describe("P4-F physical-source camera gate (2 real sources)", () => {
         await enableButton.click();
         // Surface a preflight failure explicitly instead of letting the
         // preview poll time out with no diagnosis.
-        const failText = preflight.getByText(/Camera check failed|denied|unavailable/i);
+        const failText = preflight.getByText(/Camera check failed|denied|unavailable/i).first();
         const previewReady = page.waitForFunction(
           () => {
             const video = document.querySelector<HTMLElement>(

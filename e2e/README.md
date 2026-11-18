@@ -88,12 +88,14 @@ by G). Evidence: `evidence/E3-*`, `F1-*`, `G3-*`.
 
 ## P4-F final physical-camera gate (issue #98; manual/hardware required)
 
-The normal Playwright suite above uses SIMULATED Chrome camera devices and can never prove Phase 4's five DISTINCT simultaneous physical webcam criterion.
+The normal Playwright suite above uses SIMULATED Chrome camera devices and can never prove Phase 4's physical-source camera criterion (owner amendment 2026-11-18: TWO simultaneous independent real sources).
 
 This branch adds a separate explicit test:
 - e2e/p4f-physical.config.ts — headed Chromium with NO fake camera launch flags, run only by explicit command.
-- e2e/p4f-five-physical.spec.ts — enumerates at least five DIFFERENT browser video input IDs on the same workstation, opens independent student contexts, forces each app capture to a distinct device through real getUserMedia, publishes real LiveKit video for five monitored Attempts and verifies five simultaneously decoding teacher-grid videos. It emits a PRIVATE pseudonymized candidate JSON + grid screenshot in gitignored e2e/evidence/.
-- Requires five physical USB cameras on the SAME machine. The alternative of five laptops with one camera each uses the witnessed System runbook and is not automatically implemented by this script.
+- e2e/p4f-two-physical-sources.spec.ts — **the amendment gate (2026-11-18)**: BisonCam NB Pro (built-in) + live iPhone via e2eSoft iVCam as TWO separate Students/Attempts over real LiveKit; each publisher pinned to its source BY LABEL inside its own context (Chromium salts deviceIds per context); teacher grid must decode NEW frames on BOTH exact camera trackSIDs. Emits private evidence JSON + grid screenshot in gitignored e2e/evidence/.
+- e2e/p4f-five-physical.spec.ts — legacy five-device probe, retained as an honest NO-GO detector on workstations with fewer sensors; NOT the current gate.
+- e2e/real-detection-e2e.mts — real-model detection E2E: drives the REAL yolo26s detector on the PHYSICAL BisonCam inside a real monitored attempt (operator holds a phone; a second adult joins), then posts typed events through the real ingest API and reads teacher alerts. Run: `node --experimental-strip-types e2e/real-detection-e2e.mts`.
+- The two-source gate requires the built-in camera plus an iPhone running the e2eSoft iVCam app (witness the phone streaming). OBS/loopback/synthetic never qualify.
 - Device IDs/labels cannot authenticate physical hardware. The generated report intentionally has status HUMAN_HARDWARE_ATTESTATION_PENDING and source UNVERIFIED_PHYSICAL_CANDIDATE; a separate adult witness must verify physical serials offline. It is not sufficient by itself to close #98.
 
 Run from Frontend repo with isolated Backend, Next, LiveKit, Mailpit, class test DB and five real webcams connected:
