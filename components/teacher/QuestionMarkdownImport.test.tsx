@@ -10,6 +10,16 @@ vi.mock("@/lib/api/question-import", () => ({
   importMarkdownQuestions: vi.fn(),
 }));
 
+// The authoring pane now embeds the AI Assistant tab (issue #114); stub the
+// AI endpoints so these import tests stay offline and deterministic.
+vi.mock("@/lib/api/ai-authoring", () => ({
+  getAiAuthoringStatus: vi.fn(() =>
+    Promise.resolve({ enabled: true, available: true, model: "test-model" }),
+  ),
+  extractAiDocument: vi.fn(),
+  authorAiMarkdown: vi.fn(),
+}));
+
 const importMock = vi.mocked(importMarkdownQuestions);
 
 const VALID_DOC = `Câu 1 [SINGLE_CHOICE]: 2 + 2?

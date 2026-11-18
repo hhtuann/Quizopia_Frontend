@@ -130,7 +130,7 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
       {result && <ResultBanner result={result} />}
 
       <div className={collapsed ? "hidden" : "flex h-[70vh] min-h-[32rem] flex-col"}>
-        <QuizMarkdownAuthoringPane title={null} value={source} onChange={setSource} />
+        <QuizMarkdownAuthoringPane bankId={bankId} title={null} value={source} onChange={setSource} />
       </div>
 
       {tooLong && (
