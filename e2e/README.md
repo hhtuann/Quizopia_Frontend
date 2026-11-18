@@ -84,3 +84,29 @@ Additional environment on top of the P4-A contract:
 
 State files: `.smoke-camera-e.json` (E), `.smoke-camera-f.json` (F, consumed
 by G). Evidence: `evidence/E3-*`, `F1-*`, `G3-*`.
+
+
+## P4-F final physical-camera gate (issue #98; manual/hardware required)
+
+The normal Playwright suite above uses SIMULATED Chrome camera devices and can never prove Phase 4's physical-source camera criterion (owner amendment 2026-11-18: TWO simultaneous independent real sources).
+
+This branch adds a separate explicit test:
+- e2e/p4f-physical.config.ts — headed Chromium with NO fake camera launch flags, run only by explicit command.
+- e2e/p4f-two-physical-sources.spec.ts — **the amendment gate (2026-11-18)**: BisonCam NB Pro (built-in) + live iPhone via e2eSoft iVCam as TWO separate Students/Attempts over real LiveKit; each publisher pinned to its source BY LABEL inside its own context (Chromium salts deviceIds per context); teacher grid must decode NEW frames on BOTH exact camera trackSIDs. Emits private evidence JSON + grid screenshot in gitignored e2e/evidence/.
+- e2e/p4f-five-physical.spec.ts — legacy five-device probe, retained as an honest NO-GO detector on workstations with fewer sensors; NOT the current gate.
+- e2e/real-detection-e2e.mts — real-model detection E2E: drives the REAL yolo26s detector on the PHYSICAL BisonCam inside a real monitored attempt (operator holds a phone; a second adult joins), then posts typed events through the real ingest API and reads teacher alerts. Run: `node --experimental-strip-types e2e/real-detection-e2e.mts`.
+- The two-source gate requires the built-in camera plus an iPhone running the e2eSoft iVCam app (witness the phone streaming). OBS/loopback/synthetic never qualify.
+- Device IDs/labels cannot authenticate physical hardware. The generated report intentionally has status HUMAN_HARDWARE_ATTESTATION_PENDING and source UNVERIFIED_PHYSICAL_CANDIDATE; a separate adult witness must verify physical serials offline. It is not sufficient by itself to close #98.
+
+Run from Frontend repo with isolated Backend, Next, LiveKit, Mailpit, class test DB and five real webcams connected:
+
+~~~powershell
+$env:P4F_PHYSICAL_CAMERAS="1"
+npx playwright test --config e2e/p4f-physical.config.ts
+~~~
+
+For Bash: P4F_PHYSICAL_CAMERAS=1 npx playwright test --config e2e/p4f-physical.config.ts
+
+Do NOT use the normal config for this test, or set any Chromium fake-device flag. If fewer than five physical devices are present, report a HARDWARE NO-GO and preserve the existing five-synthetic-publisher evidence only as transport proof. The test does not cover real model phone/multiple-person accuracy, full recording and outage matrix — follow System/docs/phase4/DEMO_RUNBOOK.md and the P4-F evidence manifest contract separately.
+
+The script is NOT executed in the GitHub-hosted CI job (which has no physical webcams). Local execution, private media evidence and independent hardware attestation are required.
