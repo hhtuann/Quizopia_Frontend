@@ -258,6 +258,92 @@ describe("AiAuthoringChat", () => {
     await waitFor(() => expect(mirror().value).toBe(SOURCE));
   });
 
+  /** Gate review P1: Undo must not silently delete post-Apply manual edits. */
+  it("asks before Undo when the teacher edited after Apply, then restores", async () => {
+    authorMock.mockResolvedValue({
+      markdown: CANDIDATE,
+      reply: "Here is your question",
+      valid: true,
+      diagnostics: [],
+    });
+    renderChat();
+    await sendInstruction("Add a question");
+    await waitFor(() => expect(screen.getByText("Here is your question")).not.toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply to editor" }));
+    await waitFor(() => expect(mirror().value).toBe(CANDIDATE));
+
+    // Manual edit AFTER Apply must not be silently destroyed by Undo.
+    const MANUAL = `${CANDIDATE}Question 30 [SINGLE_CHOICE]: manual edit?
+`;
+    fireEvent.change(mirror(), { target: { value: MANUAL } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(
+      screen.getByText(/editor changed since you applied this candidate/i),
+    ).not.toBeNull();
+    // Nothing overwritten yet — the manual edit survives until confirmation.
+    expect(mirror().value).toBe(MANUAL);
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore anyway" }));
+    expect(onChange).toHaveBeenLastCalledWith(SOURCE);
+    await waitFor(() => expect(mirror().value).toBe(SOURCE));
+  });
+
+  it("undoes immediately (no prompt) when nothing was edited after Apply", async () => {
+    authorMock.mockResolvedValue({
+      markdown: CANDIDATE,
+      reply: "Here is your question",
+      valid: true,
+      diagnostics: [],
+    });
+    renderChat();
+    await sendInstruction("Add a question");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Apply to editor" })).not.toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "Apply to editor" }));
+    await waitFor(() => expect(mirror().value).toBe(CANDIDATE));
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await waitFor(() => expect(mirror().value).toBe(SOURCE));
+    expect(screen.queryByText(/editor changed since you applied/i)).toBeNull();
+  });
+
+  /** Gate review P2: every selected file must land, in selection order. */
+  it("multi-file upload attaches every document in order despite one failure", async () => {
+    extractMock.mockImplementation(async (_bankId: number, file: File) => {
+      if (file.name === "b.txt") {
+        throw { kind: "api", status: 422, code: "AI_DOCUMENT_NO_TEXT", message: "No text in b", raw: {} };
+      }
+      return {
+        name: file.name,
+        text: `text of ${file.name}`,
+        truncated: false,
+        charCount: 20,
+      };
+    });
+    renderChat();
+    await waitFor(() => expect(uploadButton().disabled).toBe(false));
+
+    fireEvent.change(screen.getByLabelText("Upload document"), {
+      target: {
+        files: [
+          new File(["a"], "a.txt", { type: "text/plain" }),
+          new File(["b"], "b.txt", { type: "text/plain" }),
+          new File(["c"], "c.txt", { type: "text/plain" }),
+        ],
+      },
+    });
+
+    await waitFor(() => expect(extractMock).toHaveBeenCalledTimes(3));
+    // Both successful documents are attached, in selection order.
+    await waitFor(() => expect(screen.getByText(/a\.txt/)).not.toBeNull());
+    expect(screen.getByText(/c\.txt/)).not.toBeNull();
+    // The failed one is reported but does not drop the others.
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toContain("No text in b"),
+    );
+  });
+
   it("asks for confirmation when the editor changed since the request, then applies anyway", async () => {
     const { promise: authorPromise, resolve: resolveAuthor } =
       Promise.withResolvers<AiAuthorResponse>();

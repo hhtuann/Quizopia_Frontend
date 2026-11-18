@@ -78,8 +78,15 @@ export function AiAuthoringChat({
   const [applied, setApplied] = useState(false);
   const [undoSnapshot, setUndoSnapshot] = useState<string | null>(null);
   const [confirmingStale, setConfirmingStale] = useState(false);
+  const [confirmingUndo, setConfirmingUndo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+
+  // The exact markdown handed to the editor at Apply time: any later
+  // deviation means the teacher edited manually after Apply, and Undo must
+  // then ask before overwriting those edits (gate review P1).
+  const appliedMarkdownRef = useRef<string | null>(null);
 
   // Latest editor source (for Apply-stale handling; updated post-commit, not
   // during render) + last issued request (for Retry).
@@ -100,7 +107,7 @@ export function AiAuthoringChat({
   const unavailable = statusQuery.isError || statusQuery.data?.available === false;
   const inputsDisabled = loading || unavailable;
   const pending = authorMutation.isPending;
-  const uploading = extractMutation.isPending;
+  const uploading = uploadingFiles || extractMutation.isPending;
   const sendDisabled =
     inputsDisabled || pending || instruction.trim().length === 0;
 
@@ -123,6 +130,8 @@ export function AiAuthoringChat({
     setApplied(false);
     setUndoSnapshot(null);
     setConfirmingStale(false);
+    setConfirmingUndo(false);
+    appliedMarkdownRef.current = null;
   };
 
   const issueRequest = (request: AiAuthorRequest, sourceAtRequest: string) => {
@@ -177,8 +186,10 @@ export function AiAuthoringChat({
     // Snapshot the PRE-apply editor source so Undo restores exactly it.
     setUndoSnapshot(valueRef.current);
     onChange(candidate.markdown);
+    appliedMarkdownRef.current = candidate.markdown;
     setApplied(true);
     setConfirmingStale(false);
+    setConfirmingUndo(false);
   };
 
   const handleApplyClick = () => {
@@ -192,22 +203,45 @@ export function AiAuthoringChat({
     applyCandidate();
   };
 
-  const handleUndo = () => {
+  const performUndo = () => {
     if (undoSnapshot !== null) {
       onChange(undoSnapshot);
     }
     setApplied(false);
     setCandidate(null);
     setUndoSnapshot(null);
+    setConfirmingUndo(false);
+    appliedMarkdownRef.current = null;
+  };
+
+  /**
+   * Undo restores the pre-Apply snapshot. If the teacher edited AFTER Apply,
+   * that restore would silently delete their manual changes — require an
+   * explicit confirmation first (gate review P1).
+   */
+  const handleUndoClick = () => {
+    if (appliedMarkdownRef.current !== null && valueRef.current !== appliedMarkdownRef.current) {
+      setConfirmingUndo(true);
+      return;
+    }
+    performUndo();
   };
 
   const handleDiscard = () => {
     setCandidate(null);
     setApplied(false);
     setConfirmingStale(false);
+    setConfirmingUndo(false);
   };
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+  /**
+   * Multi-file upload: one mutateAsync per file, awaited via allSettled so
+   * EVERY document lands (TanStack per-mutate callbacks can be dropped for
+   * superseded calls on the same observer — gate review P2). Chips append in
+   * selection order; the first rejection surfaces as the upload error while
+   * the remaining successes still attach.
+   */
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
     if (files.length === 0) {
@@ -225,11 +259,24 @@ export function AiAuthoringChat({
     if (accepted.length === 0) {
       return;
     }
-    for (const file of accepted) {
-      extractMutation.mutate(file, {
-        onSuccess: (doc) => setDocuments((prev) => [...prev, doc]),
-        onError: (err) => setUploadError(describeError(err)),
-      });
+
+    setUploadingFiles(true);
+    try {
+      const settled = await Promise.allSettled(
+        accepted.map((file) => extractMutation.mutateAsync(file)),
+      );
+      const extracted = settled
+        .filter((r): r is PromiseFulfilledResult<AiExtractedDocument> => r.status === "fulfilled")
+        .map((r) => r.value);
+      if (extracted.length > 0) {
+        setDocuments((prev) => [...prev, ...extracted]);
+      }
+      const firstFailure = settled.find((r) => r.status === "rejected");
+      if (firstFailure !== undefined) {
+        setUploadError(describeError((firstFailure as PromiseRejectedResult).reason));
+      }
+    } finally {
+      setUploadingFiles(false);
     }
   };
 
@@ -372,16 +419,33 @@ export function AiAuthoringChat({
 
           {candidate !== null &&
             (applied ? (
-              <div className="rounded-xl border border-[#10B981]/30 bg-[#10B981]/5 p-3">
-                <p className="text-xs font-semibold text-[#10B981]">
-                  Applied to the editor — live validation is shown in the preview.
-                </p>
-                <div className="mt-2">
-                  <Button onClick={handleUndo} size="sm" type="button" variant="outline">
-                    Undo
-                  </Button>
+              confirmingUndo ? (
+                <div className="rounded-xl border border-[#F59E0B]/40 bg-[#F59E0B]/10 p-3">
+                  <p className="text-xs font-medium leading-relaxed text-[#92400E]">
+                    The editor changed since you applied this candidate. Undo restores the
+                    earlier snapshot and discards those manual edits.
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <Button onClick={performUndo} size="sm" type="button">
+                      Restore anyway
+                    </Button>
+                    <Button onClick={() => setConfirmingUndo(false)} size="sm" type="button" variant="ghost">
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-xl border border-[#10B981]/30 bg-[#10B981]/5 p-3">
+                  <p className="text-xs font-semibold text-[#10B981]">
+                    Applied to the editor — live validation is shown in the preview.
+                  </p>
+                  <div className="mt-2">
+                    <Button onClick={handleUndoClick} size="sm" type="button" variant="outline">
+                      Undo
+                    </Button>
+                  </div>
+                </div>
+              )
             ) : confirmingStale ? (
               <div className="rounded-xl border border-[#F59E0B]/40 bg-[#F59E0B]/10 p-3">
                 <p className="text-xs font-medium leading-relaxed text-[#92400E]">
