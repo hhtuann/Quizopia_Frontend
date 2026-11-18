@@ -1,8 +1,18 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QuizMarkdownAuthoringPane } from "./authoring-pane";
 
+// The bankId variant embeds the AI Assistant chat; stub its API module so
+// these pane tests stay offline (the status probe resolves as available).
+vi.mock("@/lib/api/ai-authoring", () => ({
+  getAiAuthoringStatus: vi.fn(() =>
+    Promise.resolve({ enabled: true, available: true, model: "test-model" }),
+  ),
+  extractAiDocument: vi.fn(),
+  authorAiMarkdown: vi.fn(),
+}));
 afterEach(cleanup);
 
 const sample = [
@@ -113,5 +123,74 @@ describe("QuizMarkdownAuthoringPane", () => {
       .getByRole("button", { name: "Editor" })
       .closest("div.lg\\:hidden");
     expect(switchWrap).not.toBeNull();
+  });
+});
+
+describe("QuizMarkdownAuthoringPane with bankId", () => {
+  let queryClient: QueryClient;
+
+  beforeEach(() => {
+    queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  });
+
+  afterEach(cleanup);
+
+  function setupWithAi(value: string) {
+    const onChange = vi.fn();
+    const view = render(
+      <QueryClientProvider client={queryClient}>
+        <QuizMarkdownAuthoringPane bankId={7} onChange={onChange} value={value} />
+      </QueryClientProvider>,
+    );
+    return { onChange, view };
+  }
+
+  it("adds the AI Assistant tab and keeps the editor mounted with its value while switching", async () => {
+    const { view } = setupWithAi(sample);
+    expect(view.getByRole("tab", { name: "Preview" })).not.toBeNull();
+    expect(view.getByRole("tab", { name: "Preview" }).getAttribute("aria-selected")).toBe("true");
+    const aiTab = view.getByRole("tab", { name: "AI Assistant" });
+
+    const textarea = view.getByLabelText("Quiz Markdown source") as HTMLTextAreaElement;
+    expect(textarea.value).toBe(sample);
+
+    fireEvent.click(aiTab);
+    expect(aiTab.getAttribute("aria-selected")).toBe("true");
+    // Editor is NOT remounted: same DOM node, same value, still queryable.
+    expect(view.getByLabelText("Quiz Markdown source")).toBe(textarea);
+    expect((view.getByLabelText("Quiz Markdown source") as HTMLTextAreaElement).value).toBe(sample);
+    // The chat surface is present alongside the still-mounted preview.
+    await waitFor(() =>
+      expect(view.getByRole("tabpanel", { name: "AI Assistant" })).not.toBeNull());
+    expect(view.getByText("Question 1")).not.toBeNull();
+
+    // Preview tab still reachable; editor still the same mounted node.
+    fireEvent.click(view.getByRole("tab", { name: "Preview" }));
+    expect(view.getByRole("tab", { name: "Preview" }).getAttribute("aria-selected")).toBe("true");
+    expect(view.getByLabelText("Quiz Markdown source")).toBe(textarea);
+    expect((view.getByLabelText("Quiz Markdown source") as HTMLTextAreaElement).value).toBe(sample);
+  });
+
+  it("exposes AI on the mobile 3-way switch and hides the editor pane while active", async () => {
+    const { view } = setupWithAi(sample);
+    const editorPane = view.getByLabelText("Quiz Markdown source").closest("div.grid > div");
+    expect(editorPane).not.toBeNull();
+
+    fireEvent.click(view.getByRole("button", { name: "AI" }));
+    expect(editorPane?.className).toContain("hidden");
+    await waitFor(() =>
+      expect(view.getByRole("button", { name: "Upload document" })).not.toBeNull(),
+    );
+
+    fireEvent.click(view.getByRole("button", { name: "Editor" }));
+    expect(editorPane?.className).not.toContain("hidden");
+    expect((view.getByLabelText("Quiz Markdown source") as HTMLTextAreaElement).value).toBe(sample);
+  });
+
+  it("does not render the AI Assistant tab without a bankId", () => {
+    const { view } = setup(sample);
+    expect(view.queryByRole("tab")).toBeNull();
+    expect(view.queryByRole("button", { name: "AI" })).toBeNull();
+    expect(view.getByRole("button", { name: "Preview" })).not.toBeNull();
   });
 });
