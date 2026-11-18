@@ -246,7 +246,7 @@ async function main(): Promise<void> {
     const res = await apiJson(ingestBase, student.accessToken, { method: "POST", body: JSON.stringify({ detections: batch }) });
     if (res.status === 202 || res.status === 200) posted.phone = batch.length;
   }
-  if (personsPhase && (personsPhase as { framesWithTwoPlusPersons?: number }).framesWithTwoPlusPersons > 0) {
+  if (personsPhase && ((personsPhase as { framesWithTwoPlusPersons?: number }).framesWithTwoPlusPersons ?? 0) > 0) {
     const batch = Array.from({ length: 3 }, () => mkEvent("MULTIPLE_PERSONS_OBSERVED", personsPhase.detections.person?.maxConfidence ?? 0.9, seq++));
     const res = await apiJson(ingestBase, student.accessToken, { method: "POST", body: JSON.stringify({ detections: batch }) });
     if (res.status === 202 || res.status === 200) posted.persons = batch.length;
