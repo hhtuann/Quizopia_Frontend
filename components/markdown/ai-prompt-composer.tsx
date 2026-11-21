@@ -62,14 +62,8 @@ export function AiPromptComposer({
     if (event.nativeEvent.isComposing || composing) {
       return;
     }
+    // Enter (plain or with Ctrl/Cmd — any non-shift Enter) sends.
     if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      if (!sendBlocked) {
-        onSend();
-      }
-      return;
-    }
-    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       if (!sendBlocked) {
         onSend();

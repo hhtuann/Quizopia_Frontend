@@ -309,13 +309,14 @@ function GutterLines({
           >
             {index + 1}
           </span>
-          {/* Invisible mirror of the line text: wraps at the content width,
-              so its natural height drives the row height and the gutter
-              stays aligned with the soft-wrapped content column. */}
+          {/* Invisible mirror of the line text: wraps at the EXACT content
+              width (no extra padding, same tab-size as the textarea) so its
+              natural height drives the row height and the gutter stays
+              aligned with the soft-wrapped content column. */}
           <span
             aria-hidden="true"
-            className="invisible block whitespace-pre-wrap break-words px-1"
-            style={{ width: Math.max(0, textWidth) }}
+            className="invisible block whitespace-pre-wrap break-words"
+            style={{ tabSize: QUIZ_MARKDOWN_TAB_SIZE, width: Math.max(0, textWidth) }}
           >
             {line}
           </span>
@@ -364,15 +365,20 @@ export const QuizMarkdownCodeEditor = forwardRef<
     .map((suggestion) => suggestion.id)
     .join("|")}`;
 
-  // Track the content column width so the gutter mirror wraps identically.
+  // Track the textarea's actual text width (clientWidth minus paddings —
+  // clientWidth already excludes the scrollbar) so the gutter mirror wraps
+  // at exactly the same width, scrollbar or not.
   useEffect(() => {
     const column = contentColumnRef.current;
+    const textarea = textareaRef.current;
     if (column === null) {
       return;
     }
     const update = () => {
+      const el = textareaRef.current ?? null;
+      const basis = el ?? column;
       const width =
-        column.clientWidth - EDITOR_PADDING_LEFT - EDITOR_PADDING_RIGHT;
+        basis.clientWidth - EDITOR_PADDING_LEFT - EDITOR_PADDING_RIGHT;
       setContentWidth((current) => (current === width ? current : width));
     };
     update();
@@ -382,6 +388,9 @@ export const QuizMarkdownCodeEditor = forwardRef<
     }
     const observer = new ResizeObserver(update);
     observer.observe(column);
+    if (textarea !== null) {
+      observer.observe(textarea);
+    }
     return () => observer.disconnect();
   }, []);
 

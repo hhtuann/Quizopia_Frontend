@@ -78,6 +78,7 @@ export function AiDiffViewer({
         className="flex h-full max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_25px_60px_rgba(0,0,0,0.2)] focus-visible:outline-none"
         onClick={(event) => event.stopPropagation()}
         ref={dialogRef}
+        aria-modal="true"
         role="dialog"
         tabIndex={-1}
       >

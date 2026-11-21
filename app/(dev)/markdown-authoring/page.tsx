@@ -1,7 +1,7 @@
 "use client";
 
 import { notFound, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { QuizMarkdownAuthoringPane } from "@/components/markdown/authoring-pane";
 
 /**
@@ -45,10 +45,7 @@ const SAMPLE = [
   "",
 ].join("\r\n");
 
-export default function MarkdownAuthoringHarnessPage() {
-  if (process.env.NODE_ENV === "production") {
-    notFound();
-  }
+function Harness() {
   const [source, setSource] = useState(SAMPLE);
   // Dev-only: `?ai=1` mounts the AI Assistant surface (bankId 0) so the
   // chat/composer/sources UX can be verified without a real bank. The
@@ -68,5 +65,17 @@ export default function MarkdownAuthoringHarnessPage() {
         value={source}
       />
     </main>
+  );
+}
+
+export default function MarkdownAuthoringHarnessPage() {
+  if (process.env.NODE_ENV === "production") {
+    notFound();
+  }
+  // useSearchParams requires a Suspense boundary in the App Router.
+  return (
+    <Suspense fallback={null}>
+      <Harness />
+    </Suspense>
   );
 }

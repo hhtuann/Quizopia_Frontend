@@ -26,8 +26,8 @@ export interface AiSourceItem {
  * only shows the `N Sources` counter.
  *
  * Budget honesty: the caller passes the backend caps (max documents per
- * request, max total chars); the manager refuses to select beyond them and
- * shows exactly how many sources will be sent.
+ * request, max total chars); the footer shows exactly how many sources will
+ * be sent, and the owner (chat) refuses selections beyond the caps.
  */
 export function AiSourcesManager({
   items,
@@ -107,6 +107,7 @@ export function AiSourcesManager({
         className="flex max-h-[min(28rem,80vh)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_20px_50px_rgba(0,0,0,0.15)] focus-visible:outline-none"
         onClick={(event) => event.stopPropagation()}
         ref={dialogRef}
+        aria-modal="true"
         role="dialog"
         tabIndex={-1}
       >

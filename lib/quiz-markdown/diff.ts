@@ -276,7 +276,10 @@ function middleSnake(
         y += 1;
       }
       vf[base + k] = x;
-      // Odd delta: forward d can meet reverse d-1.
+      // Odd delta: forward d can meet reverse d-1. The forward reach on
+      // diagonal k meets the reversed reach on reversed-diagonal delta - k
+      // when x + vr[delta - k] >= sizeX; the guard needs reverse data on
+      // that diagonal: |delta - k| <= d - 1.
       if (
         oddDelta &&
         k >= delta - (d - 1) &&
@@ -285,7 +288,7 @@ function middleSnake(
       ) {
         // Overlap confirmed; extract the split snake as the longest common
         // run in the trimmed region (same rationale as the even branch).
-        const snake = longestCommonRun(before, x0, x1, after, y0, y1);
+        const snake = optimalPathSplit(before, x0, x1, after, y0, y1);
         if (snake !== null) {
           return snake;
         }
@@ -314,21 +317,25 @@ function middleSnake(
         ry += 1;
       }
       vr[base + k] = rx;
-      // Even delta: reverse d can meet forward d. The reverse point on
-      // diagonal k maps to forward diagonal delta - k; overlap when the
-      // forward reach plus the reverse reach covers sizeX.
+      // Even delta: reverse d can meet forward d. vr[k] is the reversed
+      // reach on reversed-diagonal k, which maps to forward diagonal
+      // delta - k; the reaches overlap on that diagonal when
+      // vf[delta - k] + vr[k] >= sizeX. The guard only needs k to be a
+      // valid reverse diagonal whose mapped forward diagonal carries
+      // forward data: |delta - k| <= d, i.e. k in [delta - d, delta + d]
+      // (automatically within this loop's [-d, d] when |delta| <= 2d).
       if (
         !oddDelta &&
-        k >= -delta - (d - 1) &&
-        k <= -delta + (d - 1) &&
-        vf[base + (delta - k)] + rx >= sizeX
+        k >= delta - d &&
+        k <= delta + d &&
+        vf[base + (delta - k)] + vr[base + k] >= sizeX
       ) {
         // Overlap confirmed at edit distance 2d. Extract the split snake:
         // the longest common run inside the region. The meeting interval
         // itself may sit on a diagonal with no common line while the true
         // middle snake lies on a neighbor diagonal, so search the whole
         // (already prefix/suffix-trimmed, hence change-bounded) region.
-        const snake = longestCommonRun(before, x0, x1, after, y0, y1);
+        const snake = optimalPathSplit(before, x0, x1, after, y0, y1);
         if (snake !== null) {
           return snake;
         }
@@ -341,13 +348,19 @@ function middleSnake(
 }
 
 /**
- * Longest run of identical consecutive lines anywhere in the region, as a
- * MiddleSnake split point. Null when the regions share no line at all.
- * Dynamic programming over the (trimmed, change-bounded) region:
- * O(sizeX * sizeY) time, O(sizeY) space. Called only after Myers overlap
- * detection, on regions already stripped of common prefix/suffix.
+ * Exact split point on an optimal (LCS) path, as a MiddleSnake.
+ *
+ * Computes the full LCS length table for the (already prefix/suffix-trimmed,
+ * hence change-bounded — ≤ a few dozen lines for realistic edits) region,
+ * walks an optimal path from (0,0), and returns the first maximal common
+ * run on it. Splitting at a point that lies ON an optimal path guarantees
+ * the divide-and-conquer emits a minimal edit script; the previous
+ * longest-common-run heuristic could pick a run off the optimal path and
+ * inflate the +/- counters on repetitive documents.
+ *
+ * Null when the regions share no line at all (pure replace).
  */
-function longestCommonRun(
+function optimalPathSplit(
   before: readonly string[],
   x0: number,
   x1: number,
@@ -355,37 +368,53 @@ function longestCommonRun(
   y0: number,
   y1: number,
 ): MiddleSnake | null {
-  const width = y1 - y0;
-  // prev[j] = length of the longest common run ending at before[x0+i-1],
-  // after[y0+j-1]; rolled row by row.
-  let prev = new Int32Array(width + 1);
-  let bestLen = 0;
-  let bestEndX = -1;
-  let bestEndY = -1;
-  for (let i = 1; i <= x1 - x0; i += 1) {
-    const current = new Int32Array(width + 1);
-    for (let j = 1; j <= width; j += 1) {
-      if (before[x0 + i - 1] === after[y0 + j - 1]) {
-        const len = prev[j - 1] + 1;
-        current[j] = len;
-        if (len > bestLen) {
-          bestLen = len;
-          bestEndX = x0 + i;
-          bestEndY = y0 + j;
-        }
-      }
+  const m = x1 - x0;
+  const n = y1 - y0;
+  // lcs[i][j] = LCS length of before[x0..x0+i) and after[y0..y0+j).
+  const lcs = new Int32Array((m + 1) * (n + 1));
+  const at = (i: number, j: number) => i * (n + 1) + j;
+  for (let i = m - 1; i >= 0; i -= 1) {
+    for (let j = n - 1; j >= 0; j -= 1) {
+      lcs[at(i, j)] =
+        before[x0 + i] === after[y0 + j]
+          ? lcs[at(i + 1, j + 1)] + 1
+          : Math.max(lcs[at(i + 1, j)], lcs[at(i, j + 1)]);
     }
-    prev = current;
   }
-  if (bestLen === 0) {
+  if (lcs[at(0, 0)] === 0) {
     return null;
   }
-  return {
-    snakeStartX: bestEndX - bestLen,
-    snakeEndX: bestEndX,
-    snakeStartY: bestEndY - bestLen,
-    snakeEndY: bestEndY,
-  };
+  // Walk the optimal path; the first match encountered starts the snake.
+  let i = 0;
+  let j = 0;
+  while (i < m && j < n && lcs[at(i, j)] > 0) {
+    if (before[x0 + i] === after[y0 + j] && lcs[at(i, j)] === lcs[at(i + 1, j + 1)] + 1) {
+      // On the path: extend the run maximally.
+      let sx = i;
+      let sy = j;
+      while (
+        sx < m &&
+        sy < n &&
+        before[x0 + sx] === after[y0 + sy] &&
+        lcs[at(sx, sy)] === lcs[at(sx + 1, sy + 1)] + 1
+      ) {
+        sx += 1;
+        sy += 1;
+      }
+      return {
+        snakeStartX: x0 + i,
+        snakeEndX: x0 + sx,
+        snakeStartY: y0 + j,
+        snakeEndY: y0 + sy,
+      };
+    }
+    if (lcs[at(i + 1, j)] >= lcs[at(i, j + 1)]) {
+      i += 1;
+    } else {
+      j += 1;
+    }
+  }
+  return null;
 }
 
 /** Flatten an edit script into per-line unified rows. */

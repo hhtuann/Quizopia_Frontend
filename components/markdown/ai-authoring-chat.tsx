@@ -282,9 +282,13 @@ export function AiAuthoringChat({
       if (pending) {
         return;
       }
-      // Replace the error entry instead of stacking a new one.
+      // Replace the error entry instead of stacking a new one. The retried
+      // request keeps ITS OWN baseline (currentMarkdown it was authored
+      // against) — reusing the latest request's sourceAtRequest would let a
+      // stale retry auto-apply against a newer baseline and silently
+      // overwrite a later kept change set (review P2).
       setEntries((prev) => prev.filter((e) => !(e.kind === "error" && e.request === request)));
-      issueRequest(request, lastRequestRef.current?.sourceAtRequest ?? request.currentMarkdown);
+      issueRequest(request, request.currentMarkdown);
     },
     [issueRequest, pending],
   );
@@ -336,6 +340,13 @@ export function AiAuthoringChat({
       setSourceItems((prev) => {
         const updated = [...prev];
         let acceptIndex = 0;
+        // Budget-aware auto-attach: count already-attached docs first so a
+        // multi-file upload never auto-selects beyond the backend caps.
+        let attached = prev.filter((i) => i.selected && i.document !== null).length;
+        let attachedChars = prev.reduce(
+          (sum, i) => sum + (i.selected ? (i.document?.charCount ?? 0) : 0),
+          0,
+        );
         for (let i = 0; i < updated.length; i += 1) {
           const item = updated[i];
           if (item.status !== "loading") {
@@ -347,11 +358,18 @@ export function AiAuthoringChat({
             continue;
           }
           if (result.status === "fulfilled") {
+            const withinBudget =
+              attached + 1 <= MAX_DOCUMENTS &&
+              attachedChars + result.value.charCount <= MAX_TOTAL_DOCUMENT_CHARS;
+            if (withinBudget) {
+              attached += 1;
+              attachedChars += result.value.charCount;
+            }
             updated[i] = {
               ...item,
               document: result.value,
               status: "ready",
-              selected: true,
+              selected: withinBudget,
             };
           } else {
             const described = describeError(result.reason);
@@ -542,9 +560,32 @@ export function AiAuthoringChat({
         onDismiss={() => setSourcesOpen(false)}
         onRemove={(id) => setSourceItems((prev) => prev.filter((i) => i.id !== id))}
         onSelectToggle={(id) =>
-          setSourceItems((prev) =>
-            prev.map((i) => (i.id === id ? { ...i, selected: !i.selected } : i)),
-          )
+          setSourceItems((prev) => {
+            const target = prev.find((i) => i.id === id);
+            if (target === undefined) {
+              return prev;
+            }
+            if (!target.selected) {
+              // Enforce the backend budget at selection time: refuse to
+              // attach beyond max documents or max total chars (the send
+              // path double-checks; this keeps the counter honest early).
+              const selectedDocs = prev.filter(
+                (i) => i.selected && i.document !== null,
+              );
+              const count = selectedDocs.length + 1;
+              const chars =
+                selectedDocs.reduce(
+                  (sum, i) => sum + (i.document?.charCount ?? 0),
+                  0,
+                ) + (target.document?.charCount ?? 0);
+              if (count > MAX_DOCUMENTS || chars > MAX_TOTAL_DOCUMENT_CHARS) {
+                return prev;
+              }
+            }
+            return prev.map((i) =>
+              i.id === id ? { ...i, selected: !i.selected } : i,
+            );
+          })
         }
         onUploadClick={() => fileInputRef.current?.click()}
         open={sourcesOpen}
@@ -556,12 +597,20 @@ export function AiAuthoringChat({
           before={reviewChangeSet.preApplySnapshot ?? reviewChangeSet.sourceAtRequest}
           after={reviewChangeSet.markdown}
           keepDisabled={!reviewChangeSet.valid}
+          undoDisabled={merge.hasManualEditsAfterApply(reviewChangeSet.id)}
           onDismiss={() => setReviewChangeSetId(null)}
           onKeepAll={() => {
             merge.keepAll(reviewChangeSet.id);
             setReviewChangeSetId(null);
           }}
           onUndoAll={() => {
+            // Manual edits after the pending apply: the inline card demands
+            // an explicit destructive-restore confirmation; the dialog simply
+            // refuses and points there (review P2 — no silent data loss).
+            if (merge.hasManualEditsAfterApply(reviewChangeSet.id)) {
+              setReviewChangeSetId(null);
+              return;
+            }
             merge.undoAll(reviewChangeSet.id, true);
             setReviewChangeSetId(null);
           }}

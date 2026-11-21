@@ -591,7 +591,7 @@ describe("AiAuthoringChat", () => {
     await waitFor(() => expect(screen.queryByText("alpha.txt")).toBeNull());
   });
 
-  it("blocks sending when the selection exceeds the backend document budget", async () => {
+  it("caps auto-attachment at the backend budgets (5 docs / 100k chars)", async () => {
     extractMock.mockImplementation(async (_bankId: number, file: File) => ({
       name: file.name,
       text: "x".repeat(30_000),
@@ -612,11 +612,160 @@ describe("AiAuthoringChat", () => {
       expect(screen.getByRole("button", { name: /6 sources/i })).not.toBeNull(),
     );
 
-    // 6 selected > max 5 documents: honest over-budget message, send blocked.
-    await waitFor(() =>
-      expect(screen.getByText(/at most 5 can be sent/i)).not.toBeNull(),
-    );
-    await waitFor(() => expect(sendButton().disabled).toBe(true));
+    // 30k chars each: the 100k total-char budget caps attachment at 3 docs
+    // (90k); the remaining 3 stay ready but unattached. Send stays available
+    // with an honest selection, and no request is issued.
+    fireEvent.click(screen.getByRole("button", { name: /6 sources/i }));
+    await waitFor(() => {
+      const checked = screen
+        .getAllByRole("checkbox")
+        .filter((c) => (c as HTMLInputElement).checked);
+      expect(checked.length).toBe(3);
+    });
     expect(authorMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("AiAuthoringChat review regressions", () => {
+  let queryClient: QueryClient;
+
+  beforeEach(() => {
+    queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    statusMock.mockReset();
+    statusMock.mockResolvedValue({ enabled: true, available: true, model: "test-model" });
+    extractMock.mockReset();
+    authorMock.mockReset();
+  });
+
+  afterEach(cleanup);
+
+  function renderChat(start = SOURCE) {
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <Harness start={start} />
+      </QueryClientProvider>,
+    );
+  }
+
+  function composer() {
+    return screen.getByLabelText("Message the AI assistant") as HTMLTextAreaElement;
+  }
+
+  /** Review P2 #3: retry after a successful intervening turn must NOT
+   *  auto-apply against the newer baseline. */
+  it("marks a retried stale request as conflict instead of silently overwriting", async () => {
+    // Turn A fails.
+    authorMock.mockRejectedValueOnce({
+      kind: "http",
+      status: 503,
+      message: "Service Unavailable",
+      raw: {},
+    });
+    renderChat();
+    await waitFor(() => expect(composer().disabled).toBe(false));
+    fireEvent.change(composer(), { target: { value: "turn A" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+    await waitFor(() => expect(screen.getByRole("alert")).not.toBeNull());
+
+    // Turn B succeeds and auto-applies.
+    authorMock.mockResolvedValueOnce({
+      markdown: CANDIDATE,
+      reply: "Turn B done",
+      valid: true,
+      diagnostics: [],
+    });
+    fireEvent.change(composer(), { target: { value: "turn B" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+    await waitFor(() => expect(screen.getByText("Turn B done")).not.toBeNull());
+    await waitFor(() =>
+      expect((screen.getByLabelText("Editor mirror") as HTMLTextAreaElement).value).toBe(CANDIDATE),
+    );
+
+    // Retry turn A: its baseline (SOURCE) differs from the editor (CANDIDATE)
+    // -> conflict, never a silent auto-apply.
+    authorMock.mockResolvedValueOnce({
+      markdown: `${SOURCE}Question 77 [SINGLE_CHOICE]: from A?\n*A. x\nB. y\nC. z\nD. w\n`,
+      reply: "Turn A recovered",
+      valid: true,
+      diagnostics: [],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(screen.getByText("Turn A recovered")).not.toBeNull());
+    expect(screen.getByText(/Editor changed — review required/i)).not.toBeNull();
+    // Editor still holds turn B's kept candidate.
+    expect((screen.getByLabelText("Editor mirror") as HTMLTextAreaElement).value).toBe(CANDIDATE);
+  });
+
+  /** Review P2 #4: the diff dialog's Undo all must not bypass the
+   *  manual-edits confirmation. */
+  it("disables dialog Undo all when manual edits followed the pending apply", async () => {
+    authorMock.mockResolvedValue({
+      markdown: CANDIDATE,
+      reply: "Here",
+      valid: true,
+      diagnostics: [],
+    });
+    renderChat();
+    await waitFor(() => expect(composer().disabled).toBe(false));
+    fireEvent.change(composer(), { target: { value: "go" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+    await waitFor(() =>
+      expect((screen.getByLabelText("Editor mirror") as HTMLTextAreaElement).value).toBe(CANDIDATE),
+    );
+
+    // Manual edit after the pending apply.
+    fireEvent.change(screen.getByLabelText("Editor mirror"), {
+      target: { value: `${CANDIDATE}Question 30 [SINGLE_CHOICE]: manual?\n*A. a\nB. b\nC. c\nD. d\n` },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
+    await waitFor(() =>
+      expect(screen.getByRole("dialog", { name: "Review changes" })).not.toBeNull(),
+    );
+    const undo = screen
+      .getAllByRole("button", { name: "Undo all" })
+      .find((b) => b.closest('[role="dialog"]')) as HTMLButtonElement;
+    expect(undo.disabled).toBe(true);
+    // Manual edits survive.
+    expect(
+      (screen.getByLabelText("Editor mirror") as HTMLTextAreaElement).value,
+    ).toContain("manual?");
+  });
+
+  /** Review P2 #5: selection beyond the document cap is refused at toggle. */
+  it("refuses attaching a 6th source (backend max 5)", async () => {
+    extractMock.mockImplementation(async (_bankId: number, file: File) => ({
+      name: file.name,
+      text: "x".repeat(100),
+      truncated: false,
+      charCount: 100,
+    }));
+    renderChat();
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Upload document" }) as HTMLButtonElement).disabled,
+      ).toBe(false),
+    );
+    fireEvent.change(screen.getByLabelText("Upload document (file input)"), {
+      target: {
+        files: Array.from({ length: 6 }, (_, i) =>
+          new File(["x"], `f${i}.txt`, { type: "text/plain" }),
+        ),
+      },
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /6 sources/i })).not.toBeNull(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /6 sources/i }));
+    // First 5 attach (auto-selected on success); the 6th refuses to attach.
+    const checked = screen
+      .getAllByRole("checkbox")
+      .filter((c) => (c as HTMLInputElement).checked);
+    expect(checked.length).toBe(5);
+    const unchecked = screen
+      .getAllByRole("checkbox")
+      .find((c) => !(c as HTMLInputElement).checked) as HTMLInputElement;
+    fireEvent.click(unchecked);
+    expect(unchecked.checked).toBe(false);
   });
 });

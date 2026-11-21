@@ -192,3 +192,49 @@ describe("diffLines stress (deterministic pseudo-random)", () => {
     }
   });
 });
+
+describe("diffLines optimality (review P1 regression)", () => {
+  it("is minimal on the reviewer's failing case", () => {
+    // Optimal: delete ccc, keep b, delete a — 4 edits, not 6.
+    const script = diffLines(["c", "c", "c", "b", "a"], ["b"]);
+    expect(diffLineCounts(script)).toEqual({ added: 0, deleted: 4 });
+  });
+
+  it("matches the LCS optimum on repetitive small documents", () => {
+    // Deterministic exhaustive-ish sweep over a tiny alphabet; the edit
+    // distance must equal |a| + |b| - 2*LCS(a, b) every time.
+    const alpha = ["A.", "B.", ""];
+    let seed = 20261121;
+    const rnd = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+    const lcs = (a: readonly string[], b: readonly string[]): number => {
+      const dp = Array.from({ length: a.length + 1 }, () =>
+        new Array(b.length + 1).fill(0),
+      );
+      for (let i = 1; i <= a.length; i += 1) {
+        for (let j = 1; j <= b.length; j += 1) {
+          dp[i][j] =
+            a[i - 1] === b[j - 1]
+              ? dp[i - 1][j - 1] + 1
+              : Math.max(dp[i - 1][j], dp[i][j - 1]);
+        }
+      }
+      return dp[a.length][b.length];
+    };
+    for (let round = 0; round < 500; round += 1) {
+      const a = Array.from(
+        { length: 1 + Math.floor(rnd() * 10) },
+        () => alpha[Math.floor(rnd() * alpha.length)],
+      );
+      const b = Array.from(
+        { length: 1 + Math.floor(rnd() * 10) },
+        () => alpha[Math.floor(rnd() * alpha.length)],
+      );
+      const counts = diffLineCounts(diffLines(a, b));
+      const optimal = a.length + b.length - 2 * lcs(a, b);
+      expect(counts.added + counts.deleted).toBe(optimal);
+    }
+  });
+});
