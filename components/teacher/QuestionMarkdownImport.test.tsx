@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QuestionMarkdownImport } from "./QuestionMarkdownImport";
 import { importMarkdownQuestions } from "@/lib/api/question-import";
 import type { ImportResponse } from "@/lib/api/question-import";
+import { authorAiMarkdown } from "@/lib/api/ai-authoring";
 
 vi.mock("@/lib/api/question-import", () => ({
   importMarkdownQuestions: vi.fn(),
@@ -247,4 +248,59 @@ describe("QuestionMarkdownImport", () => {
       )
     );
   });
+
+describe("QuestionMarkdownImport AI pending-changes gate (UX-04)", () => {
+  let queryClient: QueryClient;
+
+  beforeEach(() => {
+    queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    importMock.mockReset();
+  });
+
+  afterEach(cleanup);
+
+  function renderComponent(bankId = 7) {
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <QuestionMarkdownImport bankId={bankId} />
+      </QueryClientProvider>,
+    );
+  }
+
+  it("blocks import while an AI change set is pending and unblocks after Keep all", async () => {
+    const authorMock = vi.mocked(authorAiMarkdown);
+    authorMock.mockResolvedValue({
+      markdown: `${VALID_DOC}Câu 2 [SINGLE_CHOICE]: 3 + 3?
+*A. 6
+B. 5
+C. 7
+D. 8
+`,
+      reply: "Added one",
+      valid: true,
+      diagnostics: [],
+    });
+    renderComponent();
+
+    // Open the authoring pane, switch to AI, send a request.
+    fireEvent.click(screen.getByRole("button", { name: /write questions|collapse/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Ask AI" }));
+    const composer = await screen.findByLabelText("Message the AI assistant");
+    fireEvent.change(composer, { target: { value: "Add a question" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+    // Pending change set exists: import blocked with an honest notice.
+    await waitFor(() =>
+      expect(screen.getByText(/AI changes are pending review/i)).not.toBeNull(),
+    );
+    expect((screen.getByRole("button", { name: /^Confirm adding/ }) as HTMLButtonElement).disabled).toBe(true);
+
+    // Keep all seals the change set: import unblocked.
+    fireEvent.click(screen.getByRole("button", { name: "Keep all" }));
+    await waitFor(() =>
+      expect(screen.queryByText(/AI changes are pending review/i)).toBeNull(),
+    );
+    expect((screen.getByRole("button", { name: /^Confirm adding/ }) as HTMLButtonElement).disabled).toBe(false);
+  });
+});
 });

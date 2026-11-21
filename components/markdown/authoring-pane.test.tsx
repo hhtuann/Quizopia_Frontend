@@ -145,30 +145,49 @@ describe("QuizMarkdownAuthoringPane with bankId", () => {
     return { onChange, view };
   }
 
-  it("adds the AI Assistant tab and keeps the editor mounted with its value while switching", async () => {
+  it("shows Ask AI / Back to Preview and keeps the editor mounted while switching", async () => {
     const { view } = setupWithAi(sample);
-    expect(view.getByRole("tab", { name: "Preview" })).not.toBeNull();
-    expect(view.getByRole("tab", { name: "Preview" }).getAttribute("aria-selected")).toBe("true");
-    const aiTab = view.getByRole("tab", { name: "AI Assistant" });
+    // Default: live preview visible with the Ask AI action (no tab bar).
+    expect(view.queryByRole("tab")).toBeNull();
+    const askAi = view.getByRole("button", { name: "Ask AI" });
+    expect(view.getByText("Live preview (authoring)")).not.toBeNull();
 
     const textarea = view.getByLabelText("Quiz Markdown source") as HTMLTextAreaElement;
     expect(textarea.value).toBe(sample);
 
-    fireEvent.click(aiTab);
-    expect(aiTab.getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(askAi);
+    // Action flips to Back to Preview; the AI header replaces the preview's.
+    expect(view.getByRole("button", { name: "Back to Preview" })).not.toBeNull();
+    expect(view.getByText("AI Assistant")).not.toBeNull();
     // Editor is NOT remounted: same DOM node, same value, still queryable.
     expect(view.getByLabelText("Quiz Markdown source")).toBe(textarea);
     expect((view.getByLabelText("Quiz Markdown source") as HTMLTextAreaElement).value).toBe(sample);
-    // The chat surface is present alongside the still-mounted preview.
+    // The chat composer is present alongside the still-mounted preview.
     await waitFor(() =>
-      expect(view.getByRole("tabpanel", { name: "AI Assistant" })).not.toBeNull());
-    expect(view.getByText("Question 1")).not.toBeNull();
+      expect(view.getByLabelText("Message the AI assistant")).not.toBeNull());
 
-    // Preview tab still reachable; editor still the same mounted node.
-    fireEvent.click(view.getByRole("tab", { name: "Preview" }));
-    expect(view.getByRole("tab", { name: "Preview" }).getAttribute("aria-selected")).toBe("true");
+    // Back to Preview restores the preview; editor still the same node.
+    fireEvent.click(view.getByRole("button", { name: "Back to Preview" }));
+    expect(view.getByRole("button", { name: "Ask AI" })).not.toBeNull();
     expect(view.getByLabelText("Quiz Markdown source")).toBe(textarea);
     expect((view.getByLabelText("Quiz Markdown source") as HTMLTextAreaElement).value).toBe(sample);
+  });
+
+  it("preserves chat state across Ask AI / Back to Preview switching (UX-08)", async () => {
+    const { view } = setupWithAi(sample);
+    fireEvent.click(view.getByRole("button", { name: "Ask AI" }));
+    const composer = await waitFor(() =>
+      view.getByLabelText("Message the AI assistant") as HTMLTextAreaElement,
+    );
+    fireEvent.change(composer, { target: { value: "draft prompt about networking" } });
+
+    fireEvent.click(view.getByRole("button", { name: "Back to Preview" }));
+    fireEvent.click(view.getByRole("button", { name: "Ask AI" }));
+
+    // The draft prompt survived: the chat was hidden, never unmounted.
+    const restored = view.getByLabelText("Message the AI assistant") as HTMLTextAreaElement;
+    expect(restored).toBe(composer);
+    expect(restored.value).toBe("draft prompt about networking");
   });
 
   it("exposes AI on the mobile 3-way switch and hides the editor pane while active", async () => {
@@ -187,10 +206,9 @@ describe("QuizMarkdownAuthoringPane with bankId", () => {
     expect((view.getByLabelText("Quiz Markdown source") as HTMLTextAreaElement).value).toBe(sample);
   });
 
-  it("does not render the AI Assistant tab without a bankId", () => {
+  it("does not render the Ask AI action without a bankId", () => {
     const { view } = setup(sample);
-    expect(view.queryByRole("tab")).toBeNull();
-    expect(view.queryByRole("button", { name: "AI" })).toBeNull();
+    expect(view.queryByRole("button", { name: "Ask AI" })).toBeNull();
     expect(view.getByRole("button", { name: "Preview" })).not.toBeNull();
   });
 });

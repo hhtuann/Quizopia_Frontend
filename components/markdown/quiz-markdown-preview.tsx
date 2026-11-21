@@ -256,6 +256,8 @@ function DiagnosticItem({
 export interface QuizMarkdownPreviewProps {
   /** Put the diagnostics + question cards in a bordered, independently scrolling box (the heading stays fixed above it). */
   readonly boxed?: boolean;
+  /** Suppress the built-in heading (the host renders its own header row). */
+  readonly hideTitle?: boolean;
   readonly onChange?: (value: string) => void;
   readonly onDiagnosticSelect?: (line: number, column: number) => void;
   readonly onQuestionSelect?: (question: QuizPreviewQuestion) => void;
@@ -267,6 +269,7 @@ export interface QuizMarkdownPreviewProps {
 
 export function QuizMarkdownPreview({
   boxed = false,
+  hideTitle = false,
   onChange,
   onDiagnosticSelect,
   onQuestionSelect,
@@ -367,12 +370,14 @@ export function QuizMarkdownPreview({
         aria-labelledby={`${generatedId}-title`}
         className="flex h-full min-h-0 flex-col"
       >
-        <h2
-          className="mb-2 block pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]"
-          id={`${generatedId}-title`}
-        >
-          {title ?? "Live preview (authoring)"}
-        </h2>
+        {!hideTitle && (
+          <h2
+            className="mb-2 block pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]"
+            id={`${generatedId}-title`}
+          >
+            {title ?? "Live preview (authoring)"}
+          </h2>
+        )}
         <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-[#E2E8F0] bg-white p-3 shadow-[0_4px_6px_rgba(0,0,0,0.05)] sm:p-4">
           {content}
         </div>

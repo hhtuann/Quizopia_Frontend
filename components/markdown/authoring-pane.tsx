@@ -11,10 +11,10 @@ import { QuizMarkdownPreview } from "./quiz-markdown-preview";
 /**
  * Split Markdown authoring surface: source editor and live preview side by
  * side on desktop with independent vertical scrolling, and an accessible
- * Editor/Preview switch on small screens. Both panes stay mounted so source
- * and caret state survive switching. With `bankId`, the right pane gains an
- * AI Assistant tab (Phase 5, issue #114) — chat and preview stay mounted so
- * their state survives switching too.
+ * Editor/Preview/AI switch on small screens. All panes stay mounted so
+ * source, caret, chat, sources and change-set state survive switching.
+ * With `bankId`, the right pane header offers `Ask AI` / `Back to Preview`
+ * (Phase 5 UX redesign, issue #121) instead of the old tab bar.
  */
 type Pane = "editor" | "preview" | "ai";
 type RightPaneView = "preview" | "ai";
@@ -61,81 +61,91 @@ function PaneSwitch({
   );
 }
 
-const RIGHT_TABS: readonly { readonly id: RightPaneView; readonly label: string }[] = [
-  { id: "preview", label: "Preview" },
-  { id: "ai", label: "AI Assistant" },
-];
-
 /**
- * Desktop tablist switching the right pane between the live preview and the
- * AI Assistant. WAI-ARIA tabs pattern: roving tabindex + ArrowLeft/ArrowRight.
+ * Right-pane header row (UX-01): the pane title on the left (`Live preview`
+ * or `AI Assistant`) and the `Ask AI` / `Back to Preview` action on the
+ * right, in ONE row whose height matches the editor's `QUIZ MARKDOWN SOURCE`
+ * label — so both columns' content starts at the same line without magic
+ * negative margins. Replaces the old full-width `Preview | AI Assistant`
+ * tab bar.
  */
-function RightPaneTabs({
+function RightPaneHeader({
+  hasAi,
   view,
   onChange,
 }: {
+  readonly hasAi: boolean;
   readonly view: RightPaneView;
   readonly onChange: (view: RightPaneView) => void;
 }) {
-  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const keyboardFocusRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (keyboardFocusRef.current !== null) {
-      buttonRefs.current[keyboardFocusRef.current]?.focus();
-      keyboardFocusRef.current = null;
-    }
-  }, [view]);
-
-  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    const current = RIGHT_TABS.findIndex((tab) => tab.id === view);
-    const delta = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-    if (delta === 0) {
-      return;
-    }
-    event.preventDefault();
-    const next = (current + delta + RIGHT_TABS.length) % RIGHT_TABS.length;
-    keyboardFocusRef.current = next;
-    onChange(RIGHT_TABS[next].id);
-  };
-
+  const showingAi = hasAi && view === "ai";
   return (
-    <div
-      aria-label="Right pane view"
-      className="mb-2 hidden items-center gap-1 rounded-xl border border-[#E2E8F0] bg-white p-1 shadow-[0_4px_6px_rgba(0,0,0,0.07)] lg:flex"
-      onKeyDown={onKeyDown}
-      role="tablist"
-    >
-      {RIGHT_TABS.map((tab, index) => (
+    <div className="mb-2 flex items-center justify-between gap-2">
+      <span className="block pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]">
+        {showingAi ? "AI Assistant" : "Live preview (authoring)"}
+      </span>
+      {hasAi && (
         <button
-          aria-controls={`authoring-panel-${tab.id}`}
-          aria-selected={view === tab.id}
-          className={`h-9 rounded-lg px-4 font-mono text-xs font-semibold uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 ${
-            view === tab.id
-              ? "bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white shadow-[0_4px_14px_rgba(0,82,255,0.25)]"
-              : "text-[#64748B] hover:bg-[#F1F5F9] hover:text-[#0F172A]"
+          className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 font-mono text-[11px] font-semibold uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF] focus-visible:ring-offset-2 ${
+            showingAi
+              ? "border border-[#E2E8F0] bg-white text-[#64748B] hover:bg-[#F1F5F9] hover:text-[#0F172A]"
+              : "bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white shadow-[0_4px_14px_rgba(0,82,255,0.25)] hover:brightness-110"
           }`}
-          id={`authoring-tab-${tab.id}`}
-          key={tab.id}
-          onClick={() => onChange(tab.id)}
-          ref={(el) => {
-            buttonRefs.current[index] = el;
-          }}
-          role="tab"
-          tabIndex={view === tab.id ? 0 : -1}
+          onClick={() => onChange(showingAi ? "preview" : "ai")}
           type="button"
         >
-          {tab.label}
+          {showingAi ? (
+            <>
+              <svg
+                aria-hidden="true"
+                fill="none"
+                height="13"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                viewBox="0 0 24 24"
+                width="13"
+              >
+                <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Back to Preview
+            </>
+          ) : (
+            <>
+              <svg
+                aria-hidden="true"
+                fill="none"
+                height="13"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                width="13"
+              >
+                <path
+                  d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3Z"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15Z"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Ask AI
+            </>
+          )}
         </button>
-      ))}
+      )}
     </div>
   );
 }
 
 export interface QuizMarkdownAuthoringPaneProps {
-  /** Question-bank id; when set, the right pane gains the AI Assistant tab. */
+  /** Question-bank id; when set, the right pane gains the AI Assistant. */
   readonly bankId?: number;
   readonly onChange: (value: string) => void;
+  /** Notifies the host when unconfirmed pending AI changes exist (import gate). */
+  readonly onPendingChangesChange?: (pending: boolean) => void;
   /** Authoring mode shows answers/explanations in the preview. */
   readonly readOnly?: boolean;
   /** Internal heading; pass null to render none (host supplies its own). */
@@ -146,6 +156,7 @@ export interface QuizMarkdownAuthoringPaneProps {
 export function QuizMarkdownAuthoringPane({
   bankId,
   onChange,
+  onPendingChangesChange,
   readOnly = false,
   title,
   value,
@@ -293,19 +304,19 @@ export function QuizMarkdownAuthoringPane({
             activePane === "editor" ? "hidden lg:flex" : "flex"
           }`}
         >
-          {hasAi && <RightPaneTabs view={rightView} onChange={setRightView} />}
+          <RightPaneHeader hasAi={hasAi} view={rightView} onChange={setRightView} />
           {/* Both right-pane children stay mounted (CSS hidden) so preview
-              and chat state survive tab switching. */}
+              and chat state — conversation, sources, change sets, undo —
+              survive switching (UX-01/UX-08). */}
           <div
-            aria-labelledby="authoring-tab-preview"
             className={`min-h-0 flex-1 ${
               !hasAi || rightView === "preview" ? "" : "hidden"
             }`}
-            id="authoring-panel-preview"
-            role="tabpanel"
+            data-testid="authoring-panel-preview"
           >
             <QuizMarkdownPreview
               boxed
+              hideTitle
               onChange={onChange}
               onDiagnosticSelect={(line, column) =>
                 navigateEditor((editor) =>
@@ -327,12 +338,15 @@ export function QuizMarkdownAuthoringPane({
           </div>
           {hasAi && (
             <div
-              aria-labelledby="authoring-tab-ai"
               className={`min-h-0 flex-1 ${rightView === "ai" ? "" : "hidden"}`}
-              id="authoring-panel-ai"
-              role="tabpanel"
+              data-testid="authoring-panel-ai"
             >
-              <AiAuthoringChat bankId={bankId} onChange={onChange} value={value} />
+              <AiAuthoringChat
+                bankId={bankId}
+                onChange={onChange}
+                onPendingChangesChange={onPendingChangesChange}
+                value={value}
+              />
             </div>
           )}
         </div>
