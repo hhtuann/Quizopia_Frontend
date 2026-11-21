@@ -176,7 +176,7 @@ test.describe("Scenario H — AI detections (SIMULATED detector)", () => {
       console.log("AI-STATE-AT-FAIL", JSON.stringify(aiState));
       throw e;
     }
-    await expect(teacherPage.getByTestId("ai-alert-card").first()).toContainText("Phát hiện điện thoại");
+    await expect(teacherPage.getByTestId("ai-alert-card").first()).toContainText("Phone detected");
     await expect(teacherPage.getByTestId("ai-alert-card").first()).toContainText("yolo26s");
     await expect(teacherPage.getByTestId("ai-alert-card").first()).toContainText("CLIENT MODEL");
 
@@ -292,7 +292,7 @@ test.describe("Scenario H — AI detections (SIMULATED detector)", () => {
     await expect(feed).toBeVisible({ timeout: 60_000 });
     const card = page.getByTestId("ai-alert-card").first();
     await expect(card).toBeVisible({ timeout: 30_000 });
-    await expect(card).toContainText("Phát hiện điện thoại");
+    await expect(card).toContainText("Phone detected");
     await page.screenshot({ path: `${__dirname}/evidence/H4-teacher-reload.png`, fullPage: true });
   });
 

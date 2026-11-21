@@ -23,7 +23,7 @@ import type { AlertReviewStatus } from "@/lib/api/alert-review";
  * merged by alertId, newest first.
  *
  * Honesty (CONTRACT §8): cards show observations with confidence + provenance
- * and the disclaimer "Quan sát bằng AI — không tự động kết luận vi phạm."
+ * and the disclaimer "AI observations only — they do not automatically establish misconduct."
  * The bbox mini-render draws the normalized boxes from latestDetections.
  * When the session stores evidence snapshots (P4-D) and one is AVAILABLE
  * for the alert, that snapshot is shown underneath the boxes; otherwise
@@ -33,8 +33,8 @@ import type { AlertReviewStatus } from "@/lib/api/alert-review";
  * (`firstDetections`), so they line up; the caption says which frame.
  *
  * P4-E: each card gains teacher review controls (action + note + history,
- * `AlertReviewForm`) and provenance chips — "AI phát hiện" (detector
- * fields) vs "Giảng viên đánh giá" (review fields) vs "Chưa được xác minh"
+ * `AlertReviewForm`) and provenance chips — "AI-detected" (detector
+ * fields) vs "Instructor review" (review fields) vs "Unreviewed"
  * (UNREVIEWED). Reviews are assessments, never verdicts.
  */
 
@@ -56,19 +56,19 @@ export function mergeAlertItems(
 }
 
 const ALERT_LABEL: Record<AiAlertItem["alertType"], string> = {
-  PHONE_DETECTED: "Phát hiện điện thoại",
-  SCREEN_DETECTED: "Phát hiện màn hình phụ",
-  MULTIPLE_PERSONS_DETECTED: "Nhiều người trong khung hình",
-  PERSON_NOT_VISIBLE: "Không thấy người làm bài",
-  LOOKING_AWAY: "Nhìn lệch khỏi màn hình",
+  PHONE_DETECTED: "Phone detected",
+  SCREEN_DETECTED: "Secondary screen detected",
+  MULTIPLE_PERSONS_DETECTED: "Multiple people detected",
+  PERSON_NOT_VISIBLE: "Student not visible",
+  LOOKING_AWAY: "Looking away from the screen",
 };
 
 const GAZE_DIRECTION_LABEL: Record<GazeLabelInfo["direction"], string> = {
-  left: "sang trái",
-  right: "sang phải",
-  up: "lên trên",
-  down: "xuống dưới",
-  frequent: "lặp lại nhiều lần",
+  left: "to the left",
+  right: "to the right",
+  up: "upward",
+  down: "downward",
+  frequent: "repeatedly",
 };
 
 const signedDeg = (v: number): string => `${v > 0 ? "+" : ""}${v}°`;
@@ -86,13 +86,13 @@ export function snapshotsByAlert(items: EvidenceItem[]): Map<number, EvidenceIte
   return byAlert;
 }
 
-/** VN summary of a gaze payload label; null for non-gaze boxes. Pure. */
+/** Human-readable summary of a gaze payload label; null for non-gaze boxes. Pure. */
 export function describeGazeLabel(label: string | null | undefined): string | null {
   const info = parseGazeLabel(label);
   if (!info) return null;
-  return `Nhìn lệch ${GAZE_DIRECTION_LABEL[info.direction]} · lệch ngang ${signedDeg(
+  return `Looking ${GAZE_DIRECTION_LABEL[info.direction]} · horizontal deviation ${signedDeg(
     info.deltaYaw
-  )}, dọc ${signedDeg(info.deltaPitch)} so với mốc`;
+  )}, vertical deviation ${signedDeg(info.deltaPitch)} from baseline`;
 }
 
 const BOX_CLASS_LABEL: Record<number, string> = {
@@ -166,7 +166,7 @@ export function AiAlertFeed({ sessionId }: { sessionId: number }) {
     <div className={cn(cardVariants(), "mt-6 p-6")} data-testid="ai-alert-feed">
       <div className="mb-1 flex items-center justify-between gap-3">
         <h3 className="font-display text-base font-bold tracking-tight text-[#0F172A]">
-          Cảnh báo AI
+          AI Alerts
         </h3>
         <button
           type="button"
@@ -182,21 +182,21 @@ export function AiAlertFeed({ sessionId }: { sessionId: number }) {
           }
           className="rounded-lg px-2 py-1 text-xs font-semibold text-[#64748B] outline-none transition-colors hover:text-[#0F172A] focus-visible:ring-2 focus-visible:ring-[#0052FF]"
         >
-          Làm mới
+          Refresh
         </button>
       </div>
       <p className="mb-4 text-xs font-medium text-[#94A3B8]">
-        Quan sát bằng AI — không tự động kết luận vi phạm.
+        AI observations only — they do not automatically establish misconduct.
       </p>
 
-      {isPending && <p className="text-sm text-[#64748B]">Đang tải cảnh báo…</p>}
+      {isPending && <p className="text-sm text-[#64748B]">Loading alerts…</p>}
       {isError && (
         <p className="text-sm text-[#64748B]">
-          Chưa tải được cảnh báo — dữ liệu khu vực này không ảnh hưởng buổi thi.
+          Could not load alerts — this section does not affect the exam session.
         </p>
       )}
       {!isPending && !isError && items.length === 0 && (
-        <p className="text-sm text-[#64748B]">Chưa có cảnh báo AI.</p>
+        <p className="text-sm text-[#64748B]">No AI alerts yet.</p>
       )}
 
       {items.length > 0 && (
@@ -221,7 +221,7 @@ export function AiAlertFeed({ sessionId }: { sessionId: number }) {
           disabled={loadingOlder}
           className="mt-3 text-xs font-semibold text-[#0052FF] outline-none transition-colors hover:text-[#0052FF]/80 focus-visible:ring-2 focus-visible:ring-[#0052FF]"
         >
-          {loadingOlder ? "Đang tải…" : "Tải cảnh báo cũ hơn"}
+          {loadingOlder ? "Loading…" : "Load older alerts"}
         </button>
       )}
     </div>
@@ -313,24 +313,24 @@ export function AiAlertCard({
       ? `${snapshot.width} / ${snapshot.height}`
       : "4 / 3";
   const boxCaption = !hasSnapshot
-    ? "bbox từ khung phân tích — chưa có ảnh minh chứng cho cảnh báo này"
+    ? "Detection boxes from the analyzed frame — no evidence image is available for this alert"
     : !isDetectionFrame
-      ? `Ảnh do máy thí sinh gửi lúc ${formatTime(snapshot.capturedAt ?? snapshot.createdAt)} — không phải khung hình lúc phát hiện; khung bbox là của lần phát hiện gần nhất`
+      ? `Evidence image submitted by the student's device at ${formatTime(snapshot.capturedAt ?? snapshot.createdAt)} — not the frame used for detection; boxes show the latest detection`
       : boxesMatchPhoto
       ? alert.detectionCount <= 1
-        ? "Ảnh do máy thí sinh gửi — đúng khung hình lúc phát hiện"
-        : "Ảnh do máy thí sinh gửi — khung hình và bbox của lần phát hiện đầu tiên"
-      : "Ảnh do máy thí sinh gửi — khung hình của lần phát hiện đầu tiên; khung bbox là của lần phát hiện gần nhất";
+        ? "Evidence image submitted by the student's device — the same frame used for detection"
+        : "Evidence image submitted by the student's device — frame and boxes from the first detection"
+      : "Evidence image submitted by the student's device — frame from the first detection; boxes show the latest detection";
   // P4-E review rollup — absent field (pre-P4-E backend) reads UNREVIEWED.
   const reviewStatus: AlertReviewStatus = alert.reviewStatus ?? "UNREVIEWED";
   const reviewStatusChip =
     reviewStatus === "UNREVIEWED" ? (
-      <span className="rounded-full border border-[#F59E0B]/30 bg-[#F59E0B]/5 px-2 py-0.5 text-[11px] font-semibold text-[#F59E0B]">
+      <span className="whitespace-nowrap rounded-full border border-[#F59E0B]/30 bg-[#F59E0B]/5 px-2 py-0.5 text-[11px] font-semibold text-[#F59E0B]">
         {REVIEW_STATUS_LABEL[reviewStatus]}
       </span>
     ) : (
-      <span className="rounded-full border border-[#10B981]/30 bg-[#10B981]/5 px-2 py-0.5 text-[11px] font-semibold text-[#10B981]">
-        {`Giảng viên đánh giá · ${REVIEW_STATUS_LABEL[reviewStatus]}`}
+      <span className="whitespace-nowrap rounded-full border border-[#10B981]/30 bg-[#10B981]/5 px-2 py-0.5 text-[11px] font-semibold text-[#10B981]">
+        {`Instructor review · ${REVIEW_STATUS_LABEL[reviewStatus]}`}
         {alert.reviewedAt ? ` · ${formatTime(alert.reviewedAt)}` : ""}
       </span>
     );
@@ -346,16 +346,16 @@ export function AiAlertCard({
           <span className="text-sm font-bold text-[#0F172A]">
             {alert.studentName ?? `#${alert.studentUserId}`}
           </span>
-          <span className="rounded-full border border-[#F59E0B]/30 bg-[#F59E0B]/5 px-2 py-0.5 text-[11px] font-semibold text-[#F59E0B]">
+          <span className="whitespace-nowrap rounded-full border border-[#F59E0B]/30 bg-[#F59E0B]/5 px-2 py-0.5 text-[11px] font-semibold text-[#F59E0B]">
             {ALERT_LABEL[alert.alertType]}
           </span>
-          <span className="rounded-full border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wide text-[#64748B]">
+          <span className="whitespace-nowrap rounded-full border border-[#E2E8F0] bg-[#F1F5F9] px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wide text-[#64748B]">
             {provenance}
           </span>
           {/* P4-E provenance distinction: detector fields vs review fields.
            * UNREVIEWED is stated honestly — an unverified observation. */}
-          <span className="rounded-full border border-[#0052FF]/30 bg-[#0052FF]/5 px-2 py-0.5 text-[11px] font-semibold text-[#0052FF]">
-            AI phát hiện
+          <span className="whitespace-nowrap rounded-full border border-[#0052FF]/30 bg-[#0052FF]/5 px-2 py-0.5 text-[11px] font-semibold text-[#0052FF]">
+            AI-detected
           </span>
           {reviewStatusChip}
         </div>
@@ -365,20 +365,20 @@ export function AiAlertCard({
       <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] sm:grid-cols-4">
         <div>
           <dt className="text-[#94A3B8]">
-            {isGaze ? "Độ tin cậy (khuôn mặt)" : "Độ tin cậy"}
+            {isGaze ? "Face confidence" : "Confidence"}
           </dt>
           <dd className="font-semibold text-[#0F172A]">{confidence}</dd>
         </div>
         <div>
-          <dt className="text-[#94A3B8]">Số lần phát hiện</dt>
+          <dt className="text-[#94A3B8]">Detection count</dt>
           <dd className="font-semibold text-[#0F172A]">{alert.detectionCount}</dd>
         </div>
         <div>
-          <dt className="text-[#94A3B8]">Khoảng thời gian</dt>
+          <dt className="text-[#94A3B8]">Time range</dt>
           <dd className="font-semibold text-[#0F172A]">{window}</dd>
         </div>
         <div>
-          <dt className="text-[#94A3B8]">Mô hình</dt>
+          <dt className="text-[#94A3B8]">Model</dt>
           <dd className="font-mono font-semibold text-[#0F172A]">
             {alert.modelId && alert.modelVersion
               ? `${alert.modelId}@${alert.modelVersion}`
@@ -390,7 +390,7 @@ export function AiAlertCard({
       {isGaze && (
         <p className="mt-2 text-[11px] font-medium text-[#64748B]" data-testid="ai-alert-gaze">
           {gazeSummary ? `${gazeSummary}. ` : ""}
-          Hướng nhìn là ước lượng của mô hình — chỉ để giáo viên tham khảo.
+          Gaze direction is a model estimate — for instructor reference only.
         </p>
       )}
 
@@ -409,7 +409,7 @@ export function AiAlertCard({
               // eslint-disable-next-line @next/next/no-img-element -- presigned URL (300s TTL) must not pass through the Next image optimizer
               <img
                 src={snapshotUrl!.url}
-                alt="Ảnh minh chứng do máy thí sinh gửi"
+                alt="Evidence image submitted by the student's device"
                 data-testid="ai-alert-snapshot"
                 className="absolute inset-0 h-full w-full object-fill"
               />

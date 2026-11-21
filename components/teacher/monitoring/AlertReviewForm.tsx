@@ -27,23 +27,23 @@ import { cn } from "@/lib/utils/cn";
  * success and after an acknowledged conflict, never reused for a new intent.
  */
 
-/** Vietnamese action labels (fallback = raw enum, mirroring ALERT_LABEL). */
+/** Review action labels (fallback = raw enum, mirroring ALERT_LABEL). */
 export const REVIEW_ACTION_LABEL: Record<AlertReviewAction, string> = {
-  MARK_VIEWED: "Đã xem",
-  FALSE_POSITIVE: "Báo động sai",
-  NEEDS_FOLLOW_UP: "Cần theo dõi thêm",
-  NOTED: "Ghi chú",
-  REVIEWED_NO_CONCLUSION: "Đã xét — không kết luận",
+  MARK_VIEWED: "Reviewed",
+  FALSE_POSITIVE: "False positive",
+  NEEDS_FOLLOW_UP: "Needs follow-up",
+  NOTED: "Note added",
+  REVIEWED_NO_CONCLUSION: "Reviewed — no conclusion",
 };
 
-/** Vietnamese review-status labels (provenance chip on the card). */
+/** Review-status labels (provenance chip on the card). */
 export const REVIEW_STATUS_LABEL: Record<AlertReviewStatus, string> = {
-  UNREVIEWED: "Chưa được xác minh",
-  VIEWED: "Đã xem",
-  FALSE_POSITIVE: "Báo động sai",
-  NEEDS_FOLLOW_UP: "Cần theo dõi thêm",
-  NOTED: "Đã ghi chú",
-  REVIEWED_NO_CONCLUSION: "Đã xét — không kết luận",
+  UNREVIEWED: "Unreviewed",
+  VIEWED: "Reviewed",
+  FALSE_POSITIVE: "False positive",
+  NEEDS_FOLLOW_UP: "Needs follow-up",
+  NOTED: "Note added",
+  REVIEWED_NO_CONCLUSION: "Reviewed — no conclusion",
 };
 
 export function reviewActionLabel(action: AlertReviewAction): string {
@@ -90,8 +90,8 @@ export function AlertReviewForm({
     onSuccess: (result) => {
       setSuccessMessage(
         result.idempotentReplay
-          ? `Yêu cầu trùng lặp — giữ nguyên đánh giá phiên ${result.reviewVersion}.`
-          : `Đã lưu đánh giá (phiên ${result.reviewVersion}).`
+          ? `Duplicate request — kept the existing review (version ${result.reviewVersion}).`
+          : `Review saved (version ${result.reviewVersion}).`
       );
       setConflictMessage(null);
       setErrorMessage(null);
@@ -135,7 +135,7 @@ export function AlertReviewForm({
           queryKey: ["alerts", alert.alertId, "reviews"],
         });
       } else {
-        setErrorMessage("Không lưu được đánh giá — thử lại.");
+        setErrorMessage("Could not save review — please try again.");
       }
       setSuccessMessage(null);
     },
@@ -166,14 +166,14 @@ export function AlertReviewForm({
       data-testid="alert-review-form"
       className="mt-3 rounded-lg border border-[#E2E8F0] bg-[#F1F5F9]/60 p-3"
     >
-      <p className="text-xs font-bold text-[#0F172A]">Đánh giá của giảng viên</p>
+      <p className="text-xs font-bold text-[#0F172A]">Instructor review</p>
       <p className="mt-0.5 text-[11px] font-medium text-[#94A3B8]">
-        Ghi chép quá trình xem xét — không phải kết luận vi phạm.
+        Review notes — not a determination of misconduct.
       </p>
 
       <div className="mt-3">
         <SegmentedControl
-          aria-label="Hành động đánh giá"
+          aria-label="Review action"
           value={action}
           onChange={(next) => setAction(next)}
           options={REVIEW_ACTIONS.map((value) => ({
@@ -187,7 +187,7 @@ export function AlertReviewForm({
         htmlFor={`review-note-${alert.alertId}`}
         className="mb-1 mt-1 block font-mono text-[10px] uppercase tracking-[0.1em] text-[#64748B]"
       >
-        Ghi chú (không bắt buộc)
+        Note (optional)
       </label>
       <textarea
         id={`review-note-${alert.alertId}`}
@@ -212,7 +212,7 @@ export function AlertReviewForm({
           onClick={submit}
           disabled={reviewMut.isPending}
         >
-          {reviewMut.isPending ? "Đang lưu…" : "Lưu đánh giá"}
+          {reviewMut.isPending ? "Saving…" : "Save review"}
         </Button>
         <button
           type="button"
@@ -221,7 +221,7 @@ export function AlertReviewForm({
           aria-controls={`review-history-${alert.alertId}`}
           className="rounded-lg px-2 py-1 text-xs font-semibold text-[#0052FF] outline-none transition-colors hover:text-[#0052FF]/80 focus-visible:ring-2 focus-visible:ring-[#0052FF]"
         >
-          {historyOpen ? "Ẩn lịch sử đánh giá" : "Xem lịch sử đánh giá"}
+          {historyOpen ? "Hide review history" : "View review history"}
         </button>
       </div>
 
@@ -246,7 +246,7 @@ export function AlertReviewForm({
             onClick={acknowledgeConflict}
             className="mt-1.5 rounded-lg font-semibold underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
           >
-            Đã hiểu — dùng phiên bản mới
+            Got it — use the latest version
           </button>
         </div>
       )}
@@ -257,13 +257,13 @@ export function AlertReviewForm({
         className="mt-3"
       >
         {historyQuery.isPending ? (
-          <p className="text-xs text-[#64748B]">Đang tải lịch sử…</p>
+          <p className="text-xs text-[#64748B]">Loading review history…</p>
         ) : historyQuery.isError ? (
           <p className="text-xs text-[#64748B]">
-            Chưa tải được lịch sử đánh giá.
+            Could not load review history.
           </p>
         ) : (historyQuery.data?.history.length ?? 0) === 0 ? (
-          <p className="text-xs text-[#64748B]">Chưa có đánh giá nào.</p>
+          <p className="text-xs text-[#64748B]">No reviews yet.</p>
         ) : (
           <ul className="space-y-1.5" data-testid="alert-review-history">
             {historyQuery.data?.history.map((entry) => (

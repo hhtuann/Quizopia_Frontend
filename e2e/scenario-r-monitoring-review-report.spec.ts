@@ -186,20 +186,20 @@ test.describe("Scenario R — monitoring dashboard, review & report", () => {
     await expect(focusCard).toBeVisible({ timeout: 120_000 });
     const reviewForm = focusCard.getByTestId("alert-review-form");
     await expect(reviewForm).toBeVisible({ timeout: 30_000 });
-    await reviewForm.getByRole("button", { name: "Báo động sai" }).click();
+    await reviewForm.getByRole("button", { name: "False positive" }).click();
     await reviewForm.getByRole("textbox").fill("SIMULATED detector artefact — reviewed in R1");
-    await reviewForm.getByRole("button", { name: "Lưu đánh giá" }).click();
+    await reviewForm.getByRole("button", { name: "Save review" }).click();
     await expect(reviewForm.getByRole("status")).toBeVisible({ timeout: 30_000 });
 
     // The card now distinguishes teacher judgement from AI detection.
-    await expect(focusCard.getByText("Giảng viên đánh giá")).toBeVisible({
+    await expect(focusCard.getByText("Instructor review")).toBeVisible({
       timeout: 30_000,
     });
 
     // Review history (append-only) shows the row.
-    await reviewForm.getByRole("button", { name: "Xem lịch sử đánh giá" }).click();
+    await reviewForm.getByRole("button", { name: "View review history" }).click();
     const history = reviewForm.getByTestId("alert-review-history");
-    await expect(history.getByText("Báo động sai").first()).toBeVisible({ timeout: 30_000 });
+    await expect(history.getByText("False positive").first()).toBeVisible({ timeout: 30_000 });
 
     // Unified timeline gains the review event with review provenance
     // (rendered via TIMELINE_TYPE_LABEL — "Alert review recorded").
@@ -215,7 +215,7 @@ test.describe("Scenario R — monitoring dashboard, review & report", () => {
     await expect(
       teacherPage.locator(
         `[data-testid="ai-alert-card"][data-attempt-id="${focusAttempt}"]`
-      ).getByText("Giảng viên đánh giá")
+      ).getByText("Instructor review")
     ).toBeVisible({ timeout: 30_000 });
 
     // Submit the focus attempt so the report has a closed window

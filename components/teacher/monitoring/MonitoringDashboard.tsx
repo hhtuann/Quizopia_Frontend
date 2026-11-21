@@ -51,7 +51,7 @@ export function isMonitoringDashboardActivity(ev: RealtimeEventEnvelope): boolea
   );
 }
 
-/** English review-status labels for the dashboard (VN lives on the cards). */
+/** English review-status labels used across the monitoring interface. */
 export const REVIEW_STATUS_LABEL_EN: Record<AlertReviewStatus, string> = {
   UNREVIEWED: "Unreviewed",
   VIEWED: "Viewed",

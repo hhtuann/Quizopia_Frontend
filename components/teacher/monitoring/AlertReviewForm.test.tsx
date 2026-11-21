@@ -90,12 +90,12 @@ describe("AlertReviewForm submit (happy path + idempotency)", () => {
     });
     const { container } = renderForm(alertItem({ reviewVersion: 0 }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Cần theo dõi thêm" }));
+    fireEvent.click(screen.getByRole("button", { name: "Needs follow-up" }));
     fireEvent.change(
       container.querySelector("textarea") as HTMLTextAreaElement,
       { target: { value: "theo dõi thêm" } }
     );
-    fireEvent.click(screen.getByRole("button", { name: "Lưu đánh giá" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save review" }));
 
     await waitFor(() =>
       expect(submitMock).toHaveBeenCalledWith(
@@ -105,7 +105,7 @@ describe("AlertReviewForm submit (happy path + idempotency)", () => {
       )
     );
     expect(
-      await screen.findByText("Đã lưu đánh giá (phiên 1).")
+      await screen.findByText("Review saved (version 1).")
     ).not.toBeNull();
   });
 
@@ -122,10 +122,10 @@ describe("AlertReviewForm submit (happy path + idempotency)", () => {
     });
     renderForm(alertItem({ reviewVersion: 0 }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Lưu đánh giá" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save review" }));
     await waitFor(() => expect(submitMock).toHaveBeenCalledTimes(1));
 
-    fireEvent.click(screen.getByRole("button", { name: "Lưu đánh giá" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save review" }));
     await waitFor(() => expect(submitMock).toHaveBeenCalledTimes(2));
     // Second intent carries the regenerated key, never the used one.
     expect(submitMock.mock.calls[0][2]).toBe("key-1");
@@ -145,9 +145,9 @@ describe("AlertReviewForm submit (happy path + idempotency)", () => {
     });
     renderForm(alertItem({ reviewVersion: 1 }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Lưu đánh giá" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save review" }));
     expect(
-      await screen.findByText("Yêu cầu trùng lặp — giữ nguyên đánh giá phiên 2.")
+      await screen.findByText("Duplicate request — kept the existing review (version 2).")
     ).not.toBeNull();
   });
 
@@ -164,7 +164,7 @@ describe("AlertReviewForm submit (happy path + idempotency)", () => {
     });
     const { invalidateSpy } = renderForm(alertItem({ attemptId: 10 }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Lưu đánh giá" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save review" }));
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalled());
 
     const keys = invalidateSpy.mock.calls.map(
@@ -196,7 +196,7 @@ describe("AlertReviewForm submit (happy path + idempotency)", () => {
       container.querySelector("textarea") as HTMLTextAreaElement,
       { target: { value: "   " } }
     );
-    fireEvent.click(screen.getByRole("button", { name: "Lưu đánh giá" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save review" }));
 
     await waitFor(() =>
       expect(submitMock).toHaveBeenCalledWith(
@@ -221,7 +221,7 @@ describe("AlertReviewForm conflict (409) and failure states", () => {
     submitMock.mockRejectedValue(conflictError);
     const { invalidateSpy } = renderForm(alertItem({ reviewVersion: 0 }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Lưu đánh giá" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save review" }));
 
     expect(
       await screen.findByText(/current version 3/i)
@@ -230,7 +230,7 @@ describe("AlertReviewForm conflict (409) and failure states", () => {
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalled());
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Đã hiểu — dùng phiên bản mới" })
+      screen.getByRole("button", { name: "Got it — use the latest version" })
     );
     expect(screen.queryByText(/current version 3/i)).toBeNull();
 
@@ -245,7 +245,7 @@ describe("AlertReviewForm conflict (409) and failure states", () => {
       reviewedAt: "2026-11-17T08:01:00Z",
       idempotentReplay: false,
     });
-    fireEvent.click(screen.getByRole("button", { name: "Lưu đánh giá" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save review" }));
     await waitFor(() => expect(submitMock).toHaveBeenCalledTimes(2));
     expect(submitMock.mock.calls[0][2]).toBe("key-1");
     expect(submitMock.mock.calls[1][2]).toBe("key-2");
@@ -255,9 +255,9 @@ describe("AlertReviewForm conflict (409) and failure states", () => {
     submitMock.mockRejectedValue({ kind: "network", message: "offline", raw: null });
     renderForm();
 
-    fireEvent.click(screen.getByRole("button", { name: "Lưu đánh giá" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save review" }));
     expect(
-      await screen.findByText("Không lưu được đánh giá — thử lại.")
+      await screen.findByText("Could not save review — please try again.")
     ).not.toBeNull();
   });
 });
@@ -295,7 +295,7 @@ describe("AlertReviewForm history disclosure (§3.4)", () => {
     renderForm();
 
     expect(historyMock).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Xem lịch sử đánh giá" }));
+    fireEvent.click(screen.getByRole("button", { name: "View review history" }));
     await waitFor(() => expect(historyMock).toHaveBeenCalledWith(9));
 
     const history = await screen.findByTestId("alert-review-history");
@@ -313,17 +313,17 @@ describe("AlertReviewForm history disclosure (§3.4)", () => {
     });
     renderForm();
 
-    fireEvent.click(screen.getByRole("button", { name: "Xem lịch sử đánh giá" }));
-    expect(await screen.findByText("Chưa có đánh giá nào.")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "View review history" }));
+    expect(await screen.findByText("No reviews yet.")).not.toBeNull();
   });
 
   it("shows the honest failure state when history cannot load", async () => {
     historyMock.mockRejectedValue({ kind: "http", status: 500, message: "boom", raw: null });
     renderForm();
 
-    fireEvent.click(screen.getByRole("button", { name: "Xem lịch sử đánh giá" }));
+    fireEvent.click(screen.getByRole("button", { name: "View review history" }));
     expect(
-      await screen.findByText("Chưa tải được lịch sử đánh giá.")
+      await screen.findByText("Could not load review history.")
     ).not.toBeNull();
   });
 });

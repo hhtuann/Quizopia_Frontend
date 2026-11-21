@@ -21,7 +21,7 @@ import type { RealtimeEventEnvelope } from "@/lib/realtime/types";
  * SNAPSHOT thumbnails plus the alert's CLIP with honest status states.
  *
  * Honesty (CONTRACT §8 / ADR-009): CLIENT_CAPTURE snapshots are labeled
- * "Ảnh do máy thí sinh gửi" — they are student-submitted frames, NEVER
+ * "Student-submitted image" — these are student-provided frames, NEVER
  * verification. A FAILED clip shows its real reason (NO_COVERAGE is spelled
  * out); nothing is ever fabricated or implied.
  *
@@ -97,9 +97,9 @@ function formatTime(iso: string | null | undefined): string {
 }
 
 const PROVENANCE_LABEL: Record<EvidenceProvenance, string> = {
-  CLIENT_CAPTURE: "Ảnh do máy thí sinh gửi",
-  FULL_RECORDING: "Ảnh trích từ bản ghi đầy đủ",
-  ROLLING_BUFFER: "Ảnh trích từ bộ đệm luân chuyển",
+  CLIENT_CAPTURE: "Student-submitted image",
+  FULL_RECORDING: "Image extracted from full recording",
+  ROLLING_BUFFER: "Image extracted from rolling buffer",
 };
 
 function SnapshotThumb({
@@ -113,9 +113,9 @@ function SnapshotThumb({
   const { data: urlData } = useEvidenceUrl(sessionId, item.evidenceId, playable);
   const detail =
     item.status === "FAILED"
-      ? `Lỗi: ${item.error ?? "không rõ"}`
+      ? `Error: ${item.error ?? "unknown"}`
       : item.status === "PENDING"
-        ? "Đang xử lý…"
+        ? "Processing…"
         : formatTime(item.capturedAt);
   return (
     <figure
@@ -126,12 +126,12 @@ function SnapshotThumb({
         // eslint-disable-next-line @next/next/no-img-element -- presigned URL (300s TTL) must not pass through the Next image optimizer
         <img
           src={urlData.url}
-          alt={`Ảnh minh chứng ${formatTime(item.capturedAt)}`}
+          alt={`Evidence image ${formatTime(item.capturedAt)}`}
           className="h-20 w-full rounded-md border border-[#E2E8F0] object-cover"
         />
       ) : (
         <div className="flex h-20 w-full items-center justify-center rounded-md border border-dashed border-[#E2E8F0] px-1 text-center text-[10px] font-medium text-[#94A3B8]">
-          {item.status === "EXPIRED" ? "Đã hết hạn" : "Không xem được"}
+          {item.status === "EXPIRED" ? "Expired" : "Preview unavailable"}
         </div>
       )}
       <figcaption className="mt-1 space-y-0.5">
@@ -176,8 +176,8 @@ function ClipRow({
       const norm = err as NormalizedApiError | undefined;
       setClipError(
         norm?.kind === "api" && norm.code === "EVIDENCE_CLIP_REJECTED"
-          ? "Clip đã bị tắt trong cấu hình giám sát của buổi thi."
-          : "Không tạo được clip — thử lại."
+          ? "Clips are disabled in this session's monitoring settings."
+          : "Could not generate clip — please try again."
       );
     },
   });
@@ -187,7 +187,7 @@ function ClipRow({
   return (
     <div data-testid="evidence-clip" className="rounded-lg border border-[#E2E8F0] bg-[#F1F5F9]/60 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-bold text-[#0F172A]">Clip quanh cảnh báo</span>
+        <span className="text-xs font-bold text-[#0F172A]">Alert clip</span>
         {clip == null && (
           <button
             type="button"
@@ -195,25 +195,25 @@ function ClipRow({
             disabled={clipMut.isPending}
             className="rounded-lg bg-[#0052FF] px-2.5 py-1 text-[11px] font-semibold text-white outline-none transition-colors hover:bg-[#0052FF]/90 focus-visible:ring-2 focus-visible:ring-[#0052FF] disabled:opacity-60"
           >
-            {clipMut.isPending ? "Đang tạo…" : "Tạo clip"}
+            {clipMut.isPending ? "Generating…" : "Generate clip"}
           </button>
         )}
         {clip?.status === "PENDING" && (
-          <span className="text-[11px] font-medium text-[#64748B]">Đang trích xuất…</span>
+          <span className="text-[11px] font-medium text-[#64748B]">Extracting…</span>
         )}
         {clip?.status === "AVAILABLE" && (
-          <span className="text-[11px] font-semibold text-[#10B981]">Xem clip</span>
+          <span className="text-[11px] font-semibold text-[#10B981]">View clip</span>
         )}
         {clip?.status === "PARTIAL" && (
           <>
-            <span className="text-[11px] font-semibold text-[#F59E0B]">Clip một phần</span>
+            <span className="text-[11px] font-semibold text-[#F59E0B]">Partial clip</span>
             {gaps.length > 0 && (
               <button
                 type="button"
                 onClick={() => setShowGaps((v) => !v)}
                 className="text-[11px] font-semibold text-[#0052FF] underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF]"
               >
-                {showGaps ? "Ẩn khoảng trống" : "Xem khoảng trống"}
+                {showGaps ? "Hide gaps" : "View gaps"}
               </button>
             )}
           </>
@@ -221,12 +221,12 @@ function ClipRow({
         {clip?.status === "FAILED" && (
           <span className="text-[11px] font-medium text-[#EF4444]" data-testid="evidence-clip-error">
             {clip.error === "NO_COVERAGE"
-              ? "Không tạo được clip — Không có footage bao phủ thời điểm cảnh báo"
-              : `Không tạo được clip — ${clip.error ?? "lỗi không rõ"}`}
+              ? "Could not generate clip — no footage covers the alert time"
+              : `Could not generate clip — ${clip.error ?? "unknown error"}`}
           </span>
         )}
         {clip?.status === "EXPIRED" && (
-          <span className="text-[11px] font-medium text-[#94A3B8]">Đã hết hạn</span>
+          <span className="text-[11px] font-medium text-[#94A3B8]">Expired</span>
         )}
       </div>
 
@@ -240,7 +240,7 @@ function ClipRow({
         <ul data-testid="evidence-clip-gaps" className="mt-2 space-y-1">
           {gaps.map((gap, i) => (
             <li key={i} className="font-mono text-[11px] text-[#64748B]">
-              Khoảng trống {formatTime(gap.from)} → {formatTime(gap.to)}
+              Gap {formatTime(gap.from)} → {formatTime(gap.to)}
             </li>
           ))}
         </ul>
@@ -288,15 +288,15 @@ export function EvidenceSection({ sessionId }: { sessionId: number }) {
       className={cn(cardVariants(), "mt-6 p-6")}
     >
       <h3 className="font-display text-base font-bold tracking-tight text-[#0F172A]">
-        Ảnh &amp; clip minh chứng
+        Evidence images &amp; clips
       </h3>
       <p className="mb-4 mt-1 text-xs font-medium text-[#94A3B8]">
-        Ảnh/clip là ghi chép thô — không tự động kết luận vi phạm.
+        Images and clips are raw records — they do not automatically establish misconduct.
       </p>
 
       {alerts.length === 0 ? (
         <p className="text-sm text-[#64748B]">
-          Chưa có cảnh báo nào để xem minh chứng.
+          No alerts are available to review evidence for.
         </p>
       ) : (
         <>
@@ -320,12 +320,12 @@ export function EvidenceSection({ sessionId }: { sessionId: number }) {
           </div>
 
           {isPending ? (
-            <p className="text-sm text-[#64748B]">Đang tải minh chứng…</p>
+            <p className="text-sm text-[#64748B]">Loading evidence…</p>
           ) : (
             <div className="space-y-3">
               {snapshots.length === 0 && clip == null ? (
                 <p className="text-sm text-[#64748B]">
-                  Chưa có minh chứng cho cảnh báo này.
+                  No evidence is available for this alert.
                 </p>
               ) : null}
               {snapshots.length > 0 && (

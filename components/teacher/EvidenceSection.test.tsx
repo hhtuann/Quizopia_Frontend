@@ -160,13 +160,13 @@ describe("EvidenceSection", () => {
     renderSection();
 
     expect(await screen.findByTestId("evidence-snapshot")).not.toBeNull();
-    expect(screen.getByText("Ảnh do máy thí sinh gửi")).not.toBeNull();
+    expect(screen.getByText("Student-submitted image")).not.toBeNull();
     const img = await screen.findByRole("img");
     expect(img.getAttribute("src")).toBe("https://signed.example/evidence?sig=abc");
     expect(evidenceMock).toHaveBeenCalledWith(5, { alertId: 1 });
     expect(urlMock).toHaveBeenCalledWith(5, snap.evidenceId);
     // Honesty: the panel never claims verification.
-    expect(screen.getByText(/không tự động kết luận vi phạm/)).not.toBeNull();
+    expect(screen.getByText(/do not automatically establish misconduct/)).not.toBeNull();
   });
 
   it("no alerts yet → honest empty state, no evidence query", async () => {
@@ -174,12 +174,12 @@ describe("EvidenceSection", () => {
     renderSection();
 
     expect(
-      await screen.findByText("Chưa có cảnh báo nào để xem minh chứng.")
+      await screen.findByText("No alerts are available to review evidence for.")
     ).not.toBeNull();
     expect(evidenceMock).not.toHaveBeenCalled();
   });
 
-  it("no clip yet → 'Tạo clip' posts the clip request, then shows PENDING", async () => {
+  it("no clip yet → 'Generate clip' posts the clip request, then shows PENDING", async () => {
     const snap = evidenceItem();
     const pendingClip = evidenceItem({
       evidenceId: "22222222-0000-4000-8000-000000000002",
@@ -195,11 +195,11 @@ describe("EvidenceSection", () => {
     clipMock.mockResolvedValue(pendingClip);
 
     renderSection();
-    const button = await screen.findByRole("button", { name: "Tạo clip" });
+    const button = await screen.findByRole("button", { name: "Generate clip" });
     fireEvent.click(button);
 
     await waitFor(() => expect(clipMock).toHaveBeenCalledWith(5, 1));
-    expect(await screen.findByText("Đang trích xuất…")).not.toBeNull();
+    expect(await screen.findByText("Extracting…")).not.toBeNull();
   });
 
   it("clip rejection (EVIDENCE_CLIP_REJECTED) → honest disabled-clips copy", async () => {
@@ -213,14 +213,14 @@ describe("EvidenceSection", () => {
     });
 
     renderSection();
-    fireEvent.click(await screen.findByRole("button", { name: "Tạo clip" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Generate clip" }));
 
     expect(
-      await screen.findByText("Clip đã bị tắt trong cấu hình giám sát của buổi thi.")
+      await screen.findByText("Clips are disabled in this session's monitoring settings.")
     ).not.toBeNull();
   });
 
-  it("AVAILABLE clip → 'Xem clip' + video with the signed src", async () => {
+  it("AVAILABLE clip → 'View clip' + video with the signed src", async () => {
     const clip = evidenceItem({
       evidenceId: "33333333-0000-4000-8000-000000000003",
       kind: "CLIP",
@@ -233,14 +233,14 @@ describe("EvidenceSection", () => {
 
     renderSection();
 
-    expect(await screen.findByText("Xem clip")).not.toBeNull();
+    expect(await screen.findByText("View clip")).not.toBeNull();
     const video = await screen.findByTestId("evidence-clip-video");
     expect(video.getAttribute("src")).toBe("https://signed.example/evidence?sig=abc");
     expect(video.hasAttribute("controls")).toBe(true);
     expect(urlMock).toHaveBeenCalledWith(5, clip.evidenceId);
   });
 
-  it("PARTIAL clip → 'Clip một phần' + expandable gaps from coverage", async () => {
+  it("PARTIAL clip → 'Partial clip' + expandable gaps from coverage", async () => {
     const clip = evidenceItem({
       evidenceId: "44444444-0000-4000-8000-000000000004",
       kind: "CLIP",
@@ -260,15 +260,15 @@ describe("EvidenceSection", () => {
 
     renderSection();
 
-    expect(await screen.findByText("Clip một phần")).not.toBeNull();
+    expect(await screen.findByText("Partial clip")).not.toBeNull();
     expect(screen.queryByTestId("evidence-clip-gaps")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Xem khoảng trống" }));
+    fireEvent.click(screen.getByRole("button", { name: "View gaps" }));
 
     const gaps = await screen.findByTestId("evidence-clip-gaps");
     const rows = gaps.querySelectorAll("li");
     expect(rows).toHaveLength(2);
-    expect(rows[0]!.textContent).toContain("Khoảng trống");
-    expect(rows[0]!.textContent).toMatch(/Khoảng trống .+:10 → .+:15/);
+    expect(rows[0]!.textContent).toContain("Gap");
+    expect(rows[0]!.textContent).toMatch(/Gap .+:10 → .+:15/);
   });
 
   it("FAILED clip → verbatim NO_COVERAGE honest text", async () => {
@@ -285,12 +285,12 @@ describe("EvidenceSection", () => {
 
     expect(
       await screen.findByText(
-        "Không tạo được clip — Không có footage bao phủ thời điểm cảnh báo"
+        "Could not generate clip — no footage covers the alert time"
       )
     ).not.toBeNull();
   });
 
-  it("EXPIRED clip → 'Đã hết hạn' and no URL fetch", async () => {
+  it("EXPIRED clip → 'Expired' and no URL fetch", async () => {
     const clip = evidenceItem({
       evidenceId: "66666666-0000-4000-8000-000000000006",
       kind: "CLIP",
@@ -301,7 +301,7 @@ describe("EvidenceSection", () => {
 
     renderSection();
 
-    expect(await screen.findByText("Đã hết hạn")).not.toBeNull();
+    expect(await screen.findByText("Expired")).not.toBeNull();
     expect(urlMock).not.toHaveBeenCalled();
   });
 
@@ -313,7 +313,7 @@ describe("EvidenceSection", () => {
     evidenceMock.mockResolvedValue([]);
 
     renderSection();
-    await screen.findByText("Chưa có minh chứng cho cảnh báo này.");
+    await screen.findByText("No evidence is available for this alert.");
     expect(evidenceMock).toHaveBeenCalledWith(5, { alertId: 2 });
     fireEvent.click(screen.getByRole("button", { name: /#1 · Nguyen Van A/ }));
     await waitFor(() =>

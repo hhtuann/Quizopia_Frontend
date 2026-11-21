@@ -149,10 +149,10 @@ describe("AiAlertFeed", () => {
     renderFeed();
 
     const feed = await screen.findByTestId("ai-alert-feed");
-    expect(feed.textContent).toContain("Quan sát bằng AI — không tự động kết luận vi phạm.");
+    expect(feed.textContent).toContain("AI observations only — they do not automatically establish misconduct.");
     const card = await screen.findByTestId("ai-alert-card");
     expect(card.textContent).toContain("Nguyen Van A");
-    expect(card.textContent).toContain("Phát hiện điện thoại");
+    expect(card.textContent).toContain("Phone detected");
     expect(card.textContent).toContain("87%");
     expect(card.textContent).toContain("yolo26s@8.4.64-onnx");
     expect(card.textContent).toContain("CLIENT MODEL");
@@ -183,7 +183,7 @@ describe("AiAlertFeed", () => {
     // Honesty label: boxes only while no snapshot exists for the alert.
     expect(canvas.textContent).toContain("cell phone 90%");
     expect(screen.getByTestId("ai-alert-card").textContent).toContain(
-      "bbox từ khung phân tích — chưa có ảnh minh chứng cho cảnh báo này"
+      "Detection boxes from the analyzed frame — no evidence image is available for this alert"
     );
     expect(screen.queryByTestId("ai-alert-snapshot")).toBeNull();
   });
@@ -191,7 +191,7 @@ describe("AiAlertFeed", () => {
   it("shows the empty state when no alerts exist", async () => {
     alertsMock.mockResolvedValue({ items: [], nextCursor: null });
     renderFeed();
-    const feed = await screen.findByText("Chưa có cảnh báo AI.");
+    const feed = await screen.findByText("No AI alerts yet.");
     expect(feed.closest('[data-testid="ai-alert-feed"]')).not.toBeNull();
   });
 
@@ -235,12 +235,12 @@ describe("AiAlertCard", () => {
     return { container: rendered.container, client, unmount: rendered.unmount };
   }
 
-  it("labels each VN alert type", () => {
+  it("labels each alert type in English", () => {
     const types: Array<[AiAlertItem["alertType"], string]> = [
-      ["PHONE_DETECTED", "Phát hiện điện thoại"],
-      ["SCREEN_DETECTED", "Phát hiện màn hình phụ"],
-      ["MULTIPLE_PERSONS_DETECTED", "Nhiều người trong khung hình"],
-      ["PERSON_NOT_VISIBLE", "Không thấy người làm bài"],
+      ["PHONE_DETECTED", "Phone detected"],
+      ["SCREEN_DETECTED", "Secondary screen detected"],
+      ["MULTIPLE_PERSONS_DETECTED", "Multiple people detected"],
+      ["PERSON_NOT_VISIBLE", "Student not visible"],
     ];
     for (const [alertType, label] of types) {
       const { container, unmount } = renderCard(
@@ -251,7 +251,7 @@ describe("AiAlertCard", () => {
     }
   });
 
-  it("LOOKING_AWAY: VN label, direction + deviation summary, review-only note", () => {
+  it("LOOKING_AWAY: English label, direction + deviation summary, review-only note", () => {
     const { container } = renderCard(
       alertItem({
         alertType: "LOOKING_AWAY",
@@ -263,11 +263,11 @@ describe("AiAlertCard", () => {
         ],
       })
     );
-    expect(screen.getByText("Nhìn lệch khỏi màn hình")).toBeTruthy();
+    expect(screen.getByText("Looking away from the screen")).toBeTruthy();
     const note = container.querySelector('[data-testid="ai-alert-gaze"]')?.textContent ?? "";
-    expect(note).toContain("Nhìn lệch sang trái · lệch ngang -38°, dọc +3° so với mốc");
-    expect(note).toContain("chỉ để giáo viên tham khảo");
-    expect(screen.getByText("Độ tin cậy (khuôn mặt)")).toBeTruthy();
+    expect(note).toContain("Looking to the left · horizontal deviation -38°, vertical deviation +3° from baseline");
+    expect(note).toContain("for instructor reference only");
+    expect(screen.getByText("Face confidence")).toBeTruthy();
     // The face box is drawn and tagged as a face, never as a COCO class.
     const boxes = container.querySelector('[data-testid="ai-alert-bboxes"]');
     expect(boxes?.textContent).toContain("face 91%");
@@ -279,8 +279,8 @@ describe("AiAlertCard", () => {
       alertItem({ alertType: "LOOKING_AWAY", latestDetections: null })
     );
     const note = container.querySelector('[data-testid="ai-alert-gaze"]')?.textContent ?? "";
-    expect(note).toContain("Hướng nhìn là ước lượng của mô hình");
-    expect(note).not.toContain("so với mốc");
+    expect(note).toContain("Gaze direction is a model estimate");
+    expect(note).not.toContain("from baseline");
   });
 
   it("non-gaze alerts carry no gaze note", () => {
@@ -301,13 +301,13 @@ describe("AiAlertCard", () => {
   });
 
   // P4-E provenance distinction chips.
-  it("shows AI phát hiện + Chưa được xác minh when no review exists", () => {
+  it("shows AI-detected + Unreviewed when no review exists", () => {
     const { container } = renderCard(alertItem({ latestDetections: null }));
-    expect(container.textContent).toContain("AI phát hiện");
-    expect(container.textContent).toContain("Chưa được xác minh");
+    expect(container.textContent).toContain("AI-detected");
+    expect(container.textContent).toContain("Unreviewed");
   });
 
-  it("shows the Giảng viên đánh giá outcome chip once reviewed", () => {
+  it("shows the Instructor review outcome chip once reviewed", () => {
     const { container } = renderCard(
       alertItem({
         latestDetections: null,
@@ -315,19 +315,19 @@ describe("AiAlertCard", () => {
         reviewVersion: 2,
       })
     );
-    expect(container.textContent).toContain("Giảng viên đánh giá · Báo động sai");
-    expect(container.textContent).not.toContain("Chưa được xác minh");
+    expect(container.textContent).toContain("Instructor review · False positive");
+    expect(container.textContent).not.toContain("Unreviewed");
   });
 });
 
 describe("describeGazeLabel", () => {
-  it("summarizes each direction in VN", () => {
+  it("summarizes each direction in English", () => {
     expect(describeGazeLabel("gaze:right:31:0")).toBe(
-      "Nhìn lệch sang phải · lệch ngang +31°, dọc 0° so với mốc"
+      "Looking to the right · horizontal deviation +31°, vertical deviation 0° from baseline"
     );
-    expect(describeGazeLabel("gaze:down:2:-27")).toContain("xuống dưới");
-    expect(describeGazeLabel("gaze:up:0:24")).toContain("lên trên");
-    expect(describeGazeLabel("gaze:frequent:0:0")).toContain("lặp lại nhiều lần");
+    expect(describeGazeLabel("gaze:down:2:-27")).toContain("downward");
+    expect(describeGazeLabel("gaze:up:0:24")).toContain("upward");
+    expect(describeGazeLabel("gaze:frequent:0:0")).toContain("repeatedly");
   });
 
   it("is null for non-gaze labels", () => {
@@ -371,7 +371,7 @@ describe("AiAlertFeed evidence snapshot in the bbox frame (P4-D)", () => {
     // alertItem() has detectionCount 3 and (older backend) no
     // firstDetections → boxes are from a newer frame, and it says so.
     expect(screen.getByTestId("ai-alert-card").textContent).toContain(
-      "khung hình của lần phát hiện đầu tiên; khung bbox là của lần phát hiện gần nhất"
+      "frame from the first detection; boxes show the latest detection"
     );
   });
 
@@ -404,7 +404,7 @@ describe("AiAlertFeed evidence snapshot in the bbox frame (P4-D)", () => {
     expect(box.style.top).toBe("20%");
     expect(frame.textContent).toContain("cell phone 95%");
     expect(screen.getByTestId("ai-alert-card").textContent).toContain(
-      "khung hình và bbox của lần phát hiện đầu tiên"
+      "frame and boxes from the first detection"
     );
   });
 
@@ -441,7 +441,7 @@ describe("AiAlertFeed evidence snapshot in the bbox frame (P4-D)", () => {
     renderFeed(5);
     await screen.findByTestId("ai-alert-snapshot");
     expect(screen.getByTestId("ai-alert-card").textContent).toContain(
-      "đúng khung hình lúc phát hiện"
+      "the same frame used for detection"
     );
   });
 
@@ -489,8 +489,8 @@ describe("AiAlertFeed evidence snapshot in the bbox frame (P4-D)", () => {
     renderFeed(5);
     await screen.findByTestId("ai-alert-snapshot");
     const caption = screen.getByTestId("ai-alert-card").textContent ?? "";
-    expect(caption).toContain("không phải khung hình lúc phát hiện");
-    expect(caption).not.toContain("đúng khung hình lúc phát hiện");
+    expect(caption).toContain("not the frame used for detection");
+    expect(caption).not.toContain("the same frame used for detection");
     // Boxes of the opening frame are NOT drawn over an unrelated photo.
     const box = screen.getByTestId("ai-alert-bboxes").querySelector<HTMLElement>("div.absolute")!;
     expect(box.style.left).toBe("70%");
@@ -538,9 +538,9 @@ describe("AiAlertFeed evidence snapshot in the bbox frame (P4-D)", () => {
     });
     expect(screen.queryByTestId("ai-alert-snapshot")).toBeNull();
     expect(screen.getByTestId("ai-alert-card").textContent).toContain(
-      "chưa có ảnh minh chứng cho cảnh báo này"
+      "no evidence image is available for this alert"
     );
-    expect(screen.getByTestId("ai-alert-card").textContent).not.toContain("Ảnh do máy thí sinh gửi");
+    expect(screen.getByTestId("ai-alert-card").textContent).not.toContain("Evidence image submitted by the student's device");
   });
 
   it("a snapshot shows even when the alert carries no boxes", async () => {

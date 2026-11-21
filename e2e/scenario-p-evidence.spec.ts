@@ -146,22 +146,22 @@ test.describe("Scenario P — evidence & recording (REAL media path)", () => {
     // Teacher: alert card + honest evidence panel + real clip.
     await loginViaUi(page, s.teacher.email, s.teacher.password);
     await page.goto(`/exams/${examId}/sessions/${sid}`);
-    await expect(page.getByText("Phát hiện điện thoại").first()).toBeVisible({
+    await expect(page.getByText("Phone detected").first()).toBeVisible({
       timeout: 30_000,
     });
 
     const evidence = page.getByTestId("evidence-section");
-    await expect(evidence.getByText("Ảnh do máy thí sinh gửi").first()).toBeVisible({
+    await expect(evidence.getByText("Student-submitted image").first()).toBeVisible({
       timeout: 30_000,
     });
 
-    await evidence.getByRole("button", { name: /tạo clip/i }).first().click();
+    await evidence.getByRole("button", { name: /generate clip/i }).first().click();
     // The REAL outcome must be a REAL clip: AVAILABLE ("Xem clip") or
     // honestly PARTIAL ("một phần") with the pre-roll gap. NO_COVERAGE here
     // is a FAILURE of this spec's premise (footage must exist — pulses run
     // from attempt start), never an acceptable pass.
     await expect(
-      evidence.getByText(/xem clip|một phần/i).first(),
+      evidence.getByText(/view clip|partial clip/i).first(),
     ).toBeVisible({ timeout: 90_000 });
 
     await studentPage.close();
@@ -173,7 +173,7 @@ test.describe("Scenario P — evidence & recording (REAL media path)", () => {
     await loginViaUi(page, s.teacher.email, s.teacher.password);
     await page.goto(`/exams/${examId}/sessions/${sid}`);
     await expect(
-      page.getByTestId("evidence-section").getByText(/chưa có cảnh báo|chưa có bằng chứng/i),
+      page.getByTestId("evidence-section").getByText(/no alerts|no evidence/i),
     ).toBeVisible({ timeout: 30_000 });
   });
 

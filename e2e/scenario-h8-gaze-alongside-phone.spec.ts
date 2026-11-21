@@ -15,7 +15,7 @@ import type { SmokeState } from "./helpers";
  * H8a the client sends PHONE_OBSERVED and, after auto-calibration + a
  *     sustained deviation, LOOKING_AWAY_OBSERVED (gaze model identity)
  * H8b the backend (V43) accepts it: the teacher feed shows TWO separate
- *     alerts — "Phát hiện điện thoại" and "Nhìn lệch khỏi màn hình" — the
+ *     alerts — "Phone detected" and "Looking away from the screen" — the
  *     gaze card says it is a model estimate for the teacher's reference
  * H8c the P4-E review form works on the gaze alert (assessment, not verdict)
  * H8d nothing about gaze is ever shown to the student
@@ -130,34 +130,34 @@ test.describe("Scenario H8 — gaze alongside phone detection (SIMULATED detecto
     await teacherPage.goto(`/exams/${s.examId}/sessions/${sessionId}`);
     await expect(teacherPage.getByTestId("ai-alert-feed")).toBeVisible({ timeout: 60_000 });
     const cards = teacherPage.getByTestId("ai-alert-card");
-    const phoneCard = cards.filter({ hasText: "Phát hiện điện thoại" });
-    const gazeCard = cards.filter({ hasText: "Nhìn lệch khỏi màn hình" });
+    const phoneCard = cards.filter({ hasText: "Phone detected" });
+    const gazeCard = cards.filter({ hasText: "Looking away from the screen" });
     await expect(phoneCard).toHaveCount(1, { timeout: 60_000 });
     await expect(gazeCard).toHaveCount(1, { timeout: 60_000 });
     await expect(phoneCard).toContainText("yolo26s");
     await expect(gazeCard).toContainText("mobilegaze-mobileone-s0");
-    await expect(gazeCard.getByTestId("ai-alert-gaze")).toContainText("Nhìn lệch sang");
-    await expect(gazeCard.getByTestId("ai-alert-gaze")).toContainText("chỉ để giáo viên tham khảo");
+    await expect(gazeCard.getByTestId("ai-alert-gaze")).toContainText("Looking to the");
+    await expect(gazeCard.getByTestId("ai-alert-gaze")).toContainText("for instructor reference only");
     await expect(teacherPage.getByTestId("ai-alert-feed")).toContainText(
-      "không tự động kết luận vi phạm"
+      "AI observations only"
     );
     await teacherPage.screenshot({ path: `${__dirname}/evidence/H8-teacher-two-alerts.png`, fullPage: true });
 
     // H8c — P4-E review on the gaze alert.
     const reviewForm = gazeCard.getByTestId("alert-review-form");
     await expect(reviewForm).toBeVisible({ timeout: 30_000 });
-    await reviewForm.getByRole("button", { name: "Báo động sai" }).click();
+    await reviewForm.getByRole("button", { name: "False positive" }).click();
     await reviewForm.getByRole("textbox").fill("SIMULATED gaze reading — reviewed in H8");
-    await reviewForm.getByRole("button", { name: "Lưu đánh giá" }).click();
+    await reviewForm.getByRole("button", { name: "Save review" }).click();
     await expect(reviewForm.getByRole("status")).toBeVisible({ timeout: 30_000 });
-    await expect(gazeCard).toContainText("Giảng viên đánh giá", { timeout: 30_000 });
+    await expect(gazeCard).toContainText("Instructor review", { timeout: 30_000 });
     // The phone alert is untouched by the gaze review.
-    await expect(phoneCard).not.toContainText("Giảng viên đánh giá");
+    await expect(phoneCard).not.toContainText("Instructor review");
     await teacherCtx.close();
 
     // H8d — the student never sees gaze observations.
     const bodyText = (await page.textContent("body")) ?? "";
     expect(bodyText).not.toContain("LOOKING_AWAY");
-    expect(bodyText).not.toContain("Nhìn lệch");
+    expect(bodyText).not.toContain("Looking away");
   });
 });
