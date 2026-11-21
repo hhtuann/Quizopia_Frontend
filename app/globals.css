@@ -31,7 +31,7 @@
 :root {
   /* Shared geometry: Header, Sidebar and content offsets must use these tokens. */
   --topbar-height: 3rem;
-  --sidebar-width: 16rem;
+  --sidebar-width: 68px;
   --page-gutter: 1rem;
   --z-sidebar: 20;
   --z-drawer: 30;
@@ -82,8 +82,26 @@ body {
   inset: var(--topbar-height) auto 0 0;
   width: var(--sidebar-width);
   z-index: var(--z-sidebar);
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  /* Icon rail: tooltips anchored to each icon must escape the rail's right
+     edge, so no clipping in either axis. The rail holds at most a handful of
+     44px icons — far below viewport height — so vertical scrolling is not
+     needed. (overflow-y: auto would compute overflow-x to auto and clip the
+     tooltips.) */
+  overflow: visible;
+}
+
+/* Sidebar tooltip tail: left-pointing triangle flush with the bubble's left
+   edge, vertically centered (matches the reference UI). The 12px gap comes
+   from the tooltip's ml-3; the tail fills the left half of it. */
+.nav-tooltip::before {
+  content: "";
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-right: 6px solid #0F172A;
 }
 
 .app-mobile-navigation {
