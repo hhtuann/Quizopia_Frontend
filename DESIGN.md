@@ -270,8 +270,8 @@ This gradient appears on: primary buttons, featured badges, icon backgrounds, pr
 | 1920px and above | `5rem` | `3rem` | Fixed sidebar |
 
 - `.app-shell`: `min-height: 100dvh`, with top padding equal to `--topbar-height`.
-- `.app-main`: fluid flex child with `min-width: 0`; from 1024px, its left margin equals `--sidebar-width` (`16rem`). No global maximum width.
-- `.app-sidebar`: fixed at the left edge, from `--topbar-height` to the viewport bottom; independently scrollable when navigation exceeds the available height. Visible only from 1024px.
+- `.app-main`: fluid flex child with `min-width: 0`; from 1024px, its left margin equals `--sidebar-width` (`68px` icon rail). No global maximum width.
+- `.app-sidebar`: fixed at the left edge, from `--topbar-height` to the viewport bottom; `overflow: visible` so icon tooltips can escape the rail's right edge (the icon rail never exceeds viewport height). Visible only from 1024px.
 - Footer stays in normal document flow inside main and follows its available width.
 
 #### Content Width by Purpose
