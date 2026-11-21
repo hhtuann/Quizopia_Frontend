@@ -282,18 +282,21 @@ export function AiAuthoringChat({
 
   const handleRetry = useCallback(
     (request: AiAuthorRequest) => {
-      if (pending) {
+      if (pending || merge.hasPendingChanges) {
         return;
       }
       // Replace the error entry instead of stacking a new one. The retried
       // request keeps ITS OWN baseline (currentMarkdown it was authored
       // against) — reusing the latest request's sourceAtRequest would let a
       // stale retry auto-apply against a newer baseline and silently
-      // overwrite a later kept change set (review P2).
+      // overwrite a later kept change set (review P2). Retry is ALSO blocked
+      // while a change set is unreviewed, exactly like sending (gate review
+      // round 3 re-review P2: a retry could otherwise stack a second active
+      // change set on top of an unresolved one).
       setEntries((prev) => prev.filter((e) => !(e.kind === "error" && e.request === request)));
       issueRequest(request, request.currentMarkdown);
     },
-    [issueRequest, pending],
+    [issueRequest, merge.hasPendingChanges, pending],
   );
 
   /**

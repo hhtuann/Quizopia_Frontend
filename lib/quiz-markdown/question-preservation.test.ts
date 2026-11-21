@@ -105,3 +105,37 @@ D. UDP
     expect(assessQuestionPreservation(vn, vnEdited).preserved).toBe(false);
   });
 });
+
+describe("assessQuestionPreservation — re-review round 3", () => {
+  it("a question TYPE flip is a loss even when all content is identical", () => {
+    const single = `Question 1 [SINGLE_CHOICE]: Pick one?
+*A. first
+B. second
+C. third
+D. fourth
+`;
+    const multiple = `Question 1 [MULTIPLE_CHOICE]: Pick one?
+*A. first
+B. second
+C. third
+D. fourth
+`;
+    const result = assessQuestionPreservation(single, multiple);
+    expect(result.preserved).toBe(false);
+    expect(result.lostQuestionNumbers).toEqual([1]);
+  });
+
+  it("dropping one of two identical duplicate questions is a loss (multiset)", () => {
+    const duplicate = Q1 + Q2 + Q1;
+    const droppedOne = Q1 + Q2;
+    const result = assessQuestionPreservation(duplicate, droppedOne);
+    expect(result.preserved).toBe(false);
+    expect(result.lostCount).toBe(1);
+  });
+
+  it("duplicating an existing question counts as an addition (multiset)", () => {
+    const result = assessQuestionPreservation(Q1 + Q2, Q1 + Q2 + Q1);
+    expect(result.preserved).toBe(true);
+    expect(result.addedCount).toBe(1);
+  });
+});

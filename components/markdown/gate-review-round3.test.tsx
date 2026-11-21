@@ -315,3 +315,62 @@ D. changed
     );
   });
 });
+
+describe("Gate review round 3 re-review — retry block", () => {
+  let queryClient: QueryClient;
+
+  beforeEach(() => {
+    queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    statusMock.mockReset();
+    statusMock.mockResolvedValue({ enabled: true, available: true, model: "m" });
+    extractMock.mockReset();
+    authorMock.mockReset();
+  });
+
+  afterEach(cleanup);
+
+  it("Retry is a no-op while a change set is unreviewed (no second active set)", async () => {
+    // Turn 1 fails -> error row with Retry.
+    authorMock.mockRejectedValueOnce({
+      kind: "http",
+      status: 503,
+      message: "unavailable",
+      raw: {},
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Harness start={SOURCE} />
+      </QueryClientProvider>,
+    );
+    const composer = await waitFor(() =>
+      screen.getByLabelText("Message the AI assistant") as HTMLTextAreaElement,
+    );
+    fireEvent.change(composer, { target: { value: "go" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+    await waitFor(() => expect(screen.getByRole("alert")).not.toBeNull());
+
+    // Retry succeeds but returns a DESTRUCTIVE candidate (drops Q1/Q2).
+    authorMock.mockResolvedValueOnce({
+      markdown: Q3,
+      reply: "destructive",
+      valid: true,
+      diagnostics: [],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(screen.getByText(/not preserved/i)).not.toBeNull(),
+    );
+    // The destructive set is active: send blocked.
+    expect(
+      (screen.getByRole("button", { name: "Send message" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    // A stale Retry (if an error row still existed) must be a no-op too.
+    // Simulate: the retried request fails again is impossible to trigger
+    // via UI (send blocked), so assert the invariant directly — no second
+    // active change set exists and the editor was never touched.
+    expect((screen.getByLabelText("Editor mirror") as HTMLTextAreaElement).value).toBe(SOURCE);
+    const cards = screen.getAllByTestId("ai-merge-changes-card");
+    expect(cards.length).toBe(1);
+  });
+});

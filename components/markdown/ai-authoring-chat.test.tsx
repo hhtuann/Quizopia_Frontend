@@ -684,7 +684,10 @@ describe("AiAuthoringChat review regressions", () => {
     await waitFor(() =>
       expect((screen.getByLabelText("Editor mirror") as HTMLTextAreaElement).value).toBe(CANDIDATE),
     );
-
+    // Turn B's change set must be explicitly kept before the retry can run
+    // (gate review round 3: unreviewed sets block send AND retry).
+    fireEvent.click(screen.getByRole("button", { name: "Keep all" }));
+    await waitFor(() => expect(screen.getByText(/accepted and sealed/i)).not.toBeNull());
     // Retry turn A: its baseline (SOURCE) differs from the editor (CANDIDATE)
     // -> conflict, never a silent auto-apply.
     authorMock.mockResolvedValueOnce({

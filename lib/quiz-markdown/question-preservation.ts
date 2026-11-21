@@ -19,6 +19,9 @@ import { analyzeQuizMarkdown } from "./quiz-markdown";
 
 /** Normalized signature of one question, independent of its number. */
 export interface QuestionSignature {
+  /** Question type marker (SINGLE_CHOICE, …) — a type flip changes grading
+   * semantics and must count as a rewrite, not a preservation. */
+  readonly type: string;
   /** Lowercased, whitespace-collapsed stem. */
   readonly stem: string;
   /** Options in order: label + content + correctness. */
@@ -43,9 +46,11 @@ function signatureOf(question: {
   readonly numericAnswer: string | null;
   readonly options: readonly { readonly content: string; readonly correct: boolean; readonly label: string }[];
   readonly stem: string;
+  readonly type: string;
 }): QuestionSignature {
   const collapse = (text: string) => text.replace(/\s+/g, " ").trim().toLowerCase();
   return {
+    type: question.type,
     stem: collapse(question.stem),
     options: question.options.map(
       (option) => `${option.label}:${collapse(option.content)}:${option.correct ? "1" : "0"}`,
@@ -58,6 +63,7 @@ function signatureOf(question: {
 
 function sameQuestion(a: QuestionSignature, b: QuestionSignature): boolean {
   return (
+    a.type === b.type &&
     a.stem === b.stem &&
     a.numericAnswer === b.numericAnswer &&
     a.explanation === b.explanation &&
@@ -77,27 +83,28 @@ export function assessQuestionPreservation(
 ): QuestionPreservation {
   const before = analyzeQuizMarkdown(beforeSource).questions;
   const after = analyzeQuizMarkdown(afterSource).questions;
+  const beforeSignatures = before.map(signatureOf);
   const afterSignatures = after.map(signatureOf);
 
+  // Multiset matching: each after-question can satisfy at most one
+  // before-question (duplicate identical questions must ALL survive —
+  // dropping one copy is a loss), and unmatched after-questions count as
+  // additions (an AI duplicating an existing question is an addition, not
+  // a no-op).
+  const consumed = new Array<boolean>(afterSignatures.length).fill(false);
   const lostQuestionNumbers: number[] = [];
-  for (const question of before) {
-    const signature = signatureOf(question);
-    const survives = afterSignatures.some((candidate) =>
-      sameQuestion(signature, candidate),
+  for (let i = 0; i < beforeSignatures.length; i += 1) {
+    const signature = beforeSignatures[i];
+    const match = afterSignatures.findIndex(
+      (candidate, index) => !consumed[index] && sameQuestion(signature, candidate),
     );
-    if (!survives) {
-      lostQuestionNumbers.push(question.number);
+    if (match === -1) {
+      lostQuestionNumbers.push(before[i].number);
+    } else {
+      consumed[match] = true;
     }
   }
-
-  // Additions: after-questions with no content-match in before.
-  const beforeSignatures = before.map(signatureOf);
-  let addedCount = 0;
-  for (const signature of afterSignatures) {
-    if (!beforeSignatures.some((candidate) => sameQuestion(signature, candidate))) {
-      addedCount += 1;
-    }
-  }
+  const addedCount = consumed.filter((used) => !used).length;
 
   return {
     preserved: lostQuestionNumbers.length === 0,
