@@ -113,16 +113,17 @@ export function AiMergeChangesCard({
 
       {status === "destructive" && (
         <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-[#B91C1C]">
-          The candidate {" "}
           {preservation.lostCount > 0
-            ? `changes or removes ${preservation.lostCount} existing question${
+            ? `The candidate changes or removes ${preservation.lostCount} existing question${
                 preservation.lostCount === 1 ? "" : "s"
               } (Q${preservation.lostQuestionNumbers.slice(0, 5).join(", Q")}${
                 preservation.lostQuestionNumbers.length > 5 ? "…" : ""
-              })`
-            : "does not preserve the existing questions"}
-          . Nothing was applied — review the diff and Keep all only if this
-          is intentional.
+              }).`
+            : preservation.addedCount > 0 && preservation.lostCount === 0
+              ? "Your draft has no complete questions yet, so the assistant's changes cannot be verified against it — the candidate would replace the draft text."
+              : "The candidate does not preserve the existing content."}{" "}
+          Nothing was applied — review the diff and Keep all only if this is
+          intentional.
         </p>
       )}
 
