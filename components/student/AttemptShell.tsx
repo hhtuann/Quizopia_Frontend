@@ -122,20 +122,34 @@ export function AttemptShell({
 
   // Timer
   const deadlineMs = new Date(detail.deadlineAt).getTime();
-  const [nowMs, setNowMs] = useState(() =>
-    new Date(liveServerTime ?? detail.serverTime).getTime()
-  );
-  const [prevLive, setPrevLive] = useState(liveServerTime);
-  if (liveServerTime !== prevLive) {
-    setPrevLive(liveServerTime);
-    if (liveServerTime) setNowMs(new Date(liveServerTime).getTime());
-  }
+  const serverSample = liveServerTime ?? detail.serverTime;
+  const [clock, setClock] = useState(() => {
+    const localNow = Date.now();
+    return { sample: serverSample, localNow, anchorLocal: localNow,
+      anchorServer: Date.parse(serverSample) };
+  });
   useEffect(() => {
-    const id = setInterval(() => setNowMs((prev) => prev + 1000), 1000);
-    return () => clearInterval(id);
-  }, []);
+    const update = () => {
+      const localNow = Date.now();
+      setClock((previous) => previous.sample === serverSample
+        ? { ...previous, localNow }
+        : { sample: serverSample, localNow, anchorLocal: localNow,
+            anchorServer: Date.parse(serverSample) });
+    };
+    // The callback runs outside render, so a sample received while a tab is
+    // hidden is anchored to the actual local time when it is processed.
+    const immediate = setTimeout(update, 0);
+    const id = setInterval(update, 1000);
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      clearTimeout(immediate);
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", update);
+    };
+  }, [serverSample]);
 
-  const remainingMs = Math.max(0, deadlineMs - nowMs);
+  const remainingMs = Math.max(0, deadlineMs -
+    (clock.anchorServer + clock.localNow - clock.anchorLocal));
   const sorted = [...detail.questions].sort(
     (a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)
   );
@@ -364,6 +378,7 @@ function AutosaveIndicator({ status }: { status: AutosaveStatus }) {
     saving: { label: "Saving…", tone: "text-[#0052FF]" },
     saved: { label: "Saved", tone: "text-[#10B981]" },
     error: { label: "Save failed", tone: "text-[#64748B]" },
+    conflict: { label: "Answer conflict", tone: "text-[#F59E0B]" },
     blocked: { label: "Saving stopped", tone: "text-[#94A3B8]" },
   };
   const { label, tone } = config[status];
