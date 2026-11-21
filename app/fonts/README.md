@@ -16,6 +16,8 @@ non-deterministically (Next 16 Turbopack `next/font/google` download).
 | `inter-latin-700-normal.woff2` | Inter | 700 | SIL OFL 1.1 | `6f56409fd3d64bb85f7d070bce20749db2d66b6d63cec586cc22d1c761be2491` |
 | `jetbrains-mono-latin-400-normal.woff2` | JetBrains Mono | 400 | SIL OFL 1.1 | `14425ba9c695763c1547f48a206b7aa60350a33ae23de09f0407877f3fcd89eb` |
 | `jetbrains-mono-latin-500-normal.woff2` | JetBrains Mono | 500 | SIL OFL 1.1 | `cb182feeed4d798ff6961d3c79f7026279448fca0676438aaecb21f3fc39553a` |
+| `jetbrains-mono-vietnamese-400-normal.woff2` | JetBrains Mono | 400 | SIL OFL 1.1 | `efc9e0df126ca6dd1c37a022bfe1d664d23b3fcaa32979d2028ecb4c074306c8` |
+| `jetbrains-mono-vietnamese-500-normal.woff2` | JetBrains Mono | 500 | SIL OFL 1.1 | `bb7b98e92899b511e8f3e99c924142f4421896b2cbc9406c3727c25427662cc9` |
 
 License text: `OFL.txt` (SIL Open Font License 1.1, Calistoga project copy — identical
 text applies to all three families). |

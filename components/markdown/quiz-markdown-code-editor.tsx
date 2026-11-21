@@ -21,12 +21,10 @@ import {
   QUIZ_MARKDOWN_TAB_SIZE,
   getQuizAutocompleteSuggestions,
   preserveQuizMarkdownTextareaEdit,
-  quizMarkdownPopupGeometry,
   sourceLineBoundsAtOffset,
   sourceLocationToOffset,
   sourceOffsetFromTextareaOffset,
   sourceOffsetToLocation,
-  sourceOffsetToVisualLocation,
   textareaOffsetFromSourceOffset,
 } from "@/lib/quiz-markdown";
 
@@ -41,6 +39,7 @@ import {
 const EDITOR_LINE_HEIGHT = 24;
 const EDITOR_GUTTER_WIDTH = 48;
 const EDITOR_PADDING_LEFT = 16;
+const EDITOR_PADDING_RIGHT = 16;
 const EDITOR_PADDING_TOP = 12;
 
 export interface QuizMarkdownEditorFocusOptions {
@@ -72,28 +71,6 @@ interface IndentationResult {
   readonly value: string;
 }
 
-function measuredCharacterWidth(
-  textarea: HTMLTextAreaElement,
-  container: HTMLElement,
-): number {
-  const computed = window.getComputedStyle(textarea);
-  const probe = document.createElement("span");
-  probe.setAttribute("aria-hidden", "true");
-  probe.textContent = "0000000000";
-  probe.style.font = computed.font;
-  probe.style.letterSpacing = computed.letterSpacing;
-  probe.style.position = "absolute";
-  probe.style.visibility = "hidden";
-  probe.style.whiteSpace = "pre";
-  container.append(probe);
-  const measured = probe.getBoundingClientRect().width / 10;
-  probe.remove();
-  if (measured > 0) {
-    return measured;
-  }
-  const fontSize = Number.parseFloat(computed.fontSize);
-  return Number.isFinite(fontSize) ? fontSize * 0.6 : 8.4;
-}
 
 function lineStartForOffset(source: string, offset: number): number {
   return sourceLineBoundsAtOffset(source, offset).start;
@@ -303,6 +280,51 @@ function HighlightedSource({ value }: { readonly value: string }) {
   });
 }
 
+/**
+ * Gutter rows for the soft-wrap editor. Each logical line renders as a
+ * block whose height is driven by an INVISIBLE copy of the line text,
+ * wrapped at the same width the content column uses — so a logical line
+ * that soft-wraps to N visual lines reserves N row heights and the number
+ * stays beside the first visual line.
+ */
+function GutterLines({
+  activeLine,
+  lines,
+  textWidth,
+}: {
+  readonly activeLine: number;
+  readonly lines: readonly string[];
+  readonly textWidth: number;
+}) {
+  return (
+    <>
+      {lines.map((line, index) => (
+        <div className="relative" data-gutter-row={index} key={index}>
+          <span
+            className={
+              index + 1 === activeLine
+                ? "font-semibold text-[#0052FF]"
+                : undefined
+            }
+          >
+            {index + 1}
+          </span>
+          {/* Invisible mirror of the line text: wraps at the content width,
+              so its natural height drives the row height and the gutter
+              stays aligned with the soft-wrapped content column. */}
+          <span
+            aria-hidden="true"
+            className="invisible block whitespace-pre-wrap break-words px-1"
+            style={{ width: Math.max(0, textWidth) }}
+          >
+            {line}
+          </span>
+        </div>
+      ))}
+    </>
+  );
+}
+
 export const QuizMarkdownCodeEditor = forwardRef<
   QuizMarkdownCodeEditorHandle,
   QuizMarkdownCodeEditorProps
@@ -316,6 +338,7 @@ export const QuizMarkdownCodeEditor = forwardRef<
   const editorFrameRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLUListElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const contentColumnRef = useRef<HTMLDivElement>(null);
   const [caret, setCaret] = useState(0);
   const [hasTextSelection, setHasTextSelection] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -324,6 +347,10 @@ export const QuizMarkdownCodeEditor = forwardRef<
   );
   const pendingSelectionRef = useRef<EditorSelection | null>(null);
   const [scroll, setScroll] = useState({ left: 0, top: 0 });
+  // Content-column text width (frame minus gutter minus paddings), kept in
+  // sync via ResizeObserver so the gutter mirror re-wraps with the column
+  // when the splitter drags or the viewport changes.
+  const [contentWidth, setContentWidth] = useState(0);
   const rawSuggestions = useMemo(
     () => getQuizAutocompleteSuggestions(value, caret),
     [caret, value],
@@ -337,6 +364,48 @@ export const QuizMarkdownCodeEditor = forwardRef<
     .map((suggestion) => suggestion.id)
     .join("|")}`;
 
+  // Track the content column width so the gutter mirror wraps identically.
+  useEffect(() => {
+    const column = contentColumnRef.current;
+    if (column === null) {
+      return;
+    }
+    const update = () => {
+      const width =
+        column.clientWidth - EDITOR_PADDING_LEFT - EDITOR_PADDING_RIGHT;
+      setContentWidth((current) => (current === width ? current : width));
+    };
+    update();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", update);
+      return () => window.removeEventListener("resize", update);
+    }
+    const observer = new ResizeObserver(update);
+    observer.observe(column);
+    return () => observer.disconnect();
+  }, []);
+
+  // Active-line highlight geometry under soft wrap: the highlight spans the
+  // FULL logical line (all its visual rows). Row tops come from the gutter
+  // mirror rows, which wrap identically to the content column.
+  const gutterRowRef = useRef<HTMLDivElement | null>(null);
+  const [activeLineTop, setActiveLineTop] = useState(EDITOR_PADDING_TOP);
+  const [activeLineHeight, setActiveLineHeight] = useState(EDITOR_LINE_HEIGHT);
+  useEffect(() => {
+    const container = gutterRowRef.current;
+    if (container === null) {
+      return;
+    }
+    const rows = container.querySelectorAll<HTMLElement>("[data-gutter-row]");
+    const row = rows[activeLine - 1];
+    if (row === undefined) {
+      setActiveLineTop(EDITOR_PADDING_TOP);
+      setActiveLineHeight(EDITOR_LINE_HEIGHT);
+      return;
+    }
+    setActiveLineTop(row.offsetTop);
+    setActiveLineHeight(Math.max(EDITOR_LINE_HEIGHT, row.offsetHeight));
+  }, [activeLine, contentWidth, lines, scroll.top]);
   useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea === null) {
@@ -375,11 +444,14 @@ export const QuizMarkdownCodeEditor = forwardRef<
         textareaOffsetFromSourceOffset(value, safeStart),
         textareaOffsetFromSourceOffset(value, safeEnd),
       );
-      const line = sourceOffsetToLocation(value, safeStart).line;
-      const targetTop = Math.max(
-        0,
-        (line - 1) * EDITOR_LINE_HEIGHT - textarea.clientHeight / 2,
-      );
+      // Soft wrap: a logical line may span several visual rows, so compute
+      // the scroll target from the gutter mirror row's offsetTop (identical
+      // wrapping) instead of a fixed line height.
+      const rows =
+        gutterRowRef.current?.querySelectorAll<HTMLElement>("[data-gutter-row]");
+      const row = rows?.[sourceOffsetToLocation(value, safeStart).line - 1];
+      const rowTop = row?.offsetTop ?? 0;
+      const targetTop = Math.max(0, rowTop - textarea.clientHeight / 2);
       textarea.scrollTop = targetTop;
       setScroll({ left: textarea.scrollLeft, top: textarea.scrollTop });
       setCaret(safeStart);
@@ -414,43 +486,40 @@ export const QuizMarkdownCodeEditor = forwardRef<
     }
     const frame = editorFrameRef.current;
     const popup = popupRef.current;
-    const textarea = textareaRef.current;
-    if (frame === null || popup === null || textarea === null) {
+    if (frame === null || popup === null) {
       return;
     }
 
-    const frameRect = frame.getBoundingClientRect();
-    const popupRect = popup.getBoundingClientRect();
-    const viewportWidth = frame.clientWidth || frameRect.width;
-    const viewportHeight = frame.clientHeight || frameRect.height;
-    const popupWidth =
-      popupRect.width || Math.min(448, Math.max(200, viewportWidth - 56));
+    // Soft wrap makes column-based caret geometry unreliable (a logical
+    // line spans variable visual rows). Anchor the popup to the caret's
+    // LOGICAL line row from the gutter mirror — identical wrapping — and
+    // clamp inside the frame.
+    const viewportHeight = frame.clientHeight;
     const popupHeight =
-      popupRect.height || Math.min(256, suggestions.length * 40 + 8);
-    const visual = sourceOffsetToVisualLocation(value, caret);
-    const geometry = quizMarkdownPopupGeometry({
-      caretLine: visual.line,
-      caretVisualColumn: visual.visualColumn,
-      characterWidth: measuredCharacterWidth(textarea, frame),
-      gutterWidth: EDITOR_GUTTER_WIDTH,
-      lineHeight: EDITOR_LINE_HEIGHT,
-      paddingLeft: EDITOR_PADDING_LEFT,
-      paddingTop: EDITOR_PADDING_TOP,
-      popupHeight,
-      popupWidth,
-      scrollLeft: scroll.left,
-      scrollTop: scroll.top,
-      viewportHeight,
-      viewportWidth,
-    });
-    popup.style.left = `${geometry.left}px`;
-    popup.style.top = `${geometry.top}px`;
+      popup.offsetHeight || Math.min(256, suggestions.length * 40 + 8);
+    const rows =
+      gutterRowRef.current?.querySelectorAll<HTMLElement>("[data-gutter-row]");
+    const caretLine = sourceOffsetToLocation(value, caret).line;
+    const row = rows?.[caretLine - 1];
+    const rowTop = (row?.offsetTop ?? 0) - scroll.top;
+    const rowBottom = rowTop + (row?.offsetHeight ?? EDITOR_LINE_HEIGHT);
+    const edge = 4;
+    const gap = 4;
+    const fitsBelow = rowBottom + gap + popupHeight <= viewportHeight - edge;
+    const desiredTop = fitsBelow
+      ? rowBottom + gap
+      : Math.max(edge, rowTop - popupHeight - gap);
+    const minimumLeft = EDITOR_GUTTER_WIDTH + edge;
+    popup.style.left = `${minimumLeft}px`;
+    popup.style.top = `${Math.max(
+      edge,
+      Math.min(desiredTop, Math.max(edge, viewportHeight - popupHeight - edge)),
+    )}px`;
     popup.style.visibility = "visible";
-    popup.dataset.placement = geometry.placement;
+    popup.dataset.placement = fitsBelow ? "below" : "above";
   }, [
     caret,
     popupSignature,
-    scroll.left,
     scroll.top,
     suggestions.length,
     value,
@@ -592,7 +661,7 @@ export const QuizMarkdownCodeEditor = forwardRef<
   return (
     <div className="relative flex h-full min-h-0 flex-col">
       <label
-        className="mb-2 block pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]"
+        className="mb-2 flex h-8 items-center pl-1 font-mono text-xs uppercase tracking-[0.1em] text-[#64748B]"
         htmlFor={sourceId}
         id={titleId}
       >
@@ -604,6 +673,9 @@ export const QuizMarkdownCodeEditor = forwardRef<
         data-testid="quiz-markdown-editor-frame"
         ref={editorFrameRef}
       >
+        {/* Gutter: mirrors the content column's per-logical-line wrapping so
+            each number sits beside the FIRST visual line of its logical line,
+            no matter how many visual lines a long line soft-wraps into. */}
         <div
           aria-hidden="true"
           className="absolute inset-y-0 left-0 w-12 overflow-hidden border-r border-[#E2E8F0] bg-[#F1F5F9] text-right text-[#64748B]"
@@ -611,40 +683,37 @@ export const QuizMarkdownCodeEditor = forwardRef<
         >
           <div
             className="px-2 py-3"
+            ref={gutterRowRef}
             style={{ transform: `translateY(-${scroll.top}px)` }}
           >
-            {lines.map((_, index) => (
-              <div
-                className={
-                  index + 1 === activeLine
-                    ? "font-semibold text-[#0052FF]"
-                    : undefined
-                }
-                key={index}
-                style={{ height: EDITOR_LINE_HEIGHT }}
-              >
-                {index + 1}
-              </div>
-            ))}
+            <GutterLines
+              activeLine={activeLine}
+              lines={lines}
+              textWidth={contentWidth}
+            />
           </div>
         </div>
 
-        <div className="absolute inset-y-0 left-12 right-0 overflow-hidden">
+        <div
+          className="absolute inset-y-0 left-12 right-0 overflow-hidden"
+          ref={contentColumnRef}
+        >
           <div
             aria-hidden="true"
             className="pointer-events-none absolute left-0 right-0 bg-[#0052FF]/5"
             data-testid="quiz-markdown-active-line"
             style={{
-              height: EDITOR_LINE_HEIGHT,
-              top: 12 + (activeLine - 1) * EDITOR_LINE_HEIGHT - scroll.top,
+              height: activeLineHeight,
+              top: activeLineTop - scroll.top,
             }}
           />
           <pre
             aria-hidden="true"
-            className="pointer-events-none absolute left-0 top-0 min-h-full min-w-full whitespace-pre px-4 py-3 font-mono font-normal"
+            className="pointer-events-none absolute left-0 top-0 min-h-full w-full whitespace-pre-wrap break-words px-4 py-3 font-mono font-normal"
             data-testid="quiz-markdown-highlight-layer"
             style={{
-              transform: `translate(${-scroll.left}px, ${-scroll.top}px)`,
+              paddingRight: EDITOR_PADDING_RIGHT,
+              transform: `translateY(-${scroll.top}px)`,
             }}
           >
             <HighlightedSource value={value} />
@@ -659,7 +728,7 @@ export const QuizMarkdownCodeEditor = forwardRef<
             role="combobox"
             autoCapitalize="off"
             autoCorrect="off"
-            className="absolute inset-0 h-full w-full resize-none overflow-auto whitespace-pre bg-transparent px-4 py-3 font-mono font-normal text-transparent outline-none caret-[#0F172A] selection:bg-[#0052FF]/20 disabled:cursor-not-allowed"
+            className="absolute inset-0 h-full w-full resize-none overflow-y-auto overflow-x-hidden whitespace-pre-wrap bg-transparent py-3 pl-4 font-mono font-normal text-transparent outline-none caret-[#0F172A] selection:bg-[#0052FF]/20 disabled:cursor-not-allowed"
             disabled={disabled}
             id={sourceId}
             onChange={handleChange}
@@ -696,10 +765,11 @@ export const QuizMarkdownCodeEditor = forwardRef<
             spellCheck={false}
             style={{
               caretColor: "#0F172A",
+              paddingRight: EDITOR_PADDING_RIGHT,
               tabSize: QUIZ_MARKDOWN_TAB_SIZE,
             }}
             value={value}
-            wrap="off"
+            wrap="soft"
           />
         </div>
         {suggestions.length > 0 ? (

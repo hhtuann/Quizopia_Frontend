@@ -1,106 +1,152 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ChangeEvent } from "react";
-import { Button } from "@/components/ui";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
 import { cn } from "@/lib/utils/cn";
+import type {
+  AiAuthorMessage,
+  AiAuthorRequest,
+  AiAuthorResponse,
+} from "@/lib/api/ai-authoring";
+import type { NormalizedApiError } from "@/lib/api";
 import {
   useAiAuthoringStatusQuery,
   useAuthorAiMarkdownMutation,
   useExtractAiDocumentMutation,
 } from "@/hooks/queries/use-ai-authoring";
-import type {
-  AiAuthorDiagnostic,
-  AiAuthorMessage,
-  AiAuthorRequest,
-  AiAuthorResponse,
-  AiExtractedDocument,
-} from "@/lib/api/ai-authoring";
-import type { NormalizedApiError } from "@/lib/api";
+import { AiPromptComposer } from "./ai-prompt-composer";
+import {
+  AiSourcesManager,
+  type AiSourceItem,
+} from "./ai-sources-manager";
+import { AiMergeChangesCard } from "./ai-merge-changes-card";
+import { AiDiffViewer } from "./ai-diff-viewer";
+import { useAiMergeState } from "./use-ai-merge-state";
 
-/** Mirrors the backend extraction cap — pre-checked client-side for instant feedback. */
+/** Mirrors the backend extraction cap — pre-checked client-side. */
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 /** Prior chat turns sent back with each author request (most recent last). */
 const HISTORY_LIMIT = 20;
+/** Mirrors backend `quizopia.ai.authoring.max-documents`. */
+const MAX_DOCUMENTS = 5;
+/** Mirrors backend `quizopia.ai.authoring.max-total-document-chars`. */
+const MAX_TOTAL_DOCUMENT_CHARS = 100_000;
 
-/** Latest assistant candidate + the editor source it was authored against. */
-interface ChatCandidate {
-  readonly markdown: string;
-  readonly reply: string;
-  readonly valid: boolean;
-  readonly diagnostics: readonly AiAuthorDiagnostic[];
-  readonly sourceAtRequest: string;
-}
+/** One conversation entry: user turn, assistant turn, or inline error. */
+type ChatEntry =
+  | { readonly kind: "user"; readonly id: string; readonly text: string }
+  | { readonly kind: "assistant"; readonly id: string; readonly text: string; readonly changeSetId: string | null }
+  | {
+      readonly kind: "error";
+      readonly id: string;
+      readonly message: string;
+      readonly retryable: "retry" | "login" | "none";
+      /** Request to re-issue on retry (never duplicates the user turn). */
+      readonly request: AiAuthorRequest | null;
+    };
 
-function describeError(err: unknown): string {
+let nextEntryId = 0;
+
+function describeError(err: unknown): {
+  message: string;
+  retryable: "retry" | "login" | "none";
+} {
   const norm = err as NormalizedApiError | undefined;
-  if (norm?.kind === "api") {
-    if (norm.status === 429) return "The AI service is busy — wait a moment and try again.";
-    if (norm.status >= 500) return "The AI service failed to process the request. Try again.";
-    return norm.message || "The AI request failed. Please try again.";
-  }
-  if (norm?.kind === "http") {
-    if (norm.status === 403) return "AI Assistant is not available for this question bank.";
-    if (norm.status === 429) return "The AI service is busy — wait a moment and try again.";
-    if (norm.status >= 500) return "The AI service failed to process the request. Try again.";
-    return norm.message || `Request failed (HTTP ${norm.status}).`;
+  if (norm?.kind === "api" || norm?.kind === "http") {
+    if (norm.status === 401) {
+      return {
+        message: "Your session expired — sign in again to continue.",
+        retryable: "login",
+      };
+    }
+    if (norm.status === 403) {
+      return {
+        message: "AI Assistant is not available for this question bank.",
+        retryable: "none",
+      };
+    }
+    if (norm.status === 429) {
+      return {
+        message: "The AI service is busy — wait a moment and try again.",
+        retryable: "retry",
+      };
+    }
+    if (norm.status >= 500) {
+      return {
+        message: "The AI service failed to process the request. Try again.",
+        retryable: "retry",
+      };
+    }
+    return {
+      message: norm.message || `Request failed (HTTP ${norm.status}).`,
+      retryable: "retry",
+    };
   }
   if (norm?.kind === "network") {
-    return "Network error — check your connection and try again.";
+    return {
+      message: "Network error — check your connection and try again.",
+      retryable: "retry",
+    };
   }
-  return "Something went wrong. Please try again.";
+  return { message: "Something went wrong. Please try again.", retryable: "retry" };
 }
 
 /**
- * AI Assistant chat for the Quiz Markdown authoring pane (Phase 5, #114).
+ * AI Assistant chat for the Quiz Markdown authoring pane.
  *
  * Session-only client state (no persistence): uploaded documents, the chat
- * log, and the latest assistant candidate. Every turn sends the CURRENT
- * editor Markdown; the candidate remembers the source it was authored
- * against so a stale Apply can never silently overwrite editor edits.
- * Availability comes from the server probe — any error is "unavailable" and
- * nothing about server keys/configuration is ever rendered.
+ * log, and per-turn change sets. Every turn sends the CURRENT editor
+ * Markdown; each change set remembers the source it was authored against so
+ * a stale apply can never silently overwrite editor edits. Availability
+ * comes from the server probe — any error is "unavailable" and nothing
+ * about server keys/configuration is ever rendered.
  */
 export function AiAuthoringChat({
   bankId,
   onChange,
+  onPendingChangesChange,
   value,
 }: {
   readonly bankId: number;
   readonly onChange: (value: string) => void;
+  /** Notifies the host when unconfirmed pending AI changes exist (import gate). */
+  readonly onPendingChangesChange?: (pending: boolean) => void;
   readonly value: string;
 }) {
-  const instructionId = useId();
-
-  const [documents, setDocuments] = useState<AiExtractedDocument[]>([]);
-  const [messages, setMessages] = useState<AiAuthorMessage[]>([]);
+  const [entries, setEntries] = useState<ChatEntry[]>([]);
   const [instruction, setInstruction] = useState("");
-  const [candidate, setCandidate] = useState<ChatCandidate | null>(null);
-  const [applied, setApplied] = useState(false);
-  const [undoSnapshot, setUndoSnapshot] = useState<string | null>(null);
-  const [confirmingStale, setConfirmingStale] = useState(false);
-  const [confirmingUndo, setConfirmingUndo] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [sourceItems, setSourceItems] = useState<AiSourceItem[]>([]);
+  const [reviewChangeSetId, setReviewChangeSetId] = useState<string | null>(null);
   const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [sendLock, setSendLock] = useState(false);
 
-  // The exact markdown handed to the editor at Apply time: any later
-  // deviation means the teacher edited manually after Apply, and Undo must
-  // then ask before overwriting those edits (gate review P1).
-  const appliedMarkdownRef = useRef<string | null>(null);
-
-  // Latest editor source (for Apply-stale handling; updated post-commit, not
-  // during render) + last issued request (for Retry).
+  const fileInputId = useId();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  // Latest editor source (updated post-commit, not during render) + last
+  // issued request (for Retry).
   const valueRef = useRef(value);
   useEffect(() => {
     valueRef.current = value;
   }, [value]);
   const lastRequestRef = useRef<{ request: AiAuthorRequest; sourceAtRequest: string } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const statusQuery = useAiAuthoringStatusQuery(bankId);
   const extractMutation = useExtractAiDocumentMutation(bankId);
   const authorMutation = useAuthorAiMarkdownMutation(bankId);
+
+  const merge = useAiMergeState({ onChange, value });
+
+  useEffect(() => {
+    onPendingChangesChange?.(merge.hasPendingChanges);
+  }, [merge.hasPendingChanges, onPendingChangesChange]);
 
   const loading = statusQuery.isPending;
   // Any probe error (incl. 403 for non-owners) counts as unavailable.
@@ -108,138 +154,147 @@ export function AiAuthoringChat({
   const inputsDisabled = loading || unavailable;
   const pending = authorMutation.isPending;
   const uploading = uploadingFiles || extractMutation.isPending;
-  const sendDisabled =
-    inputsDisabled || pending || instruction.trim().length === 0;
+
+  const selectedSources = sourceItems.filter(
+    (item) => item.selected && item.document !== null,
+  );
+  const selectedChars = selectedSources.reduce(
+    (sum, item) => sum + (item.document?.charCount ?? 0),
+    0,
+  );
+  const overBudget =
+    selectedSources.length > MAX_DOCUMENTS || selectedChars > MAX_TOTAL_DOCUMENT_CHARS;
 
   useEffect(() => {
     const el = chatScrollRef.current;
     if (el !== null) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [messages, pending]);
+  }, [entries, pending]);
 
-  const handleAuthorSuccess = (response: AiAuthorResponse, sourceAtRequest: string) => {
-    setMessages((prev) => [...prev, { role: "assistant", content: response.reply }]);
-    setCandidate({
-      markdown: response.markdown,
-      reply: response.reply,
-      valid: response.valid,
-      diagnostics: response.diagnostics,
-      sourceAtRequest,
-    });
-    setApplied(false);
-    setUndoSnapshot(null);
-    setConfirmingStale(false);
-    setConfirmingUndo(false);
-    appliedMarkdownRef.current = null;
-  };
+  const handleAuthorSuccess = useCallback(
+    (response: AiAuthorResponse, sourceAtRequest: string) => {
+      const changeSet = merge.registerResult({
+        markdown: response.markdown,
+        valid: response.valid,
+        diagnostics: response.diagnostics,
+        sourceAtRequest,
+      });
+      setEntries((prev) => [
+        ...prev,
+        {
+          kind: "assistant",
+          id: `e-${nextEntryId += 1}`,
+          text: response.reply,
+          changeSetId: changeSet.id,
+        },
+      ]);
+    },
+    [merge],
+  );
 
-  const issueRequest = (request: AiAuthorRequest, sourceAtRequest: string) => {
-    lastRequestRef.current = { request, sourceAtRequest };
-    setError(null);
-    authorMutation.mutate(request, {
-      onSuccess: (response) => handleAuthorSuccess(response, sourceAtRequest),
-      onError: (err) => setError(describeError(err)),
-    });
-  };
+  const issueRequest = useCallback(
+    (request: AiAuthorRequest, sourceAtRequest: string) => {
+      lastRequestRef.current = { request, sourceAtRequest };
+      authorMutation.mutate(request, {
+        onSuccess: (response) => handleAuthorSuccess(response, sourceAtRequest),
+        onError: (err) => {
+          const described = describeError(err);
+          setEntries((prev) => [
+            ...prev,
+            {
+              kind: "error",
+              id: `e-${nextEntryId += 1}`,
+              message: described.message,
+              retryable: described.retryable,
+              request: described.retryable === "retry" ? request : null,
+            },
+          ]);
+        },
+      });
+    },
+    [authorMutation, handleAuthorSuccess],
+  );
 
-  const handleSend = () => {
+  const handleSend = useCallback(() => {
     const trimmed = instruction.trim();
-    if (trimmed.length === 0 || sendDisabled) {
+    if (
+      trimmed.length === 0 ||
+      inputsDisabled ||
+      pending ||
+      sendLock ||
+      overBudget
+    ) {
       return;
     }
-    const sourceAtRequest = valueRef.current;
-    const history = messages.slice(-HISTORY_LIMIT);
-    // The user turn is appended immediately and STAYS even when the request
-    // fails (Retry re-issues the same request without duplicating it).
-    setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
-    setInstruction("");
-    setError(null);
-    setConfirmingStale(false);
-    issueRequest(
-      {
-        instruction: trimmed,
-        currentMarkdown: sourceAtRequest,
-        documents: documents.map((doc) => ({ name: doc.name, text: doc.text })),
-        history,
-      },
-      sourceAtRequest,
-    );
-  };
-
-  const handleRetry = () => {
-    const last = lastRequestRef.current;
-    if (last === null || pending) {
-      return;
+    // Duplicate-submission guard: lock synchronously for the whole commit.
+    setSendLock(true);
+    try {
+      const sourceAtRequest = valueRef.current;
+      const history: AiAuthorMessage[] = entries
+        .filter((e): e is Extract<ChatEntry, { kind: "user" | "assistant" }> =>
+          e.kind === "user" || e.kind === "assistant",
+        )
+        .slice(-HISTORY_LIMIT)
+        .map((e) => ({
+          role: e.kind === "user" ? "user" : "assistant",
+          content: e.text,
+        }));
+      // The user turn is appended immediately and STAYS even when the
+      // request fails (Retry re-issues the same request without duplicating it).
+      setEntries((prev) => [
+        ...prev,
+        { kind: "user", id: `e-${nextEntryId += 1}`, text: trimmed },
+      ]);
+      setInstruction("");
+      // A new request supersedes any still-pending change set: its applied
+      // text is the baseline this request is issued against.
+      merge.supersedePending();
+      issueRequest(
+        {
+          instruction: trimmed,
+          currentMarkdown: sourceAtRequest,
+          documents: selectedSources.map((item) => ({
+            name: item.document!.name,
+            text: item.document!.text,
+          })),
+          history,
+        },
+        sourceAtRequest,
+      );
+    } finally {
+      setSendLock(false);
     }
-    setError(null);
-    authorMutation.mutate(last.request, {
-      onSuccess: (response) => handleAuthorSuccess(response, last.sourceAtRequest),
-      onError: (err) => setError(describeError(err)),
-    });
-  };
+  }, [
+    entries,
+    inputsDisabled,
+    instruction,
+    issueRequest,
+    merge,
+    overBudget,
+    pending,
+    selectedSources,
+    sendLock,
+  ]);
 
-  const applyCandidate = () => {
-    if (candidate === null) {
-      return;
-    }
-    // Snapshot the PRE-apply editor source so Undo restores exactly it.
-    setUndoSnapshot(valueRef.current);
-    onChange(candidate.markdown);
-    appliedMarkdownRef.current = candidate.markdown;
-    setApplied(true);
-    setConfirmingStale(false);
-    setConfirmingUndo(false);
-  };
-
-  const handleApplyClick = () => {
-    if (candidate === null) {
-      return;
-    }
-    if (valueRef.current !== candidate.sourceAtRequest) {
-      setConfirmingStale(true);
-      return;
-    }
-    applyCandidate();
-  };
-
-  const performUndo = () => {
-    if (undoSnapshot !== null) {
-      onChange(undoSnapshot);
-    }
-    setApplied(false);
-    setCandidate(null);
-    setUndoSnapshot(null);
-    setConfirmingUndo(false);
-    appliedMarkdownRef.current = null;
-  };
-
-  /**
-   * Undo restores the pre-Apply snapshot. If the teacher edited AFTER Apply,
-   * that restore would silently delete their manual changes — require an
-   * explicit confirmation first (gate review P1).
-   */
-  const handleUndoClick = () => {
-    if (appliedMarkdownRef.current !== null && valueRef.current !== appliedMarkdownRef.current) {
-      setConfirmingUndo(true);
-      return;
-    }
-    performUndo();
-  };
-
-  const handleDiscard = () => {
-    setCandidate(null);
-    setApplied(false);
-    setConfirmingStale(false);
-    setConfirmingUndo(false);
-  };
+  const handleRetry = useCallback(
+    (request: AiAuthorRequest) => {
+      if (pending) {
+        return;
+      }
+      // Replace the error entry instead of stacking a new one.
+      setEntries((prev) => prev.filter((e) => !(e.kind === "error" && e.request === request)));
+      issueRequest(request, lastRequestRef.current?.sourceAtRequest ?? request.currentMarkdown);
+    },
+    [issueRequest, pending],
+  );
 
   /**
    * Multi-file upload: one mutateAsync per file, awaited via allSettled so
    * EVERY document lands (TanStack per-mutate callbacks can be dropped for
-   * superseded calls on the same observer — gate review P2). Chips append in
-   * selection order; the first rejection surfaces as the upload error while
-   * the remaining successes still attach.
+   * superseded calls on the same observer — gate review P2). Results append
+   * in selection order; failures become per-source error rows in the
+   * manager, never full-width banners.
    */
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
@@ -247,54 +302,86 @@ export function AiAuthoringChat({
     if (files.length === 0) {
       return;
     }
-    const oversized = files.find((file) => file.size > MAX_UPLOAD_BYTES);
     const accepted = files.filter((file) => file.size <= MAX_UPLOAD_BYTES);
-    // Compute the message once: set-then-clear in the same batch would drop
-    // the oversize notice whenever at least one other file is accepted.
-    setUploadError(
-      oversized === undefined
-        ? null
-        : `${oversized.name} is larger than 5 MiB — extract a smaller file.`,
-    );
+    const rejected = files.filter((file) => file.size > MAX_UPLOAD_BYTES);
+
+    const pendingItems: AiSourceItem[] = [
+      ...rejected.map((file) => ({
+        id: `src-${nextEntryId += 1}`,
+        name: file.name,
+        document: null,
+        status: "error" as const,
+        error: `${file.name} is larger than 5 MiB — extract a smaller file.`,
+        selected: false,
+      })),
+      ...accepted.map((file) => ({
+        id: `src-${nextEntryId += 1}`,
+        name: file.name,
+        document: null,
+        status: "loading" as const,
+        error: null,
+        selected: false,
+      })),
+    ];
+    setSourceItems((prev) => [...prev, ...pendingItems]);
+
     if (accepted.length === 0) {
       return;
     }
-
     setUploadingFiles(true);
     try {
       const settled = await Promise.allSettled(
         accepted.map((file) => extractMutation.mutateAsync(file)),
       );
-      const extracted = settled
-        .filter((r): r is PromiseFulfilledResult<AiExtractedDocument> => r.status === "fulfilled")
-        .map((r) => r.value);
-      if (extracted.length > 0) {
-        setDocuments((prev) => [...prev, ...extracted]);
-      }
-      const firstFailure = settled.find((r) => r.status === "rejected");
-      if (firstFailure !== undefined) {
-        setUploadError(describeError((firstFailure as PromiseRejectedResult).reason));
-      }
+      setSourceItems((prev) => {
+        const updated = [...prev];
+        let acceptIndex = 0;
+        for (let i = 0; i < updated.length; i += 1) {
+          const item = updated[i];
+          if (item.status !== "loading") {
+            continue;
+          }
+          const result = settled[acceptIndex];
+          acceptIndex += 1;
+          if (result === undefined) {
+            continue;
+          }
+          if (result.status === "fulfilled") {
+            updated[i] = {
+              ...item,
+              document: result.value,
+              status: "ready",
+              selected: true,
+            };
+          } else {
+            const described = describeError(result.reason);
+            updated[i] = {
+              ...item,
+              status: "error",
+              error: described.message,
+            };
+          }
+        }
+        return updated;
+      });
     } finally {
       setUploadingFiles(false);
     }
   };
 
-  const removeDocument = (index: number) => {
-    setDocuments((prev) => prev.filter((_, i) => i !== index));
-  };
+  const reviewChangeSet = merge.changeSets.find(
+    (cs) => cs.id === reviewChangeSetId,
+  );
 
   return (
-    <section aria-label="AI Assistant" className="flex h-full min-h-0 flex-col gap-3">
+    <section aria-label="AI Assistant" className="relative flex h-full min-h-0 flex-col gap-3">
       {/* Screen-reader announcements for pending / error / success. */}
       <p aria-live="polite" className="sr-only">
         {pending
           ? "The assistant is working on your request."
-          : error !== null
-            ? "The assistant request failed."
-            : candidate !== null
-              ? "The assistant replied with a candidate."
-              : ""}
+          : merge.hasPendingChanges
+            ? "The assistant proposed changes — review, keep, or undo them."
+            : ""}
       </p>
 
       {loading && (
@@ -316,234 +403,170 @@ export function AiAuthoringChat({
 
       {!loading && (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              ref={fileInputRef}
-              accept=".txt,.pdf,.docx,.pptx"
-              aria-label="Upload document"
-              className="sr-only"
-              disabled={inputsDisabled}
-              multiple
-              onChange={handleFileChange}
-              type="file"
-            />
-            <Button
-              disabled={inputsDisabled}
-              onClick={() => fileInputRef.current?.click()}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              Upload document
-            </Button>
-            <span className="text-[10px] font-medium text-[#64748B]">
-              .txt .pdf .docx .pptx — max 5 MiB
-            </span>
-            {uploading && (
-              <span aria-live="polite" className="text-[10px] font-medium text-[#64748B]">
-                Extracting document…
-              </span>
-            )}
-          </div>
-
-          {uploadError !== null && (
-            <p role="alert" className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-2.5 text-xs font-medium text-[#EF4444]">
-              {uploadError}
-            </p>
-          )}
-
-          {documents.length > 0 && (
-            <ul className="flex flex-wrap gap-1.5" aria-label="Uploaded documents">
-              {documents.map((doc, index) => (
-                <li
-                  key={`${doc.name}-${index}`}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[#E2E8F0] bg-[#F1F5F9] py-1 pl-2.5 pr-1.5 text-[11px] font-medium text-[#0F172A]"
-                >
-                  <span>
-                    {doc.name} ({doc.charCount} chars
-                    {doc.truncated ? ", truncated" : ""})
-                  </span>
-                  {doc.truncated && (
-                    <span className="rounded-full border border-[#F59E0B]/30 bg-[#F59E0B]/10 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-[#92400E]">
-                      Truncated
-                    </span>
-                  )}
-                  <button
-                    aria-label={`Remove ${doc.name}`}
-                    className="rounded-full p-0.5 text-[#64748B] transition-colors hover:bg-[#E2E8F0] hover:text-[#0F172A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF]"
-                    onClick={() => removeDocument(index)}
-                    type="button"
-                  >
-                    <svg aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" className="h-3 w-3">
-                      <path d="M6 18 18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <input
+            ref={fileInputRef}
+            accept=".txt,.pdf,.docx,.pptx"
+            aria-label="Upload document (file input)"
+            className="sr-only"
+            disabled={inputsDisabled}
+            id={fileInputId}
+            multiple
+            onChange={handleFileChange}
+            type="file"
+          />
 
           <div
             aria-label="AI conversation"
             className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-xl border border-[#E2E8F0] bg-white p-3 shadow-[0_4px_6px_rgba(0,0,0,0.05)]"
             ref={chatScrollRef}
           >
-            {messages.length === 0 && !pending && (
+            {entries.length === 0 && !pending && (
               <p className="px-1 py-6 text-center text-xs leading-relaxed text-[#64748B]">
                 Ask the AI to draft or rework questions, e.g. &ldquo;Add 5 multiple-choice
                 questions about the uploaded document.&rdquo;
               </p>
             )}
-            {messages.map((message, index) => (
-              <div
-                className={cn(
-                  "max-w-[90%] rounded-xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap",
-                  message.role === "user"
-                    ? "ml-auto bg-[#0052FF]/10 text-[#0F172A]"
-                    : "bg-[#F1F5F9] text-[#0F172A]",
-                )}
-                key={index}
-              >
-                <span className="mb-0.5 block text-[9px] font-bold uppercase tracking-wide text-[#64748B]">
-                  {message.role === "user" ? "You" : "Assistant"}
-                </span>
-                {message.content}
-              </div>
-            ))}
+            {entries.map((entry) => {
+              if (entry.kind === "user") {
+                return (
+                  <div
+                    className="ml-auto max-w-[90%] rounded-xl bg-[#0052FF]/10 px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap text-[#0F172A]"
+                    key={entry.id}
+                  >
+                    <span className="mb-0.5 block text-[9px] font-bold uppercase tracking-wide text-[#64748B]">
+                      You
+                    </span>
+                    {entry.text}
+                  </div>
+                );
+              }
+              if (entry.kind === "assistant") {
+                const changeSet =
+                  entry.changeSetId === null
+                    ? null
+                    : merge.changeSets.find((cs) => cs.id === entry.changeSetId) ?? null;
+                return (
+                  <div key={entry.id} className="max-w-[95%] space-y-2">
+                    <div className="rounded-xl bg-[#F1F5F9] px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap text-[#0F172A]">
+                      <span className="mb-0.5 block text-[9px] font-bold uppercase tracking-wide text-[#64748B]">
+                        Assistant
+                      </span>
+                      {entry.text}
+                    </div>
+                    {changeSet !== null && (
+                      <AiMergeChangesCard
+                        changeSetId={changeSet.id}
+                        counts={merge.countsFor(changeSet.id)}
+                        diagnostics={changeSet.diagnostics}
+                        invalid={!changeSet.valid}
+                        manualEditsAfterApply={merge.hasManualEditsAfterApply(changeSet.id)}
+                        onKeepAll={merge.keepAll}
+                        onReview={setReviewChangeSetId}
+                        onUndoAll={(id) => merge.undoAll(id, true)}
+                        status={changeSet.status}
+                      />
+                    )}
+                  </div>
+                );
+              }
+              // Inline error row tied to the failed turn.
+              return (
+                <div
+                  className="flex max-w-[95%] flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-[#EF4444]/25 bg-[#EF4444]/5 px-3 py-2 text-xs font-medium text-[#EF4444]"
+                  key={entry.id}
+                  role="alert"
+                >
+                  <span>{entry.message}</span>
+                  {entry.retryable === "retry" && entry.request !== null && (
+                    <button
+                      className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold underline decoration-dotted underline-offset-2 transition-colors hover:bg-[#EF4444]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF4444]"
+                      onClick={() => handleRetry(entry.request!)}
+                      type="button"
+                    >
+                      Retry
+                    </button>
+                  )}
+                  {entry.retryable === "login" && (
+                    <a
+                      className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold underline decoration-dotted underline-offset-2 hover:bg-[#EF4444]/10"
+                      href="/login"
+                    >
+                      Sign in
+                    </a>
+                  )}
+                </div>
+              );
+            })}
             {pending && (
-              <div className="max-w-[90%] rounded-xl bg-[#F1F5F9] px-3 py-2 text-xs font-medium text-[#64748B]" aria-live="polite">
+              <div
+                aria-live="polite"
+                className="max-w-[90%] rounded-xl bg-[#F1F5F9] px-3 py-2 text-xs font-medium text-[#64748B]"
+              >
                 Assistant is thinking…
               </div>
             )}
           </div>
 
-          {candidate !== null &&
-            (applied ? (
-              confirmingUndo ? (
-                <div className="rounded-xl border border-[#F59E0B]/40 bg-[#F59E0B]/10 p-3">
-                  <p className="text-xs font-medium leading-relaxed text-[#92400E]">
-                    The editor changed since you applied this candidate. Undo restores the
-                    earlier snapshot and discards those manual edits.
-                  </p>
-                  <div className="mt-2 flex gap-2">
-                    <Button onClick={performUndo} size="sm" type="button">
-                      Restore anyway
-                    </Button>
-                    <Button onClick={() => setConfirmingUndo(false)} size="sm" type="button" variant="ghost">
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-xl border border-[#10B981]/30 bg-[#10B981]/5 p-3">
-                  <p className="text-xs font-semibold text-[#10B981]">
-                    Applied to the editor — live validation is shown in the preview.
-                  </p>
-                  <div className="mt-2">
-                    <Button onClick={handleUndoClick} size="sm" type="button" variant="outline">
-                      Undo
-                    </Button>
-                  </div>
-                </div>
-              )
-            ) : confirmingStale ? (
-              <div className="rounded-xl border border-[#F59E0B]/40 bg-[#F59E0B]/10 p-3">
-                <p className="text-xs font-medium leading-relaxed text-[#92400E]">
-                  The editor changed since this request. Apply anyway?
-                </p>
-                <div className="mt-2 flex gap-2">
-                  <Button onClick={applyCandidate} size="sm" type="button">
-                    Apply anyway
-                  </Button>
-                  <Button onClick={() => setConfirmingStale(false)} size="sm" type="button" variant="ghost">
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <article aria-label="AI candidate" className="rounded-xl border border-[#E2E8F0] bg-white p-3 shadow-[0_4px_6px_rgba(0,0,0,0.05)]">
-                <div className="flex flex-wrap items-center gap-2">
-                  {candidate.valid ? (
-                    <span className="rounded-full border border-[#10B981]/30 bg-[#10B981]/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#10B981]">
-                      Valid Quiz Markdown
-                    </span>
-                  ) : (
-                    <span className="rounded-full border border-[#EF4444]/30 bg-[#EF4444]/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#EF4444]">
-                      Invalid — diagnostics below
-                    </span>
-                  )}
-                </div>
-
-                {!candidate.valid && candidate.diagnostics.length > 0 && (
-                  <ul className="mt-2 space-y-1" aria-label="Candidate diagnostics">
-                    {candidate.diagnostics.map((diagnostic, index) => (
-                      <li className="text-[11px] leading-relaxed text-[#EF4444]" key={index}>
-                        <span className="font-mono font-semibold">{diagnostic.code}</span>
-                        {": "}
-                        {diagnostic.message}
-                        {diagnostic.questionNumber !== null
-                          ? ` (question ${diagnostic.questionNumber}, line ${diagnostic.line}, column ${diagnostic.column})`
-                          : ` (line ${diagnostic.line}, column ${diagnostic.column})`}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                <details className="mt-2" open>
-                  <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-wide text-[#64748B]">
-                    Candidate Markdown
-                  </summary>
-                  <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-[#0F172A] p-3 font-mono text-[11px] leading-relaxed text-[#E2E8F0]">
-                    {candidate.markdown}
-                  </pre>
-                </details>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button onClick={handleApplyClick} size="sm" type="button">
-                    Apply to editor
-                  </Button>
-                  <Button onClick={handleDiscard} size="sm" type="button" variant="outline">
-                    Discard
-                  </Button>
-                </div>
-              </article>
-            ))}
-
-          {error !== null && (
-            <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-3 text-xs font-medium text-[#EF4444]">
-              <span>{error}</span>
-              <Button onClick={handleRetry} size="sm" type="button" variant="destructive">
-                Retry
-              </Button>
-            </div>
+          {overBudget && (
+            <p
+              className={cn(
+                "rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/5 p-2.5 text-[11px] font-medium leading-relaxed text-[#EF4444]",
+              )}
+              role="alert"
+            >
+              {selectedSources.length} sources selected but at most {MAX_DOCUMENTS} can be
+              sent per request ({selectedChars.toLocaleString()} /{" "}
+              {MAX_TOTAL_DOCUMENT_CHARS.toLocaleString()} chars) — open Sources and detach
+              some before sending.
+            </p>
           )}
 
-          <div>
-            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#64748B]" htmlFor={instructionId}>
-              Instruction
-            </label>
-            <div className="flex items-end gap-2">
-              <textarea
-                className="min-h-[3rem] flex-1 resize-y rounded-lg border border-[#E2E8F0] bg-white p-2.5 text-xs leading-relaxed text-[#0F172A] placeholder:text-[#64748B]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF] disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={inputsDisabled}
-                id={instructionId}
-                onChange={(event) => setInstruction(event.target.value)}
-                placeholder="e.g. Add 5 multiple-choice questions about the uploaded document"
-                rows={2}
-                value={instruction}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                    event.preventDefault();
-                    handleSend();
-                  }
-                }}
-              />
-              <Button disabled={sendDisabled} onClick={handleSend} size="sm" type="button">
-                Send
-              </Button>
-            </div>
-          </div>
+          <AiPromptComposer
+            disabled={inputsDisabled}
+            onChange={setInstruction}
+            onSend={handleSend}
+            onSourcesClick={() => setSourcesOpen(true)}
+            onUploadClick={() => fileInputRef.current?.click()}
+            pending={pending || overBudget}
+            sourcesCount={sourceItems.length}
+            uploadDisabled={inputsDisabled}
+            value={instruction}
+          />
         </>
+      )}
+
+      <AiSourcesManager
+        items={sourceItems}
+        maxDocuments={MAX_DOCUMENTS}
+        maxTotalChars={MAX_TOTAL_DOCUMENT_CHARS}
+        onDismiss={() => setSourcesOpen(false)}
+        onRemove={(id) => setSourceItems((prev) => prev.filter((i) => i.id !== id))}
+        onSelectToggle={(id) =>
+          setSourceItems((prev) =>
+            prev.map((i) => (i.id === id ? { ...i, selected: !i.selected } : i)),
+          )
+        }
+        onUploadClick={() => fileInputRef.current?.click()}
+        open={sourcesOpen}
+        uploading={uploading}
+      />
+
+      {reviewChangeSet !== undefined && (
+        <AiDiffViewer
+          before={reviewChangeSet.preApplySnapshot ?? reviewChangeSet.sourceAtRequest}
+          after={reviewChangeSet.markdown}
+          keepDisabled={!reviewChangeSet.valid}
+          onDismiss={() => setReviewChangeSetId(null)}
+          onKeepAll={() => {
+            merge.keepAll(reviewChangeSet.id);
+            setReviewChangeSetId(null);
+          }}
+          onUndoAll={() => {
+            merge.undoAll(reviewChangeSet.id, true);
+            setReviewChangeSetId(null);
+          }}
+          open
+        />
       )}
     </section>
   );

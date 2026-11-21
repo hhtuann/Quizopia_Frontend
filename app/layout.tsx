@@ -32,6 +32,10 @@ const jetbrainsMono = localFont({
   src: [
     { path: "./fonts/jetbrains-mono-latin-400-normal.woff2", weight: "400", style: "normal" },
     { path: "./fonts/jetbrains-mono-latin-500-normal.woff2", weight: "500", style: "normal" },
+    // Vietnamese subset (UX-09): without it, Vietnamese glyphs in the mono
+    // editor fell back to system fonts with mismatched metrics.
+    { path: "./fonts/jetbrains-mono-vietnamese-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/jetbrains-mono-vietnamese-500-normal.woff2", weight: "500", style: "normal" },
   ],
 });
 

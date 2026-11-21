@@ -1,6 +1,6 @@
 "use client";
 
-import { notFound } from "next/navigation";
+import { notFound, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { QuizMarkdownAuthoringPane } from "@/components/markdown/authoring-pane";
 
@@ -50,6 +50,11 @@ export default function MarkdownAuthoringHarnessPage() {
     notFound();
   }
   const [source, setSource] = useState(SAMPLE);
+  // Dev-only: `?ai=1` mounts the AI Assistant surface (bankId 0) so the
+  // chat/composer/sources UX can be verified without a real bank. The
+  // status probe will report unavailable — expected offline.
+  const searchParams = useSearchParams();
+  const withAi = searchParams.get("ai") === "1";
 
   return (
     <main className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl flex-col px-4 py-8 sm:px-6 lg:px-8">
@@ -57,6 +62,7 @@ export default function MarkdownAuthoringHarnessPage() {
         Development-only harness — not available in production.
       </p>
       <QuizMarkdownAuthoringPane
+        bankId={withAi ? 0 : undefined}
         onChange={setSource}
         title="Quiz Markdown authoring (dev)"
         value={source}

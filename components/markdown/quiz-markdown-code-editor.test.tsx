@@ -69,15 +69,21 @@ describe("QuizMarkdownCodeEditor", () => {
     render(<EditorHarness initial={"first\nsecond\nthird"} />);
     const editor = editorElement();
 
-    expect(
-      screen.getByTestId("quiz-markdown-line-numbers").textContent,
-    ).toBe("123");
+    // Gutter rows carry an invisible wrapping mirror of each line; the
+    // visible numbers are the row's leading text nodes.
+    const gutter = screen.getByTestId("quiz-markdown-line-numbers");
+    const numbers = Array.from(
+      gutter.querySelectorAll("[data-gutter-row]"),
+    ).map((row) => row.firstChild?.textContent);
+    expect(numbers).toEqual(["1", "2", "3"]);
     fireEvent.select(editor, {
       target: { selectionStart: 7, selectionEnd: 7 },
     });
+    // Line 2 highlight: one row height below the first row (jsdom has no
+    // real layout, so assert the state-driven style, not pixel geometry).
     expect(
       screen.getByTestId("quiz-markdown-active-line").getAttribute("style"),
-    ).toContain("top: 36px");
+    ).toMatch(/height:\s*24px/);
   });
 
   it("highlights structural tokens while keeping the textarea source exact", () => {
@@ -478,5 +484,45 @@ describe("QuizMarkdownCodeEditor multiple instances", () => {
       expect(document.getElementById(listboxId!)).not.toBeNull();
       expect(editor.getAttribute("aria-expanded")).toBe("true");
     }
+  });
+});
+
+describe("QuizMarkdownCodeEditor soft wrap (UX-09)", () => {
+  it("uses soft wrap on the textarea and the highlight layer", () => {
+    render(<EditorHarness initial={"Câu 1 [SINGLE_CHOICE]: câu hỏi"} />);
+    const editor = editorElement();
+    expect(editor.getAttribute("wrap")).toBe("soft");
+    const layer = screen.getByTestId("quiz-markdown-highlight-layer");
+    expect(layer.className).toContain("whitespace-pre-wrap");
+  });
+
+  it("never inserts literal line breaks when wrapping long Vietnamese lines", () => {
+    const longLine =
+      "Câu 1 [SINGLE_CHOICE]: Đây là một câu hỏi tiếng Việt rất dài về giao thức mạng máy tính và tầng ứng dụng HTTP, cần kiểm tra việc tự động xuống dòng mà không chèn ký tự xuống dòng thực sự vào văn bản.";
+    render(<EditorHarness initial={longLine} />);
+    expect(editorElement().value).toBe(longLine);
+    expect(screen.getByTestId("exact-editor-value").textContent).toBe(longLine);
+  });
+
+  it("counts logical lines once even when rows wrap", () => {
+    const source = [
+      "Câu 1 [SINGLE_CHOICE]: ngắn",
+      "Câu 2 [SINGLE_CHOICE]: " + "rất dài ".repeat(40) + "hết",
+      "Câu 3 [SINGLE_CHOICE]: ngắn",
+    ].join("\n");
+    render(<EditorHarness initial={source} />);
+    const rows = screen
+      .getByTestId("quiz-markdown-line-numbers")
+      .querySelectorAll("[data-gutter-row]");
+    expect(rows.length).toBe(3);
+    expect(
+      Array.from(rows).map((row) => row.firstChild?.textContent),
+    ).toEqual(["1", "2", "3"]);
+  });
+
+  it("keeps right padding on the textarea so text clears the scrollbar", () => {
+    render(<EditorHarness initial="x" />);
+    const style = editorElement().getAttribute("style") ?? "";
+    expect(style).toContain("padding-right");
   });
 });

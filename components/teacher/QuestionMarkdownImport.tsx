@@ -59,6 +59,9 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
   const [collapsed, setCollapsed] = useState(true);
   const [result, setResult] = useState<ImportResponse | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
+  // UX-04: unconfirmed pending AI change sets block persistence — the
+  // teacher must Keep all / Undo all in the chat before importing.
+  const [pendingAiChanges, setPendingAiChanges] = useState(false);
 
   const analysis = useMemo(() => analyzeQuizMarkdown(source), [source]);
   const violations = useMemo(() => bankContractViolations(analysis), [analysis]);
@@ -70,6 +73,7 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
   const importable =
     source.trim().length > 0 &&
     !tooLong &&
+    !pendingAiChanges &&
     parseErrors === 0 &&
     violations.length === 0 &&
     questionCount > 0;
@@ -130,7 +134,13 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
       {result && <ResultBanner result={result} />}
 
       <div className={collapsed ? "hidden" : "flex h-[70vh] min-h-[32rem] flex-col"}>
-        <QuizMarkdownAuthoringPane bankId={bankId} title={null} value={source} onChange={setSource} />
+        <QuizMarkdownAuthoringPane
+          bankId={bankId}
+          onChange={setSource}
+          onPendingChangesChange={setPendingAiChanges}
+          title={null}
+          value={source}
+        />
       </div>
 
       {tooLong && (
@@ -160,6 +170,12 @@ export function QuestionMarkdownImport({ bankId }: { bankId: number }) {
         {importing && (
           <span role="status" className="text-xs font-medium text-[#64748B]">
             Adding questions to bank #{bankId}…
+          </span>
+        )}
+        {pendingAiChanges && !importing && (
+          <span role="status" className="text-xs font-medium text-[#92400E]">
+            AI changes are pending review — Keep all or Undo all in the AI Assistant
+            before adding questions to this bank.
           </span>
         )}
       </div>
