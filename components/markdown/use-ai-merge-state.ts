@@ -187,17 +187,22 @@ export function useAiMergeState({
   const countsCacheRef = useRef(new Map<string, { added: number; deleted: number }>());
   const countsFor = useCallback(
     (changeSetId: string): { added: number; deleted: number } => {
-      const cached = countsCacheRef.current.get(changeSetId);
-      if (cached !== undefined) {
-        return cached;
-      }
       const cs = changeSets.find((c) => c.id === changeSetId);
       if (cs === undefined) {
         return { added: 0, deleted: 0 };
       }
+      // Self-invalidating key: `keepAll` on a conflict set mutates
+      // preApplySnapshot (null → snapshot), so keying on the inputs — not
+      // just the id — keeps the badge correct after that transition
+      // (review P3).
       const before = cs.preApplySnapshot ?? cs.sourceAtRequest;
+      const key = `${changeSetId}\u0000${before}\u0000${cs.markdown}`;
+      const cached = countsCacheRef.current.get(key);
+      if (cached !== undefined) {
+        return cached;
+      }
       const counts = computeLineDiff(before, cs.markdown).counts;
-      countsCacheRef.current.set(changeSetId, counts);
+      countsCacheRef.current.set(key, counts);
       return counts;
     },
     [changeSets],

@@ -768,4 +768,47 @@ describe("AiAuthoringChat review regressions", () => {
     fireEvent.click(unchecked);
     expect(unchecked.checked).toBe(false);
   });
+
+  /** Review P3 (round 2): counts must refresh after Keep all on a conflict
+   *  set (preApplySnapshot transitions null → snapshot). */
+  it("recomputes merge counts after Keep all on a conflict set", async () => {
+    const { promise, resolve } = Promise.withResolvers<AiAuthorResponse>();
+    authorMock.mockImplementation(() => promise);
+    renderChat();
+    const composer = await waitFor(() =>
+      screen.getByLabelText("Message the AI assistant") as HTMLTextAreaElement,
+    );
+    fireEvent.change(composer, { target: { value: "go" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+    // Manual edit in flight -> conflict on resolve.
+    const EDITED = `${SOURCE}Question 9 [TRUE_FALSE_MATRIX]: edited?
+*A. one
+B. two
+C. three
+D. four
+`;
+    fireEvent.change(screen.getByLabelText("Editor mirror"), {
+      target: { value: EDITED },
+    });
+    resolve({
+      markdown: CANDIDATE,
+      reply: "Here",
+      valid: true,
+      diagnostics: [],
+    });
+    await waitFor(() =>
+      expect(screen.getByText(/Editor changed — review required/i)).not.toBeNull(),
+    );
+    // Conflict card counts: diff(SOURCE, CANDIDATE) = +5/-0.
+    expect(screen.getByTestId("ai-merge-changes-card").textContent).toContain("+5");
+
+    // Keep all: snapshot becomes EDITED; counts become diff(EDITED, CANDIDATE)
+    // = +5/-5 (the manual question is replaced), NOT the stale +5/-0.
+    fireEvent.click(screen.getByRole("button", { name: "Keep all" }));
+    await waitFor(() => expect(screen.getByText(/accepted and sealed/i)).not.toBeNull());
+    const cardText = screen.getByTestId("ai-merge-changes-card").textContent ?? "";
+    expect(cardText).toContain("-5");
+  });
 });
+
