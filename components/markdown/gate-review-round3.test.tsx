@@ -374,3 +374,126 @@ describe("Gate review round 3 re-review — retry block", () => {
     expect(cards.length).toBe(1);
   });
 });
+
+describe("Gate review round 4 — unparseable draft protection", () => {
+  let queryClient: QueryClient;
+
+  beforeEach(() => {
+    queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    statusMock.mockReset();
+    statusMock.mockResolvedValue({ enabled: true, available: true, model: "m" });
+    extractMock.mockReset();
+    authorMock.mockReset();
+  });
+
+  afterEach(cleanup);
+
+  function renderChat(start: string) {
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <Harness start={start} />
+      </QueryClientProvider>,
+    );
+  }
+
+  function composer() {
+    return screen.getByLabelText("Message the AI assistant") as HTMLTextAreaElement;
+  }
+
+  async function send(text: string) {
+    await waitFor(() => expect(composer().disabled).toBe(false));
+    fireEvent.change(composer(), { target: { value: text } });
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+  }
+
+  it("an incomplete question header draft is never auto-overwritten", async () => {
+    authorMock.mockResolvedValueOnce({
+      markdown: CANDIDATE_ADD,
+      reply: "Here you go",
+      valid: true,
+      diagnostics: [],
+    });
+    renderChat("Question 1 [SINGLE_CHOICE]");
+    await send("add questions");
+
+    await waitFor(() =>
+      expect(screen.getByTestId("ai-merge-changes-card")).not.toBeNull(),
+    );
+    // The draft survives; the card demands review.
+    expect((screen.getByLabelText("Editor mirror") as HTMLTextAreaElement).value).toBe(
+      "Question 1 [SINGLE_CHOICE]",
+    );
+    expect(screen.getByTestId("ai-merge-changes-card").textContent).toMatch(
+      /not preserved|review required/i,
+    );
+  });
+
+  it("plain notes are never auto-overwritten", async () => {
+    authorMock.mockResolvedValueOnce({
+      markdown: CANDIDATE_ADD,
+      reply: "Here you go",
+      valid: true,
+      diagnostics: [],
+    });
+    renderChat("notes: cover TCP handshake");
+    await send("add questions");
+
+    await waitFor(() =>
+      expect(screen.getByTestId("ai-merge-changes-card")).not.toBeNull(),
+    );
+    expect((screen.getByLabelText("Editor mirror") as HTMLTextAreaElement).value).toBe(
+      "notes: cover TCP handshake",
+    );
+  });
+
+  it("an EMPTY editor still auto-applies as pending", async () => {
+    authorMock.mockResolvedValueOnce({
+      markdown: CANDIDATE_ADD,
+      reply: "Drafted",
+      valid: true,
+      diagnostics: [],
+    });
+    renderChat("");
+    await send("draft questions");
+
+    await waitFor(() =>
+      expect((screen.getByLabelText("Editor mirror") as HTMLTextAreaElement).value).toBe(CANDIDATE_ADD),
+    );
+    expect(screen.getByText(/Pending review/i)).not.toBeNull();
+  });
+
+  it("a whitespace-only editor still auto-applies as pending", async () => {
+    authorMock.mockResolvedValueOnce({
+      markdown: CANDIDATE_ADD,
+      reply: "Drafted",
+      valid: true,
+      diagnostics: [],
+    });
+    renderChat("  \n  \n");
+    await send("draft questions");
+
+    await waitFor(() =>
+      expect((screen.getByLabelText("Editor mirror") as HTMLTextAreaElement).value).toBe(CANDIDATE_ADD),
+    );
+    expect(screen.getByText(/Pending review/i)).not.toBeNull();
+  });
+
+  it("a draft CAN be replaced through explicit Keep all", async () => {
+    authorMock.mockResolvedValueOnce({
+      markdown: CANDIDATE_ADD,
+      reply: "Here you go",
+      valid: true,
+      diagnostics: [],
+    });
+    renderChat("Question 1 [SINGLE_CHOICE]");
+    await send("replace my draft");
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Keep all" })).not.toBeNull(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Keep all" }));
+    await waitFor(() =>
+      expect((screen.getByLabelText("Editor mirror") as HTMLTextAreaElement).value).toBe(CANDIDATE_ADD),
+    );
+  });
+});

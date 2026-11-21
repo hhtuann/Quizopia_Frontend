@@ -76,6 +76,13 @@ function sameQuestion(a: QuestionSignature, b: QuestionSignature): boolean {
  * Deterministic before/after preservation check. Renumbering-safe: questions
  * are matched by content signature, not by number. Appended questions count
  * as additions and never block preservation.
+ *
+ * FAIL-CLOSED for unparseable drafts (gate review round 4): when the
+ * before-source contains non-whitespace text but the parser finds NO
+ * questions (incomplete header, plain notes), preservation cannot be
+ * PROVEN — the assessment reports not-preserved so the change set demands
+ * explicit Review/Keep instead of auto-applying over the teacher's draft.
+ * Empty/whitespace-only editors remain fully auto-applicable.
  */
 export function assessQuestionPreservation(
   beforeSource: string,
@@ -85,6 +92,18 @@ export function assessQuestionPreservation(
   const after = analyzeQuizMarkdown(afterSource).questions;
   const beforeSignatures = before.map(signatureOf);
   const afterSignatures = after.map(signatureOf);
+
+  // Unparseable-draft guard: non-whitespace content with zero parsed
+  // questions cannot be verified question-by-question.
+  const hasDraftText = beforeSource.trim().length > 0;
+  if (beforeSignatures.length === 0 && hasDraftText) {
+    return {
+      preserved: false,
+      lostCount: 0,
+      addedCount: afterSignatures.length,
+      lostQuestionNumbers: [],
+    };
+  }
 
   // Multiset matching: each after-question can satisfy at most one
   // before-question (duplicate identical questions must ALL survive —

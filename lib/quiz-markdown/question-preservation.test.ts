@@ -139,3 +139,54 @@ D. fourth
     expect(result.addedCount).toBe(1);
   });
 });
+
+describe("assessQuestionPreservation — round 4: unparseable drafts", () => {
+  it("REPRO: non-empty draft with an incomplete question header is NOT preserved by a full replacement", () => {
+    // The teacher typed a question header but no stem/colon yet.
+    const draft = "Question 1 [SINGLE_CHOICE]";
+    const replacement = `Question 1 [SINGLE_CHOICE]: done?
+*A. x
+B. y
+C. z
+D. w
+`;
+    const result = assessQuestionPreservation(draft, replacement);
+    // SAFE expectation: the draft text cannot be proven preserved.
+    expect(result.preserved).toBe(false);
+  });
+
+  it("REPRO: plain non-Quiz-Markdown notes are NOT preserved by a full replacement", () => {
+    const notes = "lesson notes: cover TCP handshake and window scaling";
+    const replacement = `Question 1 [SINGLE_CHOICE]: topic?
+*A. x
+B. y
+C. z
+D. w
+`;
+    const result = assessQuestionPreservation(notes, replacement);
+    expect(result.preserved).toBe(false);
+  });
+
+  it("whitespace-only before-source IS preserved (equivalent to empty)", () => {
+    const result = assessQuestionPreservation("   \n  \n", Q1);
+    expect(result.preserved).toBe(true);
+    expect(result.addedCount).toBe(1);
+  });
+
+  it("empty before-source IS preserved (fresh document)", () => {
+    const result = assessQuestionPreservation("", Q1);
+    expect(result.preserved).toBe(true);
+  });
+
+  it("valid existing questions still preserve on additive change", () => {
+    const result = assessQuestionPreservation(Q1 + Q2, Q1 + Q2 + Q3);
+    expect(result.preserved).toBe(true);
+  });
+
+  it("valid questions PLUS unparsed trailing notes: dropping the notes is a loss", () => {
+    const withNotes = Q1 + "\nremember to cover window scaling next time\n";
+    const result = assessQuestionPreservation(withNotes, Q1);
+    // The questions survive but the unparsed note is gone — fail closed.
+    expect(result.preserved).toBe(false);
+  });
+});
