@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -18,14 +18,14 @@ import { useAutosaveAnswers, type AutosaveStatus } from "@/lib/attempt/use-autos
 import { useAnswerStore } from "@/lib/attempt/answer-store";
 import { useAttemptTelemetry } from "@/lib/attempt/use-attempt-telemetry";
 import { useStompConnection } from "@/lib/realtime/use-stomp-connection";
-import { saveAnswer, type SaveAnswerRequest } from "@/lib/api/student-attempt";
- import { useServerTimeSync } from "@/lib/realtime/use-server-time-sync";
+import { getAttemptDetail } from "@/lib/api/student-attempt";
+import { useServerTimeSync } from "@/lib/realtime/use-server-time-sync";
 import { useAttemptCamera } from "@/lib/media/use-attempt-camera";
 import { useAttemptAiDetection } from "@/lib/ai/use-attempt-ai-detection";
 import { CameraStatusPill } from "@/components/student/CameraStatusPill";
 import { AiStatusPill } from "@/components/student/AiStatusPill";
 import { RecordingStatusPill } from "@/components/student/RecordingStatusPill";
- import type {
+import type {
   AttemptDetailResponse,
   SubmitResponse,
 } from "@/lib/api/student-attempt";
@@ -83,8 +83,8 @@ function InProgressShell({
   const { user: shellUser } = useAuth();
   const historyRedirect = participantHistoryHref(shellUser?.roles);
   const queryClient = useQueryClient();
-  const backRedirect = participantBackHref(shellUser?.roles);
-  const autosaveStatus = useAutosaveAnswers(attemptId, new Date(detail.deadlineAt).getTime());
+  const { status: autosaveStatus, retryNow, retryable, validationError } =
+    useAutosaveAnswers(attemptId, new Date(detail.deadlineAt).getTime());
   // P4-A telemetry: one stable clientInstanceId per page load; the emitter
   // lives at module scope (never re-created on re-render). Signals map
   // STOMP/autosave transitions to CONNECTION_* / AUTOSAVE_FAILED events.
@@ -122,9 +122,9 @@ function InProgressShell({
   });
 
   // Subscribe to any-dirty state (re-renders when dirty flags change).
-  const anyDirty = useAnswerStore((s) =>
-    Object.values(s.answers).some((a) => a.dirty)
-  );
+  const answerEntries = useAnswerStore((s) => s.answers);
+  const anyDirty = Object.values(answerEntries).some((a) => a.dirty);
+  const conflicts = Object.entries(answerEntries).filter(([, a]) => a.conflict);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitKey, setSubmitKey] = useState<string | null>(null);
@@ -143,61 +143,37 @@ function InProgressShell({
   // the indicator switches to Saving… in the same instant; error/blocked
   // keep priority.
   const displayAutosaveStatus: AutosaveStatus =
-    anyDirty && (autosaveStatus === "idle" || autosaveStatus === "saving" || autosaveStatus === "saved")
+    conflicts.length > 0 ? "conflict"
+    : autosaveStatus === "conflict" ? (anyDirty ? "saving" : "idle")
+    : anyDirty && (autosaveStatus === "idle" || autosaveStatus === "saving" || autosaveStatus === "saved")
       ? "saving"
       : autosaveStatus;
 
-  // Auto-submit when the timer hits 0 (bypasses canSubmit gating — the latest
-  // saved answers are graded; time is up regardless).
-  const [autoSubmitted, setAutoSubmitted] = useState(false);
-  const handleAutoSubmit = useCallback(async () => {
-    if (autoSubmitted) return;
-    setAutoSubmitted(true);
-
-    // Flush any dirty (unsaved) answers immediately before submitting —
-    // the student may have selected an answer in the last second before
-    // the timer hit 0, and the autosave debounce (1.5s) hadn't fired yet.
-    const store = useAnswerStore.getState();
-    const dirtyEntries = Object.entries(store.answers).filter(([, e]) => e?.dirty);
-    if (dirtyEntries.length > 0) {
-      const flushClientId = `flush-${Date.now()}`;
-      await Promise.allSettled(
-        dirtyEntries.map(([qidStr, entry]) => {
-          const req: SaveAnswerRequest = {
-            attemptQuestionId: Number(qidStr),
-            answerPayload: entry!.payload,
-            sequenceNumber: entry!.sequence + 1,
-            clientInstanceId: flushClientId,
-          };
-          return saveAnswer(attemptId, req).then((res) => {
-            store.markSaved(Number(qidStr), res.currentSequenceNumber, entry!.payload);
-          }).catch(() => {
-            // Best-effort flush: even if save fails, proceed to submit with
-            // whatever was last persisted. The backend submit will grade that.
-          });
-        })
-      );
-    }
-
-    let key = submitKey;
-    if (!key) {
-      key = generateSubmitKey();
-      setSubmitKey(key);
-    }
-    try {
-      const res = await submitMut.mutateAsync({ key });
-      setSubmitResult(res);
-      setTimeout(() => router.replace(`/attempts/${attemptId}/result`), 2000);
-    } catch (err) {
-      const norm = err as NormalizedApiError | undefined;
-      if (norm?.kind === "api" && (norm.code === "ATTEMPT_ALREADY_SUBMITTED" || norm.code === "ATTEMPT_INVALID_STATE")) {
-        router.replace(`/attempts/${attemptId}/result`);
-      } else {
-        setSubmitError("Time expired but auto-submit failed. Please click Submit manually.");
-        setAutoSubmitted(false);
+  // The server owns the deadline. A request started after zero cannot save or
+  // submit; its sweeper finalizes the last acknowledged answers. Poll until
+  // that transition commits instead of inviting an impossible manual submit.
+  const [finalizing, setFinalizing] = useState(false);
+  const handleAutoSubmit = useCallback(() => setFinalizing(true), []);
+  useEffect(() => {
+    if (!finalizing) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        const current = await getAttemptDetail(attemptId);
+        if (cancelled) return;
+        if (current.status !== "IN_PROGRESS") {
+          router.replace(`/attempts/${attemptId}/result`);
+          return;
+        }
+      } catch {
+        // The server may be temporarily unreachable; keep checking.
       }
-    }
-  }, [autoSubmitted, submitKey, submitMut, router, attemptId]);
+      if (!cancelled) timer = setTimeout(() => void poll(), 3000);
+    };
+    void poll();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [finalizing, attemptId, router]);
 
   const showRetry =
     submitError !== null && submitError.includes("Network");
@@ -224,8 +200,7 @@ function InProgressShell({
             setTimeout(() => router.replace(historyRedirect), 3000);
             break;
           case "ATTEMPT_DEADLINE_EXCEEDED":
-            setSubmitError("Time is over — could not submit.");
-            setTimeout(() => router.replace(backRedirect), 3000);
+            setFinalizing(true);
             break;
           case "ATTEMPT_IDEMPOTENCY_CONFLICT":
             setSubmitError("Submit conflict — please retry.");
@@ -282,6 +257,27 @@ function InProgressShell({
           )}
         </div>
       )}
+      {retryable && !finalizing && (
+        <Button type="button" size="sm" variant="outline" onClick={retryNow}>
+          Retry saving answers
+        </Button>
+      )}
+      {validationError && !finalizing && (
+        <p role="alert" className="text-xs text-[#EF4444]">An answer could not be saved. Review and edit it before submitting.</p>
+      )}
+      {conflicts.map(([qid]) => (
+        <div key={qid} role="alert" className="rounded-lg border border-[#F59E0B]/40 bg-[#F59E0B]/5 p-3 text-sm">
+          <p>Question {detail.questions.findIndex((q) => q.attemptQuestionId === Number(qid)) + 1} was changed in another tab. Your answer has not been saved.</p>
+          <div className="mt-2 flex gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={() => useAnswerStore.getState().useServerAnswer(Number(qid))}>
+              Use saved answer
+            </Button>
+            <Button type="button" size="sm" onClick={() => useAnswerStore.getState().keepLocalAnswer(Number(qid))}>
+              Keep my answer
+            </Button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 
@@ -291,11 +287,11 @@ function InProgressShell({
         detail={detail}
         studentName={studentName}
         autosaveStatus={displayAutosaveStatus}
-        submitSlot={autoSubmitted ? (
+        submitSlot={finalizing ? (
           <div className={cn(cardVariants({ variant: "elevated" }), "p-6 text-center")}>
             <p className="font-display text-lg font-bold text-[#EF4444]">Time&apos;s up!</p>
             <p className="mt-1 text-sm font-medium text-[#64748B]">
-              {submitMut.isPending ? "Auto-submitting your answers…" : "Submitting…"}
+              The server is finalizing your saved answers. Waiting for your result…
             </p>
           </div>
         ) : submitSlot}

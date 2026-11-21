@@ -18,6 +18,8 @@ export interface AnswerEntry {
   /** From the server's savedAnswer.sequenceNumber (0 if new). FE11 increments on save. */
   sequence: number;
   dirty: boolean;
+  /** A different answer was saved elsewhere; the learner must choose which version to use. */
+  conflict?: { serverPayload: AnswerPayload; serverSequence: number };
 }
 
 interface AnswerStoreState {
@@ -41,6 +43,9 @@ interface AnswerStoreState {
   reset: () => void;
   /** Sync sequence from a save response; clear dirty ONLY if payload hasn't changed since send (edit-during-flight). */
   markSaved: (qid: number, currentSequenceNumber: number, sentPayload: AnswerPayload) => void;
+  markConflict: (qid: number, serverSequence: number, serverPayload: AnswerPayload) => void;
+  useServerAnswer: (qid: number) => void;
+  keepLocalAnswer: (qid: number) => void;
 }
 
 export const useAnswerStore = create<AnswerStoreState>((set) => ({
@@ -48,17 +53,26 @@ export const useAnswerStore = create<AnswerStoreState>((set) => ({
   hydrateGeneration: 0,
   flagged: {},
   hydrate: (questions) => {
-    const next: Record<number, AnswerEntry> = {};
-    for (const q of questions) {
-      next[q.attemptQuestionId] = {
-        payload: (q.savedAnswer?.answerPayload as AnswerPayload) ?? null,
-        sequence: q.savedAnswer?.sequenceNumber ?? 0,
-        dirty: false,
-      };
-    }
     set((state) => ({
-      answers: next,
-      flagged: {},
+      answers: Object.fromEntries(questions.map((q) => {
+        const id = q.attemptQuestionId;
+        const current = state.answers[id];
+        const serverSequence = q.savedAnswer?.sequenceNumber ?? 0;
+        // A refetch can race an edit or an in-flight save. Preserve local work;
+        // never replace a newer accepted response with an older GET snapshot.
+        if (current && (current.dirty || current.sequence > serverSequence)) {
+          return [id, current];
+        }
+        return [id, {
+          payload: (q.savedAnswer?.answerPayload as AnswerPayload) ?? null,
+          sequence: serverSequence,
+          dirty: false,
+        } satisfies AnswerEntry];
+      })),
+      flagged: Object.fromEntries(
+        questions.filter((q) => state.flagged[q.attemptQuestionId])
+          .map((q) => [q.attemptQuestionId, true as const])
+      ),
       hydrateGeneration: state.hydrateGeneration + 1,
     }));
   },
@@ -79,6 +93,7 @@ export const useAnswerStore = create<AnswerStoreState>((set) => ({
           payload,
           sequence: state.answers[id]?.sequence ?? 0,
           dirty: true,
+          conflict: state.answers[id]?.conflict,
         },
       },
     })),
@@ -91,16 +106,18 @@ export const useAnswerStore = create<AnswerStoreState>((set) => ({
           payload: null,
           sequence: state.answers[id]?.sequence ?? 0,
           dirty: true,
+          conflict: state.answers[id]?.conflict,
         },
       },
     })),
 
-  reset: () => set({ answers: {} }),
+  reset: () => set({ answers: {}, flagged: {} }),
 
   markSaved: (qid, currentSequenceNumber, sentPayload) =>
     set((state) => {
       const entry = state.answers[qid];
       if (!entry) return state;
+      if (entry.sequence > currentSequenceNumber) return state;
       return {
         answers: {
           ...state.answers,
@@ -108,9 +125,40 @@ export const useAnswerStore = create<AnswerStoreState>((set) => ({
             ...entry,
             sequence: currentSequenceNumber,
             dirty: !payloadEqual(entry.payload, sentPayload),
+            conflict: undefined,
           },
         },
       };
+    }),
+  markConflict: (qid, serverSequence, serverPayload) =>
+    set((state) => {
+      const entry = state.answers[qid];
+      if (!entry) return state;
+      return { answers: {
+        ...state.answers,
+        [qid]: { ...entry, sequence: Math.max(entry.sequence, serverSequence),
+          dirty: true, conflict: { serverPayload, serverSequence } },
+      } };
+    }),
+  useServerAnswer: (qid) =>
+    set((state) => {
+      const entry = state.answers[qid];
+      if (!entry?.conflict) return state;
+      return { answers: { ...state.answers, [qid]: {
+        payload: entry.conflict.serverPayload,
+        sequence: entry.conflict.serverSequence,
+        dirty: false,
+      } } };
+    }),
+  keepLocalAnswer: (qid) =>
+    set((state) => {
+      const entry = state.answers[qid];
+      if (!entry?.conflict) return state;
+      return { answers: { ...state.answers, [qid]: {
+        payload: entry.payload,
+        sequence: entry.conflict.serverSequence,
+        dirty: true,
+      } } };
     }),
 }));
 

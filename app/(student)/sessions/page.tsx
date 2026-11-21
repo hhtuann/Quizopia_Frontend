@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAvailableSessionsQuery } from "@/hooks/queries/use-student-attempts";
 import { useStartAttemptMutation } from "@/hooks/queries/use-student-attempt";
 import { Badge, Button, buttonVariants, cardVariants } from "@/components/ui";
@@ -120,7 +121,6 @@ export default function StudentSessionsPage() {
 }
 
 function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWindowOpen?: () => void }) {
-  const flag = sessionFlag(item);
   const router = useRouter();
   const startMut = useStartAttemptMutation();
   const [startError, setStartError] = useState<string | null>(null);
@@ -135,6 +135,14 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
 
   const startsFuture = new Date(item.startsAt).getTime() > now;
   const windowEnded = new Date(item.endsAt).getTime() <= now;
+  // A monitored new attempt needs a camera lease. The listing cannot start
+  // it directly, but the session landing page performs the required preflight.
+  const needsPreflight = !item.canStartNow && !item.canResume &&
+    item.activeAttemptId === null && item.remainingAttempts > 0 &&
+    !startsFuture && !windowEnded;
+  const flag = needsPreflight
+    ? { label: "Camera check required", tone: "accent" as const }
+    : sessionFlag(item);
   // Label for the no-action fallback button (cards with no Start/Resume/Countdown/
   // Ended button) — keeps the action row visually consistent instead of a gap.
   const fallbackLabel = item.activeAttemptId !== null
@@ -227,6 +235,10 @@ function SessionCard({ item, onWindowOpen }: { item: AvailableSessionItem; onWin
               <AttemptTimeRemaining deadlineAt={item.activeAttemptDeadlineAt} onZero={onWindowOpen} />
             )}
           </>
+        ) : needsPreflight ? (
+          <Link href={`/sessions/${item.sessionId}`} className={buttonVariants({ variant: "outline" })}>
+            Check camera and start
+          </Link>
         ) : startsFuture ? (
           <CountdownButton startsAt={item.startsAt} onZero={onWindowOpen} />
         ) : windowEnded ? (
