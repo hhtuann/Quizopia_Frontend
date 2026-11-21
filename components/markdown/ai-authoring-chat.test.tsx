@@ -264,6 +264,10 @@ describe("AiAuthoringChat", () => {
 
     resolveFirst({ markdown: CANDIDATE, reply: "Done", valid: true, diagnostics: [] });
     await waitFor(() => expect(screen.getByText("Done")).not.toBeNull());
+    // The pending change set blocks the next send until explicitly kept
+    // (gate review round 3, P1-1).
+    fireEvent.click(screen.getByRole("button", { name: "Keep all" }));
+    await waitFor(() => expect(screen.getByText(/accepted and sealed/i)).not.toBeNull());
 
     authorMock.mockResolvedValue({
       markdown: CANDIDATE,

@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { computeLineDiff } from "@/lib/quiz-markdown/diff";
+import {
+  assessQuestionPreservation,
+  type QuestionPreservation,
+} from "@/lib/quiz-markdown/question-preservation";
 import type { AiAuthorDiagnostic } from "@/lib/api/ai-authoring";
 import type { AiMergeStatus } from "@/components/markdown/ai-merge-changes-card";
 
@@ -21,11 +25,10 @@ import type { AiMergeStatus } from "@/components/markdown/ai-merge-changes-card"
  * - `undoAll` restores the pre-apply snapshot. If the teacher edited after
  *   the pending apply, the caller must confirm first (the card surfaces the
  *   confirmation; `force` performs the destructive restore).
- * - A new request while a change set is still pending is allowed (the
- *   teacher drives); the previous pending set is superseded: its pending
- *   apply stays in the editor (it becomes the baseline the new request is
- *   issued against) and its card flips to "kept" semantics via
- *   `supersedePending`.
+ * - A new request is BLOCKED while a change set is pending or conflicted:
+ *   the teacher must Keep all or Undo all first (gate review round 3,
+ *   P1-1). Change sets therefore never transition to "kept" except through
+ *   the explicit Keep all action.
  */
 
 export interface AiChangeSet {
@@ -38,6 +41,8 @@ export interface AiChangeSet {
   readonly markdown: string;
   readonly valid: boolean;
   readonly diagnostics: readonly AiAuthorDiagnostic[];
+  /** Deterministic before/after question-preservation assessment. */
+  readonly preservation: QuestionPreservation;
   readonly status: AiMergeStatus;
   /** Editor content the parent last wrote for this change set (apply point). */
   readonly appliedMarkdown: string | null;
@@ -63,7 +68,10 @@ export function useAiMergeState({
   const activeChangeSet = useMemo(
     () =>
       changeSets.find(
-        (cs) => cs.status === "pending" || cs.status === "conflict",
+        (cs) =>
+          cs.status === "pending" ||
+          cs.status === "conflict" ||
+          cs.status === "destructive",
       ) ?? null,
     [changeSets],
   );
@@ -72,8 +80,14 @@ export function useAiMergeState({
   const hasPendingChanges = activeChangeSet !== null;
 
   /**
-   * Register an assistant result. Auto-applies ONLY when valid AND the
-   * editor still matches the request source; otherwise conflict/invalid.
+   * Register an assistant result. Auto-applies ONLY when ALL hold:
+   * - the candidate is valid,
+   * - the editor still matches the request source (no in-flight edits), and
+   * - every existing question survives the change (UX-06 / gate review
+   *   round 3 P1-2: syntactic validity alone is NOT proof the model kept
+   *   the teacher's questions).
+   * Otherwise the set is invalid / conflict / destructive — never applied
+   * until an explicit Keep all.
    */
   const registerResult = useCallback(
     (result: {
@@ -84,7 +98,12 @@ export function useAiMergeState({
     }): AiChangeSet => {
       const id = `cs-${nextChangeSetId += 1}`;
       const editorUnchanged = valueRef.current === result.sourceAtRequest;
-      const canAutoApply = result.valid && editorUnchanged;
+      const preservation = assessQuestionPreservation(
+        result.sourceAtRequest,
+        result.markdown,
+      );
+      const canAutoApply =
+        result.valid && editorUnchanged && preservation.preserved;
 
       const changeSet: AiChangeSet = {
         id,
@@ -93,7 +112,14 @@ export function useAiMergeState({
         markdown: result.markdown,
         valid: result.valid,
         diagnostics: result.diagnostics,
-        status: !result.valid ? "invalid" : canAutoApply ? "pending" : "conflict",
+        preservation,
+        status: !result.valid
+          ? "invalid"
+          : !editorUnchanged
+            ? "conflict"
+            : canAutoApply
+              ? "pending"
+              : "destructive",
         appliedMarkdown: canAutoApply ? result.markdown : null,
       };
 
@@ -107,16 +133,22 @@ export function useAiMergeState({
     [onChange],
   );
 
-  /** Seal a pending/conflicted change set into the editor. */
+  /** Seal a pending/conflicted/destructive change set into the editor. */
   const keepAll = useCallback(
     (changeSetId: string) => {
       setChangeSets((prev) =>
         prev.map((cs) => {
-          if (cs.id !== changeSetId || (cs.status !== "pending" && cs.status !== "conflict")) {
+          if (
+            cs.id !== changeSetId ||
+            (cs.status !== "pending" &&
+              cs.status !== "conflict" &&
+              cs.status !== "destructive")
+          ) {
             return cs;
           }
-          // Conflict: apply now (explicit user decision), snapshot first.
-          if (cs.status === "conflict") {
+          // Conflict/destructive: apply now (explicit user decision),
+          // snapshot first.
+          if (cs.status === "conflict" || cs.status === "destructive") {
             const snapshot = valueRef.current;
             onChange(cs.markdown);
             return {
@@ -143,7 +175,9 @@ export function useAiMergeState({
         const target = prev.find((cs) => cs.id === changeSetId);
         if (
           target === undefined ||
-          (target.status !== "pending" && target.status !== "conflict")
+          (target.status !== "pending" &&
+            target.status !== "conflict" &&
+            target.status !== "destructive")
         ) {
           return prev;
         }
@@ -208,16 +242,7 @@ export function useAiMergeState({
     [changeSets],
   );
 
-  /** Flip a still-pending set to kept when a new request supersedes it. */
-  const supersedePending = useCallback(() => {
-    setChangeSets((prev) =>
-      prev.map((cs) =>
-        cs.status === "pending" || cs.status === "conflict"
-          ? { ...cs, status: "kept" as const }
-          : cs,
-      ),
-    );
-  }, []);
+
 
   /** Drop all change sets (explicit reset). */
   const resetAll = useCallback(() => {
@@ -233,7 +258,6 @@ export function useAiMergeState({
     undoAll,
     hasManualEditsAfterApply,
     countsFor,
-    supersedePending,
     resetAll,
   };
 }

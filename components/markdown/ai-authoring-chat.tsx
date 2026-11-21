@@ -223,7 +223,13 @@ export function AiAuthoringChat({
       inputsDisabled ||
       pending ||
       sendLock ||
-      overBudget
+      overBudget ||
+      // P1-1 (gate review round 3): an unconfirmed change set must be
+      // resolved with an explicit Keep all / Undo all BEFORE the next
+      // request. Sending used to silently flip pending/conflict sets to
+      // "kept" — a failed follow-up then left unintended changes accepted
+      // and importable. The composer stays blocked until the decision.
+      merge.hasPendingChanges
     ) {
       return;
     }
@@ -247,9 +253,6 @@ export function AiAuthoringChat({
         { kind: "user", id: `e-${nextEntryId += 1}`, text: trimmed },
       ]);
       setInstruction("");
-      // A new request supersedes any still-pending change set: its applied
-      // text is the baseline this request is issued against.
-      merge.supersedePending();
       issueRequest(
         {
           instruction: trimmed,
@@ -270,7 +273,7 @@ export function AiAuthoringChat({
     inputsDisabled,
     instruction,
     issueRequest,
-    merge,
+    merge.hasPendingChanges,
     overBudget,
     pending,
     selectedSources,
@@ -478,6 +481,7 @@ export function AiAuthoringChat({
                         diagnostics={changeSet.diagnostics}
                         invalid={!changeSet.valid}
                         manualEditsAfterApply={merge.hasManualEditsAfterApply(changeSet.id)}
+                        preservation={changeSet.preservation}
                         onKeepAll={merge.keepAll}
                         onReview={setReviewChangeSetId}
                         onUndoAll={(id) => merge.undoAll(id, true)}
@@ -490,14 +494,14 @@ export function AiAuthoringChat({
               // Inline error row tied to the failed turn.
               return (
                 <div
-                  className="flex max-w-[95%] flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-[#EF4444]/25 bg-[#EF4444]/5 px-3 py-2 text-xs font-medium text-[#EF4444]"
+                  className="flex max-w-[95%] flex-wrap items-baseline gap-x-2 gap-y-0.5 px-1 text-xs leading-relaxed text-[#EF4444]"
                   key={entry.id}
                   role="alert"
                 >
                   <span>{entry.message}</span>
                   {entry.retryable === "retry" && entry.request !== null && (
                     <button
-                      className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold underline decoration-dotted underline-offset-2 transition-colors hover:bg-[#EF4444]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF4444]"
+                      className="rounded-sm px-0.5 text-[11px] font-semibold underline decoration-dotted underline-offset-2 transition-colors hover:text-[#B91C1C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF4444]"
                       onClick={() => handleRetry(entry.request!)}
                       type="button"
                     >
@@ -506,7 +510,7 @@ export function AiAuthoringChat({
                   )}
                   {entry.retryable === "login" && (
                     <a
-                      className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold underline decoration-dotted underline-offset-2 hover:bg-[#EF4444]/10"
+                      className="rounded-sm px-0.5 text-[11px] font-semibold underline decoration-dotted underline-offset-2 hover:text-[#B91C1C]"
                       href="/login"
                     >
                       Sign in
@@ -539,13 +543,23 @@ export function AiAuthoringChat({
             </p>
           )}
 
+          {merge.hasPendingChanges && !pending && (
+            <p
+              className="px-1 text-[11px] font-medium leading-relaxed text-[#92400E]"
+              role="status"
+            >
+              Review the proposed changes first — Keep all or Undo all to continue
+              (sending is paused until you decide).
+            </p>
+          )}
+
           <AiPromptComposer
             disabled={inputsDisabled}
             onChange={setInstruction}
             onSend={handleSend}
             onSourcesClick={() => setSourcesOpen(true)}
             onUploadClick={() => fileInputRef.current?.click()}
-            pending={pending || overBudget}
+            pending={pending || overBudget || merge.hasPendingChanges}
             sourcesCount={sourceItems.length}
             uploadDisabled={inputsDisabled}
             value={instruction}

@@ -1,11 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import type { QuestionPreservation } from "@/lib/quiz-markdown/question-preservation";
 import { cn } from "@/lib/utils/cn";
 import type { AiAuthorDiagnostic } from "@/lib/api/ai-authoring";
 
 /** Lifecycle of one AI change set inside the conversation. */
-export type AiMergeStatus = "pending" | "kept" | "undone" | "conflict" | "invalid";
+export type AiMergeStatus =
+  | "pending"
+  | "kept"
+  | "undone"
+  | "conflict"
+  | "invalid"
+  | "destructive";
 
 /**
  * Prism-style compact Merge Changes card (Quizopia_System #121, UX-04).
@@ -30,6 +37,7 @@ export function AiMergeChangesCard({
   onKeepAll,
   onReview,
   onUndoAll,
+  preservation,
   status,
 }: {
   readonly changeSetId: string;
@@ -40,6 +48,8 @@ export function AiMergeChangesCard({
   readonly onKeepAll: (changeSetId: string) => void;
   readonly onReview: (changeSetId: string) => void;
   readonly onUndoAll: (changeSetId: string) => void;
+  /** Question-preservation assessment (UX-06); drives the destructive state. */
+  readonly preservation: QuestionPreservation;
   readonly status: AiMergeStatus;
   /** Manual edits happened after the pending apply — Undo needs confirmation. */
   readonly manualEditsAfterApply: boolean;
@@ -62,6 +72,7 @@ export function AiMergeChangesCard({
         status === "kept" && "border-[#10B981]/30 bg-[#10B981]/5",
         status === "undone" && "border-[#E2E8F0] bg-[#F8FAFC] opacity-75",
         status === "invalid" && "border-[#EF4444]/30 bg-[#EF4444]/5",
+        status === "destructive" && "border-[#EF4444]/30 bg-[#EF4444]/5",
         (status === "pending" || status === "conflict") && "border-[#E2E8F0] bg-white",
       )}
       data-change-set={changeSetId}
@@ -88,6 +99,7 @@ export function AiMergeChangesCard({
             status === "undone" && "bg-[#F1F5F9] text-[#64748B]",
             status === "conflict" && "bg-[#F59E0B]/15 text-[#92400E]",
             status === "invalid" && "bg-[#EF4444]/10 text-[#B91C1C]",
+            status === "destructive" && "bg-[#EF4444]/10 text-[#B91C1C]",
           )}
         >
           {status === "pending" && "Pending review"}
@@ -95,8 +107,24 @@ export function AiMergeChangesCard({
           {status === "undone" && "Undone"}
           {status === "conflict" && "Editor changed — review required"}
           {status === "invalid" && "Invalid"}
+          {status === "destructive" && "Existing questions not preserved — review required"}
         </span>
       </div>
+
+      {status === "destructive" && (
+        <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-[#B91C1C]">
+          The candidate {" "}
+          {preservation.lostCount > 0
+            ? `changes or removes ${preservation.lostCount} existing question${
+                preservation.lostCount === 1 ? "" : "s"
+              } (Q${preservation.lostQuestionNumbers.slice(0, 5).join(", Q")}${
+                preservation.lostQuestionNumbers.length > 5 ? "…" : ""
+              })`
+            : "does not preserve the existing questions"}
+          . Nothing was applied — review the diff and Keep all only if this
+          is intentional.
+        </p>
+      )}
 
       {status === "pending" && (
         <p className="mt-1.5 text-[11px] leading-relaxed text-[#64748B]">
@@ -164,17 +192,23 @@ export function AiMergeChangesCard({
         </div>
       ) : (
         <div className="mt-2.5 flex flex-wrap gap-2">
-          {(status === "pending" || status === "conflict" || status === "invalid") && (
+          {(status === "pending" ||
+            status === "conflict" ||
+            status === "invalid" ||
+            status === "destructive") && (
             <MergeButton onClick={() => onReview(changeSetId)} variant="outline">
               Review
             </MergeButton>
           )}
-          {(status === "pending" || status === "conflict") && (
+          {(status === "pending" || status === "conflict" || status === "destructive") && (
             <MergeButton onClick={handleUndoClick} variant="outline">
               Undo all
             </MergeButton>
           )}
-          {(status === "pending" || status === "conflict" || status === "invalid") && (
+          {(status === "pending" ||
+            status === "conflict" ||
+            status === "invalid" ||
+            status === "destructive") && (
             <MergeButton
               disabled={invalid}
               onClick={() => onKeepAll(changeSetId)}
