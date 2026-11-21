@@ -190,3 +190,30 @@ D. w
     expect(result.preserved).toBe(false);
   });
 });
+
+describe("assessQuestionPreservation — round 5: parser-visibility gaps", () => {
+  it("a leading free-text note before the first question is protected", () => {
+    const withLeadingNote = "lesson notes: cover TCP handshake\n" + Q1;
+    const result = assessQuestionPreservation(withLeadingNote, Q1);
+    expect(result.preserved).toBe(false);
+  });
+
+  it("an incomplete question header AFTER a complete question is protected", () => {
+    const withIncomplete = Q1 + "Question 2 [SINGLE_CHOICE]";
+    const result = assessQuestionPreservation(withIncomplete, Q1);
+    expect(result.preserved).toBe(false);
+  });
+
+  it("a leading note document still allows explicit replacement semantics (not preserved, but assessable)", () => {
+    const withLeadingNote = "notes\n" + Q1 + Q2;
+    const result = assessQuestionPreservation(withLeadingNote, Q1 + Q2 + Q3);
+    // The note cannot be verified — fail closed even though questions match.
+    expect(result.preserved).toBe(false);
+  });
+
+  it("a blank line before the first question does NOT block preservation", () => {
+    const withBlank = "\n\n" + Q1 + Q2;
+    const result = assessQuestionPreservation(withBlank, Q1 + Q2 + Q3);
+    expect(result.preserved).toBe(true);
+  });
+});

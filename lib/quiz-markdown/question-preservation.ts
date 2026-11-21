@@ -73,30 +73,65 @@ function sameQuestion(a: QuestionSignature, b: QuestionSignature): boolean {
 }
 
 /**
+ * True when the source contains non-whitespace text on lines no parsed
+ * question covers. Coverage model (mirrors the parser): question i covers
+ * its header line through the line before question i+1's header — trailing
+ * free text folds into the previous question — so uncovered content is
+ * text BEFORE the first question header. (Malformed mid-document headers
+ * are detected separately via parser diagnostics.)
+ */
+function hasUncoveredContent(
+  source: string,
+  questions: readonly { readonly source: { readonly line: number } }[],
+): boolean {
+  if (questions.length === 0) {
+    // No questions at all: any non-whitespace text is uncovered (the
+    // caller already checked hasDraftText).
+    return source.trim().length > 0;
+  }
+  const lines = source.split(/\r\n|\r|\n/);
+  const firstHeaderLine = questions[0].source.line;
+  for (let i = 0; i < firstHeaderLine - 1 && i < lines.length; i += 1) {
+    if (lines[i].trim().length > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Deterministic before/after preservation check. Renumbering-safe: questions
  * are matched by content signature, not by number. Appended questions count
  * as additions and never block preservation.
  *
- * FAIL-CLOSED for unparseable drafts (gate review round 4): when the
- * before-source contains non-whitespace text but the parser finds NO
- * questions (incomplete header, plain notes), preservation cannot be
- * PROVEN — the assessment reports not-preserved so the change set demands
- * explicit Review/Keep instead of auto-applying over the teacher's draft.
- * Empty/whitespace-only editors remain fully auto-applicable.
+ * FAIL-CLOSED for content the parser cannot represent (gate review rounds
+ * 4/5): preservation can only be PROVEN for text the parser folded into
+ * parsed questions. When the before-source has non-whitespace content that
+ * no parsed question covers — a draft with zero complete questions
+ * (incomplete header, plain notes), a free-text note BEFORE the first
+ * question, or a malformed question header mid-document — the assessment
+ * reports not-preserved so the change set demands explicit Review/Keep
+ * instead of auto-applying over the teacher's text. Empty/whitespace-only
+ * editors remain fully auto-applicable.
  */
 export function assessQuestionPreservation(
   beforeSource: string,
   afterSource: string,
 ): QuestionPreservation {
-  const before = analyzeQuizMarkdown(beforeSource).questions;
+  const beforeAnalysis = analyzeQuizMarkdown(beforeSource);
+  const before = beforeAnalysis.questions;
   const after = analyzeQuizMarkdown(afterSource).questions;
   const beforeSignatures = before.map(signatureOf);
   const afterSignatures = after.map(signatureOf);
 
-  // Unparseable-draft guard: non-whitespace content with zero parsed
-  // questions cannot be verified question-by-question.
+  // Unparsed-content guard: non-whitespace before-text that no parsed
+  // question covers (before the first header), or a header-like line the
+  // parser rejected (MALFORMED_QUESTION_HEADER), cannot be verified.
   const hasDraftText = beforeSource.trim().length > 0;
-  if (beforeSignatures.length === 0 && hasDraftText) {
+  const hasMalformedHeader = beforeAnalysis.diagnostics.some(
+    (diagnostic) => diagnostic.code === "MALFORMED_QUESTION_HEADER",
+  );
+  if (hasDraftText && (hasMalformedHeader || hasUncoveredContent(beforeSource, before))) {
     return {
       preserved: false,
       lostCount: 0,
