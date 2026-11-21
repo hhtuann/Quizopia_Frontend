@@ -44,7 +44,7 @@ const ADVANCED_OPTIONS: {
   {
     id: "evidenceClipsEnabled",
     label: "Evidence clips",
-    hint: "Ghi clip quanh cảnh báo (đệm luân chuyển khi không ghi hình đầy đủ)",
+    hint: "Record clips around alerts (using a rolling buffer when full recording is disabled)",
   },
 ];
 
