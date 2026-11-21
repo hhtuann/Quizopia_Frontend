@@ -177,16 +177,28 @@ export function useAiMergeState({
     [changeSets, value],
   );
 
-  /** Diff counts for a change set (before = snapshot, after = candidate). */
+  /**
+   * Diff counts for a change set (before = snapshot, after = candidate).
+   * Memoized per change set: the inputs are immutable once the set is
+   * registered, and cards re-render on every chat update — recomputing a
+   * full-document diff per render made typing janky on large rewrites
+   * (review P3).
+   */
+  const countsCacheRef = useRef(new Map<string, { added: number; deleted: number }>());
   const countsFor = useCallback(
     (changeSetId: string): { added: number; deleted: number } => {
+      const cached = countsCacheRef.current.get(changeSetId);
+      if (cached !== undefined) {
+        return cached;
+      }
       const cs = changeSets.find((c) => c.id === changeSetId);
       if (cs === undefined) {
         return { added: 0, deleted: 0 };
       }
-      const before =
-        cs.preApplySnapshot ?? cs.sourceAtRequest;
-      return computeLineDiff(before, cs.markdown).counts;
+      const before = cs.preApplySnapshot ?? cs.sourceAtRequest;
+      const counts = computeLineDiff(before, cs.markdown).counts;
+      countsCacheRef.current.set(changeSetId, counts);
+      return counts;
     },
     [changeSets],
   );
