@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuestionBanksQuery } from "@/hooks/queries/use-question-banks";
-import { Input, buttonVariants, cardVariants } from "@/components/ui";
+import { CreateQuestionBankForm } from "@/components/teacher/CreateQuestionBankForm";
+import { Button, Input, ModalShell, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { QuestionBankListItem } from "@/lib/api/question-banks";
 import type { NormalizedApiError } from "@/lib/api";
@@ -28,6 +29,8 @@ export default function QuestionBanksPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   // Debounce search 300ms; reset to first page when the query changes.
   useEffect(() => {
@@ -65,10 +68,7 @@ export default function QuestionBanksPage() {
             Browse and manage your question collections.
           </p>
         </div>
-        <Link
-          href="/question-banks/new"
-          className={cn(buttonVariants({ variant: "primary" }), "gap-1.5")}
-        >
+        <Button type="button" onClick={() => setCreateOpen(true)} className="gap-1.5">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
@@ -81,8 +81,18 @@ export default function QuestionBanksPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
           Create bank
-        </Link>
+        </Button>
       </div>
+
+      {notice && (
+        <div
+          role="status"
+          className="mb-6 flex items-start gap-2 rounded-lg border border-[#10B981]/30 bg-[#10B981]/5 p-4 text-sm font-medium text-[#10B981]"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+          <span>{notice}</span>
+        </div>
+      )}
 
       <div className="mb-6">
         <label htmlFor="bank-search" className="sr-only">
@@ -119,6 +129,17 @@ export default function QuestionBanksPage() {
         )}
       </div>
 
+      {createOpen && (
+        <ModalShell title="Create question bank" onClose={() => setCreateOpen(false)}>
+          <CreateQuestionBankForm
+            onCreated={(bank) => {
+              setCreateOpen(false);
+              setNotice(`Question bank "${bank.code}" created.`);
+            }}
+            onCancel={() => setCreateOpen(false)}
+          />
+        </ModalShell>
+      )}
     </div>
   );
 }

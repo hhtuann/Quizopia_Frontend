@@ -2,4 +2,5 @@ export { Button, type ButtonProps, buttonVariants } from "./button";
 export { Card, type CardProps, FeaturedCard, cardVariants } from "./card";
 export { Input, type InputProps } from "./input";
 export { Badge, type BadgeProps, badgeVariants } from "./badge";
+export { ModalShell } from "./modal";
 export { SegmentedControl, type SegmentedOption } from "./SegmentedControl";
