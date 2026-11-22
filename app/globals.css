@@ -140,6 +140,13 @@ body {
   --collection-card-max: 36rem;
 }
 
+/* Student Available Sessions cards: the status pill (e.g. "Camera check
+   required") and window range need more room than the base collection card. */
+.adaptive-grid--sessions {
+  --collection-card-min: 22rem;
+  --collection-card-max: 28rem;
+}
+
 @media (min-width: 640px) {
   :root { --page-gutter: 1.5rem; }
 }

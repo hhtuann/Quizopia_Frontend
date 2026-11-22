@@ -20,7 +20,7 @@ describe("fluid shell + bounded card collection design contract", () => {
     ["Dashboard actions", "app/page.tsx", "adaptive-grid"],
     ["Community catalog", "app/community/page.tsx", "adaptive-grid"],
     ["Saved quizzes", "app/(community)/community/bookmarks/page.tsx", "adaptive-grid"],
-    ["Available sessions", "app/(student)/sessions/page.tsx", 'className="adaptive-grid"'],
+    ["Available sessions", "app/(student)/sessions/page.tsx", 'className="adaptive-grid adaptive-grid--sessions"'],
     ["My classes", "app/(student)/my-classes/page.tsx", 'className="adaptive-grid"'],
     ["Class sessions", "app/(student)/my-classes/[id]/page.tsx", 'className="mt-3 adaptive-grid"'],
     ["My results", "components/student/MyResultsSection.tsx", 'className="mt-3 adaptive-grid"'],
