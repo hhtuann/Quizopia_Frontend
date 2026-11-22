@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useExamsQuery } from "@/hooks/queries/use-exams";
 import { useSubjectsQuery } from "@/hooks/queries/use-subjects";
-import { Badge, Input, buttonVariants, cardVariants } from "@/components/ui";
+import { CreateExamForm } from "@/components/teacher/CreateExamForm";
+import { Badge, Button, Input, ModalShell, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { ExamListItem, ExamStatus } from "@/lib/api/exams";
 import type { NormalizedApiError } from "@/lib/api";
@@ -35,6 +36,8 @@ export default function ExamsPage() {
   const [subjectId, setSubjectId] = useState<number | "">("");
   const [status, setStatus] = useState<ExamStatus | "">("");
   const [page, setPage] = useState(0);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const { data: subjectsData } = useSubjectsQuery();
   const subjects = subjectsData?.items ?? [];
@@ -75,10 +78,7 @@ export default function ExamsPage() {
             Browse and manage your exams.
           </p>
         </div>
-        <Link
-          href="/exams/new"
-          className={cn(buttonVariants({ variant: "primary" }), "gap-1.5")}
-        >
+        <Button type="button" onClick={() => setCreateOpen(true)} className="gap-1.5">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
@@ -91,8 +91,18 @@ export default function ExamsPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
           Create exam
-        </Link>
+        </Button>
       </div>
+
+      {notice && (
+        <div
+          role="status"
+          className="mb-6 flex items-start gap-2 rounded-lg border border-[#10B981]/30 bg-[#10B981]/5 p-4 text-sm font-medium text-[#10B981]"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+          <span>{notice}</span>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
@@ -173,6 +183,18 @@ export default function ExamsPage() {
           />
         )}
       </div>
+
+      {createOpen && (
+        <ModalShell title="Create exam" onClose={() => setCreateOpen(false)}>
+          <CreateExamForm
+            onCreated={(exam) => {
+              setCreateOpen(false);
+              setNotice(`Exam "${exam.code}" created.`);
+            }}
+            onCancel={() => setCreateOpen(false)}
+          />
+        </ModalShell>
+      )}
     </div>
   );
 }
