@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AttemptTimeline } from "./AttemptTimeline";
 import { useAttemptTimelineQuery } from "@/hooks/queries/use-monitoring";
@@ -7,8 +7,8 @@ import type { AttemptTimelineResponse } from "@/lib/api/monitoring";
 
 /**
  * Component test with the query hook mocked — no QueryClient provider needed.
- * Covers: row rendering (label + source badge + summary), the source filter
- * driving query params, and the Load-more button via nextCursor.
+ * Covers: row rendering (label + source badge + summary), the type-group
+ * filter driving query params, and the Load-more button via nextCursor.
  */
 
 const fetchNextPage = vi.fn();
@@ -126,32 +126,20 @@ describe("AttemptTimeline", () => {
     expect(fetchNextPage).toHaveBeenCalledTimes(1);
   });
 
-  it("drives the query with source + type-group filters", () => {
+  it("drives the query with the type-group filter (source stays ALL)", () => {
     mockQuery({ pages: [page([], null)] });
 
     render(<AttemptTimeline attemptId={12} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Client" }));
-    expect(timelineQuery).toHaveBeenLastCalledWith(12, {
-      source: "CLIENT",
-      group: "ALL",
-      reviewsOnly: false,
-      from: "",
-      to: "",
-    });
-
     const groupSelect = screen.getByLabelText("Event type");
     fireEvent.change(groupSelect, { target: { value: "ANSWERS" } });
     expect(timelineQuery).toHaveBeenLastCalledWith(12, {
-      source: "CLIENT",
+      source: "ALL",
       group: "ANSWERS",
       reviewsOnly: false,
       from: "",
       to: "",
     });
-
-    // Filter controls exist inside the labelled group.
-    expect(within(screen.getByRole("group", { name: "Filter by source" })).getAllByRole("button").length).toBe(3);
   });
 
   it("renders the empty hint when the first page has no items", () => {

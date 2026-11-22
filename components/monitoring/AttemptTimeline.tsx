@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Badge, cardVariants } from "@/components/ui";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { cn } from "@/lib/utils/cn";
 import {
   DEFAULT_TIMELINE_FILTERS,
@@ -107,21 +106,8 @@ export function AttemptTimeline({
         </span>
       </div>
 
-      {/* Filters: source toggle + type-group select + time range (F08) */}
+      {/* Filters: type-group select + time range (F08) */}
       <div className="mb-4 flex flex-wrap items-start gap-3">
-        <div>
-          <p className="sr-only">Filter by source</p>
-          <SegmentedControl
-            aria-label="Filter by source"
-            value={filters.source}
-            onChange={(source) => setFilters((f) => ({ ...f, source }))}
-            options={[
-              { label: "All sources", value: "ALL" },
-              { label: "Client", value: "CLIENT" },
-              { label: "Server", value: "SERVER" },
-            ]}
-          />
-        </div>
         <div className="min-w-48 flex-1">
           <label
             htmlFor={`timeline-group-${attemptId}`}
