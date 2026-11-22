@@ -59,6 +59,7 @@ export function AttemptTimeline({
   emptyHint = "No activity recorded yet.",
   className,
   showReviewFilter = false,
+  scrollable = false,
 }: {
   attemptId: number;
   /** attemptQuestionId → display label (e.g. "Q3"); falls back to `Q<id>`. */
@@ -71,6 +72,12 @@ export function AttemptTimeline({
    * Teacher-only — review events never appear on student timelines.
    */
   showReviewFilter?: boolean;
+  /**
+   * Cap the event list height and scroll it independently instead of
+   * stretching the page. Used when the timeline is nested inside another
+   * card (e.g. the teacher Activity panel).
+   */
+  scrollable?: boolean;
 }) {
   const [filters, setFilters] = useState<TimelineFilters>(DEFAULT_TIMELINE_FILTERS);
   const query = useAttemptTimelineQuery(attemptId, filters);
@@ -228,7 +235,13 @@ export function AttemptTimeline({
         </p>
       ) : (
         <>
-          <ul className="space-y-1.5" aria-label="Activity events">
+          <ul
+            className={cn(
+              "space-y-1.5",
+              scrollable && "max-h-[420px] overflow-y-auto pr-1"
+            )}
+            aria-label="Activity events"
+          >
             {items.map((item) => {
               const view = describeTimelineItem(item, questionLabels);
               return (
