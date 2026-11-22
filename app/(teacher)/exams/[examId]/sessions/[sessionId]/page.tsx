@@ -354,7 +354,9 @@ function DetailView({
       )}
 
       {/* P2-D: share the participant link for this session (copy action). */}
-      <SessionShareCard sessionId={data.id} visibility={data.visibility} />
+      <div className="mb-6">
+        <SessionShareCard sessionId={data.id} visibility={data.visibility} />
+      </div>
 
       {/* Read-only facts */}
       <div className={cn(cardVariants(), "mb-6 p-6")}>
