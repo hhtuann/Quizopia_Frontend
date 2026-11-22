@@ -384,13 +384,22 @@ function OverviewTab({
   onDuplicate: () => void;
   onOpenArchive: () => void;
 }) {
+  // The persisted total is 0 until publish. Preview the saved draft with the
+  // same per-question points that the backend sums when publishing.
+  const totalPoints = data.status === "DRAFT"
+    ? data.composition.reduce(
+        (sum, section) =>
+          sum + section.questions.reduce((points, question) => points + Math.round(question.defaultPoints * 100), 0),
+        0
+      ) / 100
+    : data.totalPoints;
   const facts: { label: string; value: string }[] = [
     { label: "Status", value: data.status },
     { label: "Code", value: data.code },
     { label: "Subject", value: data.subject ? `${data.subject.code} — ${data.subject.name}` : "—" },
     { label: "Purpose", value: data.purpose ? data.purpose.title : "—" },
     { label: "Questions", value: String(questionCount) },
-    { label: "Total points", value: String(data.totalPoints) },
+    { label: "Total points (maximum)", value: String(totalPoints) },
     { label: "Duration", value: formatDuration(data.durationMinutes) },
     { label: "Published at", value: formatDate(data.publishedAt) },
     { label: "Created", value: formatDate(data.createdAt) },
@@ -412,7 +421,7 @@ function OverviewTab({
         title="Overview"
         subtitle={
           `${statusLabel} · ${questionCount} ${questionCount === 1 ? "question" : "questions"} · ` +
-          `${data.totalPoints} total point${data.totalPoints === 1 ? "" : "s"} · ${immutabilityNote}`
+          `${totalPoints} total point${totalPoints === 1 ? "" : "s"} · ${immutabilityNote}`
         }
         actions={
           <>
