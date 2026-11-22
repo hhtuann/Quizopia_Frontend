@@ -10,7 +10,7 @@ import {
 } from "@/hooks/queries/use-exams";
 import { useExamSessionsQuery } from "@/hooks/queries/use-exam-sessions";
 import type { ExamSessionListItem, ExamSessionStatus } from "@/lib/api/exam-sessions";
-import { Badge, Button, buttonVariants, cardVariants } from "@/components/ui";
+import { Badge, Button, ModalShell, cardVariants } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import type { PublishedExamSummary, TeacherExamEditorResponse } from "@/lib/api/exams";
 import type { NormalizedApiError } from "@/lib/api";
@@ -18,6 +18,7 @@ import { DraftEditor } from "./DraftEditor";
 import { PublishToCommunityDialog } from "@/components/community/PublishToCommunityDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ExamDetailSectionHeader } from "./ExamDetailSectionHeader";
+import { CreateSessionForm } from "@/components/teacher/CreateSessionForm";
 
 export type ExamTab = "overview" | "questions" | "sessions";
 
@@ -314,7 +315,7 @@ export function ExamEditor({
       {tab === "questions" && (
         <DraftEditor exam={data} readOnly={data.status !== "DRAFT"} />
       )}
-      {tab === "sessions" && <SessionsTab examId={data.id} published={data.status === "PUBLISHED"} />}
+      {tab === "sessions" && <SessionsTab examId={data.id} published={data.status === "PUBLISHED"} defaultDurationMinutes={data.durationMinutes ?? 60} />}
 
       {/* Publish confirmation — the snapshot is immutable, so confirm is required. */}
       <ConfirmDialog
@@ -566,13 +567,23 @@ function OverviewTab({
   );
 }
 
-function SessionsTab({ examId, published }: { examId: number; published: boolean }) {
+function SessionsTab({
+  examId,
+  published,
+  defaultDurationMinutes,
+}: {
+  examId: number;
+  published: boolean;
+  defaultDurationMinutes: number;
+}) {
   const { data, isPending, isError } = useExamSessionsQuery(examId, {
     size: 50,
     sort: "createdAt,desc",
   });
   const items: ExamSessionListItem[] = data?.items ?? [];
   const total = data?.totalElements ?? (isPending ? "…" : 0);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   return (
     <div className="space-y-4">
@@ -581,10 +592,7 @@ function SessionsTab({ examId, published }: { examId: number; published: boolean
         subtitle={`${total} session${total === 1 ? "" : "s"} · manage scheduling, participants, monitoring and results.`}
         actions={
           published ? (
-            <Link
-              href={`/exams/${examId}/sessions/new`}
-              className={cn(buttonVariants({ variant: "primary" }), "gap-1.5")}
-            >
+            <Button type="button" onClick={() => setCreateOpen(true)} className="gap-1.5">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
@@ -597,7 +605,7 @@ function SessionsTab({ examId, published }: { examId: number; published: boolean
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
               </svg>
               New session
-            </Link>
+            </Button>
           ) : (
             <span className="text-xs font-medium text-[#64748B]">
               Publish the exam to create sessions.
@@ -605,6 +613,16 @@ function SessionsTab({ examId, published }: { examId: number; published: boolean
           )
         }
       />
+
+      {notice && (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-lg border border-[#10B981]/30 bg-[#10B981]/5 p-4 text-sm font-medium text-[#10B981]"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+          <span>{notice}</span>
+        </div>
+      )}
 
       <div className={cn(cardVariants(), "p-4 sm:p-6")}>
         {isPending ? (
@@ -667,6 +685,20 @@ function SessionsTab({ examId, published }: { examId: number; published: boolean
           </div>
         )}
       </div>
+
+      {createOpen && (
+        <ModalShell title="Create session" onClose={() => setCreateOpen(false)}>
+          <CreateSessionForm
+            examId={examId}
+            defaultDurationMinutes={defaultDurationMinutes}
+            onCreated={() => {
+              setCreateOpen(false);
+              setNotice("Session created.");
+            }}
+            onCancel={() => setCreateOpen(false)}
+          />
+        </ModalShell>
+      )}
     </div>
   );
 }
