@@ -61,6 +61,7 @@ export function StudentActivitySection({
         questionLabels={questionLabels}
         title="Your activity timeline"
         emptyHint="No activity was recorded for this attempt."
+        scrollable
       />
 
       <div className={cn(cardVariants(), "mt-6 p-6")}>
